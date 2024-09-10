@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 )
 
 type RotateMode int
@@ -61,10 +62,8 @@ func (k *K3LogConsumer) initLogFile() (*os.File, error) {
 			return nil, err
 		}
 	}
-
 	// 创建文件名
-
-	return os.OpenFile(k.directory, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	return os.OpenFile(k.generateFileName(time.Now().Format(k.dateFormat), 0), os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
 }
 
 func (k *K3LogConsumer) generateFileName(t string, i int) string {
