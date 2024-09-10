@@ -50,6 +50,19 @@ func (k *K3LogConsumer) Close() error {
 }
 
 func (k *K3LogConsumer) init() error {
+	var (
+		fd  *os.File
+		err error
+	)
+	if fd, err = k.initLogFile(); err != nil {
+		K3LogError("init log file error: %s", err.Error())
+		return err
+	}
+
+	k.currentFile = fd
+
+	// 开始用协程来处理数据写入日志文件
+
 	return nil
 }
 
@@ -76,8 +89,10 @@ func (k *K3LogConsumer) generateFileName(t string, i int) string {
 	}
 
 	if k.fileSize > 0 {
+		// logs/prefix.log.2023-01-01.1
 		return fmt.Sprintf("%s/%slog.%s_%d", k.directory, prefix, t, i)
 	} else {
+		// logs/prefix.log.2023-01-01
 		return fmt.Sprintf("%s/%slog.%s", k.directory, prefix, t)
 	}
 }
