@@ -63,6 +63,26 @@ func (k *K3LogConsumer) init() error {
 
 	// 开始用协程来处理数据写入日志文件
 
+	go func() {
+		defer func() {
+			k.wg.Done()
+		}()
+
+		for {
+			select {
+			case res, ok := <-k.ch:
+				if !ok {
+					return
+				}
+
+				jsonStr := parseTime(res)
+				K3LogInfo("write event data :%s", jsonStr)
+				// TODO 写入文件 , 考虑协程退出和异常处理
+				k.rsyncFile(jsonStr)
+			}
+		}
+	}()
+
 	return nil
 }
 
@@ -97,7 +117,7 @@ func (k *K3LogConsumer) generateFileName(t string, i int) string {
 	}
 }
 
-func (k *K3LogConsumer) rsyncFile() {
+func (k *K3LogConsumer) rsyncFile(jsonStr string) {
 
 }
 
