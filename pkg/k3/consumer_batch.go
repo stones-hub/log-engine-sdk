@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log-engine-sdk/pkg/k3/protocol"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -29,10 +30,10 @@ type K3BatchConsumer struct {
 	bufferMutex *sync.RWMutex // buffer锁，用于Data数据在缓存中读取是否安全
 	cacheMutex  *sync.RWMutex // cache锁
 
-	buffer        []Data   // 缓存数据slice
-	batchSize     int      // 批量提交大小
-	cacheBuffer   [][]Data // buffer的数据会先写入 cacheBuffer中
-	cacheCapacity int      // cacheBuffer的最大容量
+	buffer        []protocol.Data   // 缓存数据slice
+	batchSize     int               // 批量提交大小
+	cacheBuffer   [][]protocol.Data // buffer的数据会先写入 cacheBuffer中
+	cacheCapacity int               // cacheBuffer的最大容量
 }
 
 // fetchBufferLength returns the length of buffer
@@ -50,7 +51,7 @@ func (k *K3BatchConsumer) fetchCacheLength() int {
 }
 
 // Add adds data to buffer
-func (k *K3BatchConsumer) Add(data Data) error {
+func (k *K3BatchConsumer) Add(data protocol.Data) error {
 	k.bufferMutex.Lock()
 
 	k.buffer = append(k.buffer, data)
@@ -87,7 +88,7 @@ func (k *K3BatchConsumer) Flush() error {
 	// 当buffer长度大于等于 batchSize，则将buffer中的数据写入cacheBuffer中，并清空buffer
 	if len(k.buffer) >= k.batchSize {
 		k.cacheBuffer = append(k.cacheBuffer, k.buffer)
-		k.buffer = make([]Data, 0, k.batchSize)
+		k.buffer = make([]protocol.Data, 0, k.batchSize)
 	}
 
 	// 当cacheBuffer长度大于等于 cacheCapacity，则将cacheBuffer中的数据写入server，并清空cacheBuffer
@@ -116,7 +117,7 @@ func (k *K3BatchConsumer) FlushAll() error {
 // upload uploads the first cache buffer data to the server
 func (k *K3BatchConsumer) upload() error {
 	var (
-		buffer    []Data
+		buffer    []protocol.Data
 		err       error
 		jsonBytes []byte
 		params    string
@@ -210,7 +211,7 @@ type K3BatchConsumerConfig struct {
 }
 
 // NewBatchConsumer creates a new K3BatchConsumer with default batch size.
-func NewBatchConsumer(serverURL string, appId string) (K3Consumer, error) {
+func NewBatchConsumer(serverURL string, appId string) (protocol.K3Consumer, error) {
 	return initBatchConsumer(K3BatchConsumerConfig{
 		ServerURL: serverURL,
 		AppId:     appId,
@@ -220,7 +221,7 @@ func NewBatchConsumer(serverURL string, appId string) (K3Consumer, error) {
 
 // NewBatchConsumerWithBatchSize creates a new K3BatchConsumer with batch size.
 // batchSize should be between 1 and 1000.
-func NewBatchConsumerWithBatchSize(serverURL string, appId string, batchSize int) (K3Consumer, error) {
+func NewBatchConsumerWithBatchSize(serverURL string, appId string, batchSize int) (protocol.K3Consumer, error) {
 	return initBatchConsumer(K3BatchConsumerConfig{
 		ServerURL: serverURL,
 		AppId:     appId,
@@ -229,7 +230,7 @@ func NewBatchConsumerWithBatchSize(serverURL string, appId string, batchSize int
 	})
 }
 
-func initBatchConsumer(config K3BatchConsumerConfig) (K3Consumer, error) {
+func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error) {
 	var (
 		err             error
 		u               *url.URL
@@ -280,8 +281,8 @@ func initBatchConsumer(config K3BatchConsumerConfig) (K3Consumer, error) {
 		compress:      config.Compress,
 		bufferMutex:   &sync.RWMutex{},
 		cacheMutex:    &sync.RWMutex{},
-		buffer:        make([]Data, 0, batchSize),
-		cacheBuffer:   make([][]Data, cacheCapacity),
+		buffer:        make([]protocol.Data, 0, batchSize),
+		cacheBuffer:   make([][]protocol.Data, cacheCapacity),
 		batchSize:     batchSize,
 		cacheCapacity: cacheCapacity,
 	}
@@ -295,12 +296,10 @@ func initBatchConsumer(config K3BatchConsumerConfig) (K3Consumer, error) {
 	if config.AutoFlush {
 		go func() {
 			t := time.NewTicker(time.Duration(interval) * time.Second)
-
 			defer t.Stop()
-
 			for {
 				<-t.C
-				// TODO flush数据
+				_ = k3BatchConsumer.Flush()
 			}
 		}()
 	}

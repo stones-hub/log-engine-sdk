@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log-engine-sdk/pkg/k3/protocol"
 	"os"
 	"sync"
 	"time"
@@ -22,27 +23,6 @@ const (
 	ROTATE_HOURLY      RotateMode = 1    // 时间格式
 )
 
-type Data struct {
-	IsComplex    bool                   `json:"-"` // properties are nested or not
-	AccountId    string                 `json:"account_id,omitempty"`
-	DistinctId   string                 `json:"distinct_id,omitempty"`
-	Type         string                 `json:"type"`
-	Time         string                 `json:"time"`
-	EventName    string                 `json:"event_name,omitempty"`
-	EventId      string                 `json:"event_id,omitempty"`
-	FirstCheckId string                 `json:"first_check_id,omitempty"`
-	Ip           string                 `json:"ip,omitempty"`
-	UUID         string                 `json:"uuid,omitempty"`
-	AppId        string                 `json:"app_id,omitempty"`
-	Properties   map[string]interface{} `json:"properties"`
-}
-
-type K3Consumer interface {
-	Add(data Data) error
-	Flush() error
-	Close() error
-}
-
 type K3LogConsumer struct {
 	directory      string         // 日志存储地址
 	dateFormat     string         // 时间格式
@@ -56,7 +36,7 @@ type K3LogConsumer struct {
 }
 
 // Add 写入日志, 将日志写入到 chan
-func (k *K3LogConsumer) Add(data Data) error {
+func (k *K3LogConsumer) Add(data protocol.Data) error {
 	var (
 		err error
 		b   []byte
@@ -100,7 +80,7 @@ func (k *K3LogConsumer) Close() error {
 	)
 
 	k.mutex.Lock()
-	defer func() { k.mutex.Unlock() }()
+	defer k.mutex.Unlock()
 
 	if k.sdkClose {
 		err = errors.New("sdk has been closed")
@@ -255,11 +235,11 @@ type K3LogConsumerConfig struct {
 	ChannelSize    int
 }
 
-func NewLogConsumer(directory string, r RotateMode) (K3Consumer, error) {
+func NewLogConsumer(directory string, r RotateMode) (protocol.K3Consumer, error) {
 	return NewLogConsumerWithFileSize(directory, r, 0)
 }
 
-func NewLogConsumerWithFileSize(directory string, r RotateMode, size int) (K3Consumer, error) {
+func NewLogConsumerWithFileSize(directory string, r RotateMode, size int) (protocol.K3Consumer, error) {
 
 	return NewLogConsumerWithConfig(K3LogConsumerConfig{
 		Directory: directory,
@@ -268,7 +248,7 @@ func NewLogConsumerWithFileSize(directory string, r RotateMode, size int) (K3Con
 	})
 }
 
-func NewLogConsumerWithConfig(config K3LogConsumerConfig) (K3Consumer, error) {
+func NewLogConsumerWithConfig(config K3LogConsumerConfig) (protocol.K3Consumer, error) {
 	var (
 		dateFormat string
 		chSize     int
