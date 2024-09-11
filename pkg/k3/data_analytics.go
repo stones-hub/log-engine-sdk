@@ -1,8 +1,10 @@
 package k3
 
 import (
+	"errors"
 	"log-engine-sdk/pkg/k3/protocol"
 	"sync"
+	"time"
 )
 
 type DataAnalytics struct {
@@ -49,8 +51,35 @@ func (i *DataAnalytics) track() {
 		}
 	}()
 
+	// TODO 日志封装 思考
 }
 
-func (i *DataAnalytics) add() {
+func (i *DataAnalytics) add(accountId, appId, eventName, eventId, ip string, properties map[string]interface{}) error {
+	var (
+		msg  string
+		now  string
+		uuid string
+		data protocol.Data
+	)
 
+	if len(accountId) == 0 {
+		msg = "invalid parameters: account_id cannot be empty "
+		K3LogError(msg)
+		return errors.New(msg)
+	}
+
+	now = time.Now().Format("2006-01-02 15:04:05")
+	uuid = GenerateUUID()
+	data = protocol.Data{
+		AccountId:  accountId,
+		AppId:      appId,
+		EventId:    eventId,
+		EventName:  eventName,
+		Ip:         ip,
+		Properties: properties,
+		Time:       now,
+		UUID:       uuid,
+	}
+
+	return i.consumer.Add(data)
 }
