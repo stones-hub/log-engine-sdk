@@ -55,3 +55,9 @@ func DecompressGzip(data string) (string, error) {
 
 	return string(decompressedData), nil
 }
+
+func MergeProperties(target, source map[string]interface{}) {
+	for k, v := range source {
+		target[k] = v
+	}
+}
