@@ -2,31 +2,8 @@ package k3
 
 import (
 	"fmt"
-	"log"
 	"time"
 )
-
-// SDK_LOG_PREFIX is the prefix of log
-const SDK_LOG_PREFIX = "[K3SDK] "
-
-// K3Logger is a logger interface
-type K3Logger interface {
-	Print(message string)
-}
-
-var (
-	// current log level
-	CurrentLogLevel = K3LogLevelOFF
-	// custom logger
-	LogInstance K3Logger
-)
-
-// SetCustomLogger set custom logger
-func SetCustomLogger(logger K3Logger) {
-	if logger != nil {
-		LogInstance = logger
-	}
-}
 
 type K3LogLevel int
 
@@ -38,11 +15,24 @@ const (
 	K3LogLevelDEBUG
 )
 
-// SetLogLevel set log level
-func SetLogLevel(level K3LogLevel) {
-	if level < K3LogLevelOFF || level > K3LogLevelDEBUG {
-		log.Printf("Invalid log level: %d", level)
-		return
+// K3Logger is a logger interface
+type K3Logger interface {
+	Print(message string)
+}
+
+// SDK_LOG_PREFIX is the prefix of log
+const SDK_LOG_PREFIX = "[K3SDK] "
+
+var (
+	// current log level
+	CurrentLogLevel = K3LogLevelOFF
+	// custom logger
+	LogInstance K3Logger
+)
+
+func InitLogger(logger K3Logger, level K3LogLevel) {
+	if logger != nil {
+		LogInstance = logger
 	}
 	CurrentLogLevel = level
 }
@@ -92,7 +82,6 @@ func K3LogInfo(format string, v ...interface{}) {
 
 func K3LogWarn(format string, v ...interface{}) {
 	K3Log(K3LogLevelWARN, format, v...)
-
 }
 
 func K3LogError(format string, v ...interface{}) {

@@ -1,0 +1,8 @@
+
+system:
+  name: "ELK"
+  description: "ELK"
+  version: "1.0"
+  read_path: "logs/"
+  account_id : "000000000000"
+  app_id : "000000000000"
