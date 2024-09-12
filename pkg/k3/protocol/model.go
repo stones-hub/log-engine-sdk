@@ -17,3 +17,7 @@ type K3Consumer interface {
 	Flush() error
 	Close() error
 }
+
+type Sender interface {
+	Send(data []Data) error
+}

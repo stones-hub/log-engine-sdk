@@ -1,31 +1,19 @@
 package k3
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
 	"log-engine-sdk/pkg/k3/protocol"
-	"net/http"
-	"net/url"
-	"strconv"
 	"sync"
 	"time"
 )
 
 const (
-	DefaultTimeout       = 30000 // 默认超时时间
-	DefaultBatchSize     = 100   // 默认批量提交大小
-	MaxBatchSize         = 1000  // 批量提交最大值
-	DefaultInterval      = 5     // 默认定时检查缓存时间间隔
-	DefaultCacheCapacity = 100   // 默认缓存容量
+	DefaultInterval      = 5    // 默认定时检查缓存时间间隔
+	DefaultBatchSize     = 100  // 默认批量提交大小
+	MaxBatchSize         = 1000 // 批量提交最大值, 需要控制一下
+	DefaultCacheCapacity = 100  // 默认缓存容量
 )
 
 type K3BatchConsumer struct {
-	serverURL   string        // 数据发送地址
-	timeout     time.Duration // 超时时间
-	compress    bool          // 是否压缩
 	bufferMutex *sync.RWMutex // buffer锁，用于Data数据在缓存中读取是否安全
 	cacheMutex  *sync.RWMutex // cache锁
 
@@ -33,6 +21,11 @@ type K3BatchConsumer struct {
 	batchSize     int               // 批量提交大小
 	cacheBuffer   [][]protocol.Data // buffer的数据会先写入 cacheBuffer中
 	cacheCapacity int               // cacheBuffer的最大容量
+
+	wg        *sync.WaitGroup // 用于管控自动刷新协程
+	closed    chan struct{}
+	autoFlush bool            // 是否自动上报
+	sender    protocol.Sender // 不同的日志存储类型，用不同的实现即可
 }
 
 // fetchBufferLength returns the length of buffer
@@ -51,12 +44,10 @@ func (k *K3BatchConsumer) fetchCacheLength() int {
 
 // Add adds data to buffer
 func (k *K3BatchConsumer) Add(data protocol.Data) error {
+
 	k.bufferMutex.Lock()
-
 	k.buffer = append(k.buffer, data)
-
 	k.bufferMutex.Unlock()
-
 	K3LogInfo("Add data to buffer, current buffer length: %d", k.fetchBufferLength())
 
 	// 当buffer长度大于等于 batchSize 或者 cacheBuffer的长度大于0，则立即flush, 要么buffer满了，要么cacheBuffer有数据都可以刷新发送
@@ -91,9 +82,9 @@ func (k *K3BatchConsumer) Flush() error {
 	}
 
 	// 当cacheBuffer长度大于等于 cacheCapacity，则将cacheBuffer中的数据写入server，并清空cacheBuffer
-	if len(k.cacheBuffer) > k.cacheCapacity {
+	if len(k.cacheBuffer) > k.cacheCapacity || len(k.cacheBuffer) > 0 {
 		// 减少一个cache buffer , 并上传
-		err = k.upload()
+		err = k.sender.Send(k.cacheBuffer[0])
 		k.cacheBuffer = k.cacheBuffer[1:]
 	}
 
@@ -113,138 +104,47 @@ func (k *K3BatchConsumer) FlushAll() error {
 	return err
 }
 
-// upload uploads the first cache buffer data to the server
-func (k *K3BatchConsumer) upload() error {
-	var (
-		buffer    []protocol.Data
-		err       error
-		jsonBytes []byte
-		params    string
-		status    int
-		code      int
-	)
-
-	buffer = k.cacheBuffer[0]
-	if jsonBytes, err = json.Marshal(buffer); err != nil {
-		return err
-	}
-
-	params = parseTime(jsonBytes)
-	if status, code, err = k.send(params, len(buffer)); err != nil {
-		return err
-	}
-	fmt.Println(status, code)
-	return err
-}
-
-// send sends the data to the server, params 需要提交的数据, bsize 数据在slice阶段的长度
-func (k *K3BatchConsumer) send(params string, bsize int) (int, int, error) {
-	var (
-		data         string
-		err          error
-		compressType = "gzip"
-		resp         *http.Response
-		req          *http.Request
-		c            *http.Client
-		res          []byte
-	)
-
-	// TODO 提交给elk或类似elk的远端上传接口, 需要跟elk类似的日志存储系统对接
-
-	if k.compress {
-		data, err = CompressGzip(params)
-	} else {
-		data = params
-		compressType = "none"
-	}
-
-	if err != nil {
-		return 0, 0, err
-	}
-
-	if req, err = http.NewRequest("POST", k.serverURL, bytes.NewBufferString(data)); err != nil {
-		return 0, 0, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("compress", compressType)
-	req.Header.Set("size", strconv.Itoa(bsize))
-
-	c = &http.Client{Timeout: k.timeout}
-	if resp, err = c.Do(req); err != nil {
-		return 0, 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK {
-		if res, err = io.ReadAll(resp.Body); err != nil {
-			return resp.StatusCode, 0, err
-		}
-
-		// 正常获取数据
-
-		fmt.Println(res)
-		return resp.StatusCode, 0, nil
-
-	} else {
-		return resp.StatusCode, -1, nil
-	}
-}
-
 // Close closes the consumer
 func (k *K3BatchConsumer) Close() error {
 	K3LogInfo("Close K3BatchConsumer")
+	if k.autoFlush {
+		close(k.closed)
+		k.wg.Wait()
+	}
 	return k.FlushAll()
 }
 
 type K3BatchConsumerConfig struct {
-	ServerURL     string
+	Sender        protocol.Sender
 	BatchSize     int
-	Timeout       time.Duration
-	Compress      bool
 	AutoFlush     bool
 	Interval      int
 	CacheCapacity int
 }
 
 // NewBatchConsumer creates a new K3BatchConsumer with default batch size.
-func NewBatchConsumer(serverURL string, appId string) (protocol.K3Consumer, error) {
+func NewBatchConsumer(sender protocol.Sender) (protocol.K3Consumer, error) {
 	return initBatchConsumer(K3BatchConsumerConfig{
-		ServerURL: serverURL,
-		Compress:  true,
+		Sender: sender,
 	})
 }
 
 // NewBatchConsumerWithBatchSize creates a new K3BatchConsumer with batch size.
 // batchSize should be between 1 and 1000.
-func NewBatchConsumerWithBatchSize(serverURL string, appId string, batchSize int) (protocol.K3Consumer, error) {
+func NewBatchConsumerWithBatchSize(sender protocol.Sender, batchSize int) (protocol.K3Consumer, error) {
 	return initBatchConsumer(K3BatchConsumerConfig{
-		ServerURL: serverURL,
+		Sender:    sender,
 		BatchSize: batchSize,
-		Compress:  true,
 	})
 }
 
 func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error) {
 	var (
-		err             error
-		u               *url.URL
 		batchSize       int
 		cacheCapacity   int
-		timeout         time.Duration
 		k3BatchConsumer *K3BatchConsumer
 		interval        int
 	)
-
-	if len(config.ServerURL) == 0 {
-		K3LogInfo("serverURL is empty, use default serverURL")
-		return nil, errors.New("serverURL is empty")
-	}
-
-	// 解析日志提交端的地址
-	if u, err = url.Parse(config.ServerURL); err != nil {
-		return nil, err
-	}
 
 	// 批量大小
 	if config.BatchSize > MaxBatchSize {
@@ -262,23 +162,17 @@ func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error
 		cacheCapacity = config.CacheCapacity
 	}
 
-	// 超时时间
-	if config.Timeout <= 0 {
-		timeout = DefaultTimeout
-	} else {
-		timeout = config.Timeout
-	}
-
 	k3BatchConsumer = &K3BatchConsumer{
-		serverURL:     u.String(),
-		timeout:       time.Duration(timeout) * time.Millisecond,
-		compress:      config.Compress,
 		bufferMutex:   &sync.RWMutex{},
 		cacheMutex:    &sync.RWMutex{},
 		buffer:        make([]protocol.Data, 0, batchSize),
 		cacheBuffer:   make([][]protocol.Data, cacheCapacity),
 		batchSize:     batchSize,
 		cacheCapacity: cacheCapacity,
+		wg:            &sync.WaitGroup{},
+		closed:        make(chan struct{}),
+		autoFlush:     config.AutoFlush,
+		sender:        config.Sender,
 	}
 
 	if config.Interval == 0 {
@@ -287,13 +181,25 @@ func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error
 		interval = config.Interval
 	}
 
-	if config.AutoFlush {
+	if k3BatchConsumer.autoFlush {
+		k3BatchConsumer.wg.Add(1)
+
 		go func() {
 			t := time.NewTicker(time.Duration(interval) * time.Second)
-			defer t.Stop()
+			defer func() {
+				t.Stop()
+				k3BatchConsumer.wg.Done()
+			}()
+
 			for {
-				<-t.C
-				_ = k3BatchConsumer.Flush()
+				select {
+				case <-t.C:
+					_ = k3BatchConsumer.Flush()
+				case _, ok := <-k3BatchConsumer.closed: // 处理协程退出
+					if !ok {
+						return
+					}
+				}
 			}
 		}()
 	}
