@@ -1,7 +1,6 @@
 package k3
 
 import (
-	"fmt"
 	"log-engine-sdk/pkg/k3/protocol"
 	"sync"
 	"time"
@@ -9,9 +8,9 @@ import (
 
 const (
 	DefaultInterval      = 5    // 默认定时检查缓存时间间隔
-	DefaultBatchSize     = 100  // 默认批量提交大小
+	DefaultBatchSize     = 2    // 默认批量提交大小
 	MaxBatchSize         = 1000 // 批量提交最大值, 需要控制一下
-	DefaultCacheCapacity = 100  // 默认缓存容量
+	DefaultCacheCapacity = 1    // 默认缓存容量
 )
 
 type K3BatchConsumer struct {
@@ -82,7 +81,7 @@ func (k *K3BatchConsumer) Flush() error {
 	}
 
 	// 当cacheBuffer长度大于等于 cacheCapacity，则将cacheBuffer中的数据写入server，并清空cacheBuffer
-	if len(k.cacheBuffer) > k.cacheCapacity || len(k.cacheBuffer) > 0 {
+	if len(k.cacheBuffer) >= k.cacheCapacity || len(k.cacheBuffer) > 0 {
 		// 减少一个cache buffer , 并上传
 		err = k.sender.Send(k.cacheBuffer[0])
 		k.cacheBuffer = k.cacheBuffer[1:]
@@ -97,10 +96,14 @@ func (k *K3BatchConsumer) FlushAll() error {
 	)
 	// 缓存中一直有数据，就需要不断的send， 直到结束
 	for k.fetchCacheLength() > 0 || k.fetchBufferLength() > 0 {
-		if err = k.Flush(); err != nil {
+		k.cacheBuffer = append(k.cacheBuffer, k.buffer)
+		k.buffer = make([]protocol.Data, 0, k.batchSize)
+		if err = k.sender.Send(k.cacheBuffer[0]); err != nil {
 			return err
 		}
+		k.cacheBuffer = k.cacheBuffer[1:]
 	}
+
 	return err
 }
 
@@ -201,7 +204,6 @@ func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error
 					_ = k3BatchConsumer.Flush()
 				case _, ok := <-k3BatchConsumer.closed: // 处理协程退出
 					if !ok {
-						fmt.Println("aaaaaaa")
 						return
 					}
 				}
