@@ -25,7 +25,7 @@ const SDK_LOG_PREFIX = "[K3SDK] "
 
 var (
 	// current log level
-	CurrentLogLevel = K3LogLevelOFF
+	CurrentLogLevel = K3LogLevelDEBUG
 	// custom logger
 	LogInstance K3Logger
 )

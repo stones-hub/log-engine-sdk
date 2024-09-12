@@ -1,6 +1,7 @@
 package k3
 
 import (
+	"fmt"
 	"log-engine-sdk/pkg/k3/protocol"
 	"sync"
 	"time"
@@ -30,25 +31,24 @@ type K3BatchConsumer struct {
 
 // fetchBufferLength returns the length of buffer
 func (k *K3BatchConsumer) fetchBufferLength() int {
-	k.bufferMutex.RLocker()
+	k.bufferMutex.RLock()
 	defer k.bufferMutex.RUnlock()
 	return len(k.buffer)
 }
 
 // fetchCacheLength returns the length of cacheBuffer
 func (k *K3BatchConsumer) fetchCacheLength() int {
-	k.cacheMutex.RLocker()
+	k.cacheMutex.RLock()
 	defer k.cacheMutex.RUnlock()
 	return len(k.cacheBuffer)
 }
 
 // Add adds data to buffer
 func (k *K3BatchConsumer) Add(data protocol.Data) error {
-
 	k.bufferMutex.Lock()
 	k.buffer = append(k.buffer, data)
 	k.bufferMutex.Unlock()
-	K3LogInfo("Add data to buffer, current buffer length: %d", k.fetchBufferLength())
+	K3LogInfo("Add data to buffer, current buffer length: %d\n", k.fetchBufferLength())
 
 	// 当buffer长度大于等于 batchSize 或者 cacheBuffer的长度大于0，则立即flush, 要么buffer满了，要么cacheBuffer有数据都可以刷新发送
 	if k.fetchBufferLength() >= k.batchSize || k.fetchCacheLength() > 0 {
@@ -138,6 +138,10 @@ func NewBatchConsumerWithBatchSize(sender protocol.Sender, batchSize int) (proto
 	})
 }
 
+func NewBatchConsumerWithConfig(config K3BatchConsumerConfig) (protocol.K3Consumer, error) {
+	return initBatchConsumer(config)
+}
+
 func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error) {
 	var (
 		batchSize       int
@@ -166,7 +170,7 @@ func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error
 		bufferMutex:   &sync.RWMutex{},
 		cacheMutex:    &sync.RWMutex{},
 		buffer:        make([]protocol.Data, 0, batchSize),
-		cacheBuffer:   make([][]protocol.Data, cacheCapacity),
+		cacheBuffer:   make([][]protocol.Data, 0, cacheCapacity),
 		batchSize:     batchSize,
 		cacheCapacity: cacheCapacity,
 		wg:            &sync.WaitGroup{},
@@ -197,6 +201,7 @@ func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error
 					_ = k3BatchConsumer.Flush()
 				case _, ok := <-k3BatchConsumer.closed: // 处理协程退出
 					if !ok {
+						fmt.Println("aaaaaaa")
 						return
 					}
 				}
