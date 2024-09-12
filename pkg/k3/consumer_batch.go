@@ -24,7 +24,6 @@ const (
 
 type K3BatchConsumer struct {
 	serverURL   string        // 数据发送地址
-	appId       string        // 应用ID
 	timeout     time.Duration // 超时时间
 	compress    bool          // 是否压缩
 	bufferMutex *sync.RWMutex // buffer锁，用于Data数据在缓存中读取是否安全
@@ -169,7 +168,6 @@ func (k *K3BatchConsumer) send(params string, bsize int) (int, int, error) {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("compress", compressType)
-	req.Header.Set("app_id", k.appId)
 	req.Header.Set("size", strconv.Itoa(bsize))
 
 	c = &http.Client{Timeout: k.timeout}
@@ -201,7 +199,6 @@ func (k *K3BatchConsumer) Close() error {
 
 type K3BatchConsumerConfig struct {
 	ServerURL     string
-	AppId         string
 	BatchSize     int
 	Timeout       time.Duration
 	Compress      bool
@@ -214,7 +211,6 @@ type K3BatchConsumerConfig struct {
 func NewBatchConsumer(serverURL string, appId string) (protocol.K3Consumer, error) {
 	return initBatchConsumer(K3BatchConsumerConfig{
 		ServerURL: serverURL,
-		AppId:     appId,
 		Compress:  true,
 	})
 }
@@ -224,7 +220,6 @@ func NewBatchConsumer(serverURL string, appId string) (protocol.K3Consumer, erro
 func NewBatchConsumerWithBatchSize(serverURL string, appId string, batchSize int) (protocol.K3Consumer, error) {
 	return initBatchConsumer(K3BatchConsumerConfig{
 		ServerURL: serverURL,
-		AppId:     appId,
 		BatchSize: batchSize,
 		Compress:  true,
 	})
@@ -276,7 +271,6 @@ func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error
 
 	k3BatchConsumer = &K3BatchConsumer{
 		serverURL:     u.String(),
-		appId:         config.AppId,
 		timeout:       time.Duration(timeout) * time.Millisecond,
 		compress:      config.Compress,
 		bufferMutex:   &sync.RWMutex{},
