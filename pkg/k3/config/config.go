@@ -1,4 +1,4 @@
-package protocol
+package config
 
 import (
 	"github.com/koding/multiconfig"

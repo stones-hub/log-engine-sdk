@@ -9,6 +9,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"io"
 	"log-engine-sdk/pkg/k3"
+	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
 )
 
@@ -28,10 +29,10 @@ func NewELKServerWithConfig() (*ELKServer, error) {
 	)
 
 	elkConfig = elasticsearch.Config{
-		Addresses: protocol.GlobalConfig.ELK.Addresses,
-		Username:  protocol.GlobalConfig.ELK.Username,
-		Password:  protocol.GlobalConfig.ELK.Password,
-		APIKey:    protocol.GlobalConfig.ELK.APIKey,
+		Addresses: config.GlobalConfig.ELK.Addresses,
+		Username:  config.GlobalConfig.ELK.Username,
+		Password:  config.GlobalConfig.ELK.Password,
+		APIKey:    config.GlobalConfig.ELK.APIKey,
 	}
 
 	if elkClient, err = elasticsearch.NewClient(elkConfig); err != nil {
@@ -56,7 +57,7 @@ func (e *ELKServer) Send(data []protocol.Data) error {
 	)
 
 	// 批量插入数据
-	if bulkData, err = prepareBulkData(data); err != nil {
+	if bulkData, err = e.prepareBulkData(data); err != nil {
 		msg = "Error preparing bulk data: " + err.Error()
 		return errors.New(msg)
 	}
@@ -99,7 +100,7 @@ func (e *ELKServer) Send(data []protocol.Data) error {
 	return nil
 }
 
-func prepareBulkData(data []protocol.Data) ([]byte, error) {
+func (e *ELKServer) prepareBulkData(data []protocol.Data) ([]byte, error) {
 	var bulkData bytes.Buffer
 
 	for _, d := range data {
