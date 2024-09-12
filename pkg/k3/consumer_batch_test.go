@@ -11,12 +11,12 @@ import (
 func TestBatchConsumer(t *testing.T) {
 	var (
 		ips      []string
-		elk      *sender.ELK
+		elk      *sender.ELKServer
 		err      error
 		consumer protocol.K3Consumer
 	)
 
-	if elk, err = sender.NewELK([]string{"http://127.0.0.1:9200"}); err != nil {
+	if elk, err = sender.NewELKServerWithConfig(); err != nil {
 		fmt.Println(err)
 		return
 	}
