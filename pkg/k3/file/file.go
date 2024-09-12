@@ -1,4 +1,4 @@
-package k3
+package file
 
 import (
 	"bufio"
@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 )
+
+// TODO 常驻进程读取目录所有的文件的数据， 重新启动后不影响
 
 // ProgressRecord 结构体用于存储文件及其读取进度
 type ProgressRecord struct {
