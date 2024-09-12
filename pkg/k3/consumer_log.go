@@ -43,7 +43,7 @@ func (k *K3LogConsumer) Add(data protocol.Data) error {
 	)
 
 	k.mutex.Lock()
-	defer func() { k.mutex.Unlock() }()
+	defer k.mutex.Unlock()
 
 	if k.sdkClose {
 		err = errors.New("add event failed, SDK has been closed ")
@@ -59,14 +59,14 @@ func (k *K3LogConsumer) Add(data protocol.Data) error {
 }
 
 func (k *K3LogConsumer) Flush() error {
-	K3LogInfo("flush log data")
-
 	var (
 		err error
 	)
 
+	K3LogInfo("flush log data")
 	k.mutex.Lock()
 	defer func() { k.mutex.Unlock() }()
+
 	if k.currentFile != nil {
 		err = k.currentFile.Sync()
 	}
@@ -74,11 +74,11 @@ func (k *K3LogConsumer) Flush() error {
 }
 
 func (k *K3LogConsumer) Close() error {
-	K3LogInfo("close log consumer")
 	var (
 		err error
 	)
 
+	K3LogInfo("close log consumer")
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
@@ -88,6 +88,7 @@ func (k *K3LogConsumer) Close() error {
 		close(k.ch) // 关闭channel，初始化管道数据无需再写入数据了
 		k.wg.Wait() // 等待协程退出
 
+		// 清理fd
 		if k.currentFile != nil {
 			_ = k.currentFile.Sync()
 			err = k.currentFile.Close()
@@ -97,7 +98,6 @@ func (k *K3LogConsumer) Close() error {
 
 	k.sdkClose = true
 	return err
-
 }
 
 func (k *K3LogConsumer) init() error {
@@ -133,6 +133,7 @@ func (k *K3LogConsumer) init() error {
 
 				jsonStr := parseTime(res)
 				K3LogInfo("write event data :%s", jsonStr)
+				// 将管道的数据写入到 log 文件
 				k.rsyncFile(jsonStr)
 			}
 		}
@@ -160,6 +161,8 @@ func (k *K3LogConsumer) initLogFile() (*os.File, error) {
 }
 
 // generateFileName 生成文件名
+// t 当前时间
+// i 文件索引
 func (k *K3LogConsumer) generateFileName(t string, i int) string {
 	var (
 		prefix string
@@ -180,48 +183,46 @@ func (k *K3LogConsumer) generateFileName(t string, i int) string {
 
 func (k *K3LogConsumer) rsyncFile(jsonStr string) {
 	var (
-		fName    string
-		err      error
-		newFname string
-		stat     os.FileInfo
+		fName string
+		err   error
+		stat  os.FileInfo
 	)
 
 	// 取当前应该写入的文件
 	fName = k.generateFileName(time.Now().Format(k.dateFormat), LogFileIndex)
 
-	// 当前文件为空，重新打开, 当前要写入的文件
-	if k.currentFile == nil {
+	if k.currentFile != nil && k.currentFile.Name() != fName {
+		_ = k.currentFile.Close()
+		if k.currentFile, err = os.OpenFile(fName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm); err != nil {
+			K3LogError("open file error: %s", err.Error())
+			return
+		}
+	} else if k.currentFile == nil {
 		if k.currentFile, err = os.OpenFile(fName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm); err != nil {
 			K3LogError("open file error: %s", err.Error())
 			return
 		}
 	}
 
-	// 有可能时间导致文件要重新生成， fName才是最新要记录的文件地址
-	if k.currentFile.Name() != fName {
-		newFname = fName
-	} else if k.fileSize > 0 { // 如果文件有大小限制，要判断当前文件是否还是可写入的文件
-		if stat, _ = k.currentFile.Stat(); stat.Size() > k.fileSize {
+	if k.fileSize > 0 {
+		if stat, err = k.currentFile.Stat(); err != nil {
+			K3LogError("get file stat error: %s", err.Error())
+			return
+		}
+
+		if stat.Size() >= k.fileSize {
+			_ = k.currentFile.Close()
 			LogFileIndex++
-			newFname = k.generateFileName(time.Now().Format(k.dateFormat), LogFileIndex)
-		}
-	}
-
-	// 开始写入
-	if newFname != "" {
-		if err = k.currentFile.Close(); err != nil {
-			K3LogInfo("close file error: %s", err.Error())
-			return
-		}
-
-		if k.currentFile, err = os.OpenFile(newFname, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm); err != nil {
-			K3LogInfo("open file error: %s", err.Error())
-			return
+			fName = k.generateFileName(time.Now().Format(k.dateFormat), LogFileIndex)
+			if k.currentFile, err = os.OpenFile(fName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm); err != nil {
+				K3LogError("open file error: %s", err.Error())
+				return
+			}
 		}
 	}
 
 	// 数据写入文件
-	if _, err = fmt.Fprint(k.currentFile, jsonStr); err != nil {
+	if _, err = fmt.Fprint(k.currentFile, jsonStr+"\n"); err != nil {
 		K3LogInfo("write file error: %s", err.Error())
 		return
 	}
