@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"io"
@@ -13,36 +14,50 @@ import (
 	"log-engine-sdk/pkg/k3/protocol"
 )
 
-// TODO 目前只做一个伪装实现，后续补充，方便测试
-
 type ELKServer struct {
 	config elasticsearch.Config
 	client *elasticsearch.Client
 }
 
-// TODO 后续根据情况调整
-func NewELKServerWithConfig() (*ELKServer, error) {
-	var (
-		elkConfig elasticsearch.Config
-		elkClient *elasticsearch.Client
-		err       error
-	)
-
-	elkConfig = elasticsearch.Config{
-		Addresses: config.GlobalConfig.ELK.Addresses,
-		Username:  config.GlobalConfig.ELK.Username,
-		Password:  config.GlobalConfig.ELK.Password,
-		APIKey:    config.GlobalConfig.ELK.APIKey,
+func NewELKServer(address []string, username, password, apikey string) (*ELKServer, error) {
+	{
+		// TODO 方便测试，ELK还未搭建
+		return &ELKServer{
+			config: elasticsearch.Config{},
+			client: nil,
+		}, nil
 	}
 
-	if elkClient, err = elasticsearch.NewClient(elkConfig); err != nil {
+	return NewELKServerWithConfig(config.ELK{
+		Addresses: address,
+		Username:  username,
+		Password:  password,
+		APIKey:    apikey,
+	})
+}
+
+func NewELKServerWithConfig(elkServerConfig config.ELK) (*ELKServer, error) {
+	var (
+		cfg    elasticsearch.Config
+		client *elasticsearch.Client
+		err    error
+	)
+
+	cfg = elasticsearch.Config{
+		Addresses: elkServerConfig.Addresses,
+		Username:  elkServerConfig.Username,
+		Password:  elkServerConfig.Password,
+		APIKey:    elkServerConfig.APIKey,
+	}
+
+	if client, err = elasticsearch.NewClient(cfg); err != nil {
 		k3.K3LogError("Failed to create Elasticsearch client: %v", err)
 		return nil, err
 	}
 
 	return &ELKServer{
-		config: elkConfig,
-		client: elkClient,
+		config: cfg,
+		client: client,
 	}, nil
 }
 
@@ -60,6 +75,12 @@ func (e *ELKServer) Send(data []protocol.Data) error {
 	if bulkData, err = e.prepareBulkData(data); err != nil {
 		msg = "Error preparing bulk data: " + err.Error()
 		return errors.New(msg)
+	}
+
+	{
+		// TODO 方便测试，ELK还未搭建
+		fmt.Println(bulkData)
+		return nil
 	}
 
 	bulkRequest = esapi.BulkRequest{
@@ -109,7 +130,7 @@ func (e *ELKServer) prepareBulkData(data []protocol.Data) ([]byte, error) {
 			return nil, err
 		}
 
-		// bulkData.WriteString(fmt.Sprintf(`{"index":{"_id":"%d"}}\n`, d.ID))
+		bulkData.WriteString(fmt.Sprintf(`{"index":{"_id":"%s"}}\n`, d.UUID))
 		bulkData.Write(jsonData)
 		bulkData.WriteString("\n")
 	}

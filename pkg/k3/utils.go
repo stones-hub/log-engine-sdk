@@ -3,10 +3,14 @@ package k3
 import (
 	"bytes"
 	"compress/gzip"
+	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 func parseTime(input []byte) string {
@@ -101,4 +105,63 @@ func GenerateUUID() string {
 		return ""
 	}
 	return newUUID.String()
+}
+
+// FetchDirectory 递归遍历目录, maxDepth -1 全部遍历
+func FetchDirectory(dir string, maxDepth int) ([]string, error) {
+
+	var (
+		files     []string
+		rootDepth = len(strings.Split(dir, string(os.PathSeparator)))
+		err       error
+	)
+
+	// fmt.Println(files, rootDepth, string(os.PathSeparator))
+	if err = filepath.WalkDir(dir, func(currentPath string, d os.DirEntry, err error) error {
+		var (
+			currentDepth int
+		)
+
+		if err != nil {
+			return err
+		}
+
+		currentDepth = len(strings.Split(currentPath, string(os.PathSeparator))) - rootDepth
+
+		if maxDepth != -1 && currentDepth > maxDepth {
+			return filepath.SkipDir // 跳过当前目录
+		}
+
+		if !d.IsDir() {
+			files = append(files, currentPath)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
+// WatchDirectory 监听目录变化, dir 监听目录
+func WatchDirectory(dir string, f func()) error {
+	var (
+		watcher *fsnotify.Watcher
+		err     error
+	)
+
+	// 设置文件系统监听
+	if watcher, err = fsnotify.NewWatcher(); err != nil {
+		return err
+	}
+	defer watcher.Close()
+
+	if err = watcher.Add(dir); err != nil {
+		return err
+	}
+
+	// 开始监听事
+
+	return nil
+
 }
