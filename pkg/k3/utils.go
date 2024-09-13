@@ -3,7 +3,7 @@ package k3
 import (
 	"bytes"
 	"compress/gzip"
-	"github.com/fsnotify/fsnotify"
+	"encoding/json"
 	"github.com/google/uuid"
 	"io"
 	"net"
@@ -143,25 +143,15 @@ func FetchDirectory(dir string, maxDepth int) ([]string, error) {
 	return files, nil
 }
 
-// WatchDirectory 监听目录变化, dir 监听目录
-func WatchDirectory(dir string, f func()) error {
-	var (
-		watcher *fsnotify.Watcher
-		err     error
-	)
-
-	// 设置文件系统监听
-	if watcher, err = fsnotify.NewWatcher(); err != nil {
-		return err
+func InterfaceToString(val interface{}) (string, bool) {
+	if val == nil {
+		return "", false
 	}
-	defer watcher.Close()
+	strVal, ok := val.(string)
+	return strVal, ok
+}
 
-	if err = watcher.Add(dir); err != nil {
-		return err
-	}
-
-	// 开始监听事
-
-	return nil
-
+func InterfaceToJSONString(val interface{}) (string, error) {
+	b, err := json.Marshal(val)
+	return string(b), err
 }

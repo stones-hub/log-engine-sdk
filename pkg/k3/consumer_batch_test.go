@@ -16,7 +16,7 @@ func TestBatchConsumer(t *testing.T) {
 		consumer protocol.K3Consumer
 	)
 
-	if elk, err = sender.NewELKServerWithConfig(); err != nil {
+	if elk, err = sender.NewELKServer([]string{"http://127.0.0.1:8080"}, "", "", ""); err != nil {
 		fmt.Println(err)
 		return
 	}
