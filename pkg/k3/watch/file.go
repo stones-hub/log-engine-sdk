@@ -221,7 +221,7 @@ func Clean() {
 	}
 }
 
-// TODO 处理每次文件变化
+// TODO 处理每次文件变化, 并将数据发送给consumer_batch
 func handleEvent(event fsnotify.Event) {
 	log.Println("event:", event)
 	if event.Op&fsnotify.Write == fsnotify.Write { // 写入
