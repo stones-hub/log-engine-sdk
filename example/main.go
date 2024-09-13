@@ -1,14 +1,16 @@
 package main
 
-import (
-	"fmt"
-	"log-engine-sdk/pkg/k3"
-)
+import "log-engine-sdk/pkg/k3/watch"
+
+type Temp struct {
+	Name string `json:"name,omitempty"`
+	Age  int    `json:"age,omitempty"`
+}
 
 func main() {
-	files, err := k3.FetchDirectory("/Users/yelei/data/code/go-projects/log-engine-sdk", -1)
-	fmt.Println(err)
-	for _, file := range files {
-		fmt.Println(file)
-	}
+
+	fPath := "/Users/yelei/data/code/go-projects/log-engine-sdk/example/logs"
+	fStatePath := "/Users/yelei/data/code/go-projects/log-engine-sdk/example/logs/sate/state.json"
+	watch.Run(fPath, fStatePath)
+
 }

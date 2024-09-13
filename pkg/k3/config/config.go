@@ -20,11 +20,13 @@ type ELK struct {
 }
 
 type System struct {
-	Version     string `yaml:"version"`
-	UseELK      bool   `yaml:"use_elk"`
-	ReadLogPath string `yaml:"read_log_path"` // 要读取的日志文件路径
-	AccountId   string `yaml:"account_id"`
-	AppId       string `yaml:"app_id"`
+	Version        string `yaml:"version"`
+	UseELK         bool   `yaml:"use_elk"`
+	ReadLogPath    string `yaml:"read_log_path"` // 要读取的日志文件路径
+	AccountId      string `yaml:"account_id"`
+	AppId          string `yaml:"app_id"`
+	WatchDirectory string `yaml:"watch_directory"`
+	StateFilePath  string `yaml:"state_file_path"`
 }
 
 var (
