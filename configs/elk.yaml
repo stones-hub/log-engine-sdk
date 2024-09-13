@@ -5,13 +5,4 @@ elk:
   index: "elk"
   type: "log"
   index_type: "date"
-  index_date_format: "%Y.%m.%d"
-  index_date_field: "@timestamp"
-  index_date_field_format: "yyyy.MM.dd"
-  index_date_field_format_type: "strptime"
-  index_date_field_format_timezone: "UTC"
-  index_date_field_format_timezone_offset: 0
-  index_date_field_format_timezone_dst: false
-  index_date_field_format_timezone_dst_offset: 0
-  index_date_field_format_timezone_dst_start: "02:00:00"
-  index_date_field_format_timezone_dst_end: "03:00:00"
+

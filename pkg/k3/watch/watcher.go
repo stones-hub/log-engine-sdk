@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"log-engine-sdk/pkg/k3"
+	"log-engine-sdk/pkg/k3/protocol"
+	"log-engine-sdk/pkg/k3/sender"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -29,6 +31,29 @@ var (
 	GlobalSateFileLock sync.Mutex
 )
 
+var dataAnalytics k3.DataAnalytics
+
+// TODO 考虑从配置文件读取相关信息
+func InitConsumerLog() error {
+	var (
+		elk      *sender.ELKServer
+		err      error
+		consumer protocol.K3Consumer
+	)
+	if elk, err = sender.NewELKServer([]string{"http://127.0.0.1:9200"}, "admin", "admin", ""); err != nil {
+		return err
+	}
+
+	if consumer, err = k3.NewBatchConsumerWithConfig(k3.K3BatchConsumerConfig{
+		Sender:    elk,
+		AutoFlush: true,
+	}); err != nil {
+		return err
+	}
+	dataAnalytics = k3.NewDataAnalytics(consumer)
+	return nil
+}
+
 // InitWatcher 监听指定目录下的文件变化
 func InitWatcher(path string) (*fsnotify.Watcher, error) {
 	var (
@@ -46,7 +71,7 @@ func InitWatcher(path string) (*fsnotify.Watcher, error) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				k3.K3LogError("WatchDirectory Recover: %s", r)
+				k3.K3LogError("InitWatcher Recover: %s", r)
 			}
 
 			GlobalWatchSg.Done()
@@ -56,14 +81,14 @@ func InitWatcher(path string) (*fsnotify.Watcher, error) {
 			select {
 			case event, ok := <-GlobalWatcher.Events:
 				if !ok {
-					k3.K3LogError("WatchEvents error : %v \n", ok)
+					k3.K3LogError("WatchEvents error : %v", ok)
 					return
 				}
 
 				handleEvent(event)
 			case err, ok := <-GlobalWatcher.Errors:
 				if !ok {
-					k3.K3LogError("WatchErrors error : %v \n", ok)
+					k3.K3LogError("WatchErrors error : %v", ok)
 					return
 				}
 
@@ -104,22 +129,26 @@ func Run(directory string, stateFile string) error {
 
 	k3.K3LogInfo("WatchDirectory: %s, StateFile: %s", directory, stateFile)
 
-	// 1. 判断stateFile是否存在，如果不存在，则创建一个空的stateFile, 如果存在，则读取stateFile
+	if err = InitConsumerLog(); err != nil {
+		return err
+	}
+
+	// 1. 判断stateFile是否存在，如果不存在，则创建一个空的stateFile, 如果存在，直接返回
 	if err = GenerateEmptyFile(stateFile); err != nil {
 		return err
 	}
 
-	// 2. 将读取的stateFile文件的内容转换成fileStates
+	// 2. 将stateFile中的内容映射到GlobalFileStates
 	if err = LoadStateFile(stateFile); err != nil {
 		return err
 	}
 
-	// 3. 遍历directory下的所有文件，如果文件名不在fileStates中，则添加到fileStates中，并更新stateFile
+	// 3. 遍历WatchDirectory下的所有文件
 	if fileNames, err = k3.FetchDirectory(directory, -1); err != nil {
 		return err
 	}
 
-	// 4.清理掉已经不存在的文件
+	// 4.清理掉目录中已经不存在的文件
 	for fileName, _ = range GlobalFileStates {
 		if inArray(fileNames, fileName) == false {
 			delete(GlobalFileStates, fileName)
@@ -151,7 +180,7 @@ func Run(directory string, stateFile string) error {
 		}
 	}
 
-	fmt.Println("GlobalFileStatesFd: ", GlobalFileStatesFd)
+	k3.K3LogInfo("数据初始化完毕: \n GlobalFileStates: %+v \n; GlobalFileStatesFd: %+v\n", GlobalFileStates, GlobalFileStatesFd)
 
 	// 8. 监听watchDirectory下的文件变化，当文件发生变化时，读取文件内容，直到最后一个\n 结束， 最后更新fileStates和stateFile
 	if _, err = InitWatcher(directory); err != nil {
@@ -168,6 +197,7 @@ func GraceExit(stateFile string) {
 	var (
 		state      = -1
 		signalChan = make(chan os.Signal, 1)
+		err        error
 	)
 
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
@@ -195,8 +225,10 @@ func GraceExit(stateFile string) {
 	// 关闭资源退出
 	Clean()
 
-	// 更新satefile文件内容
-	SyncToSateFile(stateFile)
+	// 退出前全量更新一次state file文件内容
+	if err = SyncToSateFile(stateFile); err != nil {
+		k3.K3LogError("Closed watcher run save stateFile error: %s", err)
+	}
 
 	time.Sleep(1 * time.Second)
 	os.Exit(state)
@@ -219,6 +251,9 @@ func Clean() {
 		k3.K3LogInfo("Close file: %s", fileStatesFd.Fd.Name())
 		fileStatesFd.Fd.Close()
 	}
+
+	// 关闭数据收集器
+	dataAnalytics.Close()
 }
 
 // TODO 处理每次文件变化, 并将数据发送给consumer_batch
@@ -281,6 +316,14 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 
 EXIT:
 	k3.K3LogInfo("ReadFileByOffset: %s, content: %s", fd.Name(), content)
+
+	// TODO 封装发送函数
+	if err = dataAnalytics.Track("1001", "appid-1001", "file_read", k3.GenerateUUID(), "", map[string]interface{}{
+		"content": content,
+	}); err != nil {
+		k3.K3LogError("Track error: %s", err)
+	}
+
 	return newOffset, nil
 }
 
@@ -342,7 +385,7 @@ func LoadStateFile(filePath string) error {
 	}
 }
 
-// SyncToSateFile 将fileStates同步到stateFile, 先清空在写入, 覆盖
+// SyncToSateFile 将GlobalFileStates同步到stateFile, 先清空在写入, 覆盖
 func SyncToSateFile(filePath string) error {
 	var (
 		fd      *os.File

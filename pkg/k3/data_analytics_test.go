@@ -11,12 +11,12 @@ func TestDataAnalytics(t *testing.T) {
 
 	var (
 		dataAnalytics DataAnalytics
-		elk           *sender.ELK
+		elk           *sender.ELKServer
 		err           error
 		consumer      protocol.K3Consumer
 	)
 
-	if elk, err = sender.NewELK([]string{"http://127.0.0.1:9200"}); err != nil {
+	if elk, err = sender.NewELKServer([]string{"http://127.0.0.1:9200"}, "admin", "admin", ""); err != nil {
 		fmt.Println(err)
 		return
 	}

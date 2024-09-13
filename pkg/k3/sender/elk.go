@@ -79,7 +79,7 @@ func (e *ELKServer) Send(data []protocol.Data) error {
 
 	{
 		// TODO 方便测试，ELK还未搭建
-		fmt.Println(bulkData)
+		fmt.Println(string(bulkData))
 		return nil
 	}
 
