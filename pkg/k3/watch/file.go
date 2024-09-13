@@ -155,16 +155,16 @@ func Run(directory string, stateFile string) error {
 
 	// 8. 监听watchDirectory下的文件变化，当文件发生变化时，读取文件内容，直到最后一个\n 结束， 最后更新fileStates和stateFile
 	if _, err = InitWatcher(directory); err != nil {
-		Close()
+		Clean()
 		return err
 	}
 
-	GraceExit()
+	GraceExit(stateFile)
 	return nil
 }
 
 // GraceExit 保持进程常驻， 等待信号在退出
-func GraceExit() {
+func GraceExit(stateFile string) {
 	var (
 		state      = -1
 		signalChan = make(chan os.Signal, 1)
@@ -193,12 +193,16 @@ func GraceExit() {
 	}
 
 	// 关闭资源退出
-	Close()
+	Clean()
+
+	// 更新satefile文件内容
+	SyncToSateFile(stateFile)
+
 	time.Sleep(1 * time.Second)
 	os.Exit(state)
 }
 
-func Close() {
+func Clean() {
 	// 终止watch进程
 	close(GlobalWatchClose)
 	// 等待watch进程结束
@@ -215,35 +219,21 @@ func Close() {
 		k3.K3LogInfo("Close file: %s", fileStatesFd.Fd.Name())
 		fileStatesFd.Fd.Close()
 	}
-
-	// 更新状态文件
-	SyncFileState()
-}
-
-// TODO SyncFileState 将每个文件读取的offset数据保存到stateFile, 保持前做一下比对，如果偏移量有变化就更新，以内存中的数据为准（避免文件被删除）
-func SyncFileState() {
-
 }
 
 // TODO 处理每次文件变化
 func handleEvent(event fsnotify.Event) {
 	log.Println("event:", event)
 	if event.Op&fsnotify.Write == fsnotify.Write { // 写入
-		log.Println("Write event:", event.Name)
-		// TODO 这里要修改下，避免eof报错
-		if offset, err := ReadFileByOffset(GlobalFileStatesFd[event.Name].Fd, GlobalFileStates[event.Name].Offset); err != nil {
-			// TODO 更新offset
-			fmt.Println(offset, "-------")
-			UpdateFileStateOffset(event.Name, offset)
-			k3.K3LogInfo("ReadFileByOffset error: %s", err)
-		} else {
-			UpdateFileStateOffset(event.Name, offset)
-			k3.K3LogInfo("ReadFileByOffset success: %d", offset)
+		offset, err := ReadFileByOffset(GlobalFileStatesFd[event.Name].Fd, GlobalFileStates[event.Name].Offset)
+		if err != nil {
+			k3.K3LogError("ReadFileByOffset error: %s", err)
 		}
+		UpdateFileStateOffset(event.Name, offset)
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove { // 删除
-		log.Println("Remove event:", event.Name)
+		// TODO 删除文件， 更新状态文件
 	} else if event.Op&fsnotify.Create == fsnotify.Create { // 创建
-		log.Println("Create event:", event.Name)
+
 	} else if event.Op&fsnotify.Rename == fsnotify.Rename { // 重命名
 		log.Println("Rename event:", event.Name)
 	}
@@ -267,20 +257,29 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 	reader = bufio.NewReader(fd)
 	for {
 		line, err := reader.ReadString('\n')
-		if err != nil { // 不管是不是文件结束io.EOF错误，都要返回
-			k3.K3LogError("ReadFileByOffset error: %s, break", err)
-			break
-		} else {
-			if strings.HasSuffix(line, "\n") {
-				content += line
-				newOffset += int64(len(line))
-				continue
-			} else {
-				break
-			}
+
+		if err != nil && err != io.EOF {
+			k3.K3LogError("ReadFileByOffset: %s, ReadString error: %s", fd.Name())
+			goto EXIT
 		}
+
+		if err == io.EOF && len(line) > 0 && strings.HasSuffix(line, "\n") {
+			k3.K3LogInfo("ReadFileByOffset: %s, EOF", fd.Name())
+			content += line
+			newOffset += int64(len(line))
+			goto EXIT
+		}
+
+		if len(line) > 0 && strings.HasSuffix(line, "\n") {
+			content += line
+			newOffset += int64(len(line))
+			continue
+		}
+
+		break
 	}
 
+EXIT:
 	k3.K3LogInfo("ReadFileByOffset: %s, content: %s", fd.Name(), content)
 	return newOffset, nil
 }
