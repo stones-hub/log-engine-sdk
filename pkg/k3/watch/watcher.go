@@ -33,7 +33,7 @@ var (
 
 var dataAnalytics k3.DataAnalytics
 
-// TODO 考虑从配置文件读取相关信息
+// TODO 考虑从配置文件读取相关信息,  同时考虑每次文件编号的offset的更新，避免长期不更新导致不可预估的问题
 func InitConsumerLog() error {
 	var (
 		elk      *sender.ELKServer
