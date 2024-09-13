@@ -8,3 +8,4 @@
 {"account_id":"1001","app_id":"app_id_1001","time":"2024-09-12 12:09:59","event_name":"user","event_id":"user_event_id_001","ip":"fe80::1","uuid":"e0c52246-70bc-11ef-9aef-207bd2242135","properties":{"age":18,"user_name":"stones"}}
 {"account_id":"1001","app_id":"app_id_1001","time":"2024-09-12 12:10:02","event_name":"user","event_id":"user_event_id_001","ip":"fe80::1","uuid":"e28ed9c8-70bc-11ef-9aef-207bd2242135","properties":{"age":18,"user_name":"stones"}}
 {"account_id":"1001","app_id":"app_id_1001","time":"2024-09-12 12:10:05","event_name":"user","event_id":"user_event_id_001","ip":"fe80::1","uuid":"e458ac84-70bc-11ef-9aef-207bd2242135","properties":{"age":18,"user_name":"stones"}}
+{"account_id":"account_id","app_id":"app_id","time":"2024-09-12 17:25:27","event_name":"event_name","event_id":"event_id","ip":"ip","uuid":"f2af5400-70e8-11ef-a7bb-207bd2242135","properties":{"age":111,"name":"stones","user":"yelei"}}

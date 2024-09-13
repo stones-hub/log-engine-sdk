@@ -13,7 +13,7 @@ type DataAnalytics struct {
 	mutex           *sync.RWMutex
 }
 
-func New(consumer protocol.K3Consumer) DataAnalytics {
+func NewDataAnalytics(consumer protocol.K3Consumer) DataAnalytics {
 	K3LogInfo("New Data Analytics")
 
 	return DataAnalytics{
@@ -65,6 +65,12 @@ func (i *DataAnalytics) track(accountId, appId, eventName, eventId, ip string, p
 		return errors.New(msg)
 	}
 
+	if len(appId) == 0 {
+		msg = "the app id must be provided "
+		K3LogError(msg)
+		return errors.New(msg)
+	}
+
 	if len(eventId) == 0 {
 		msg = "the event id must be provided"
 		K3LogError(msg)
@@ -91,10 +97,13 @@ func (i *DataAnalytics) add(accountId, appId, eventName, eventId, ip string, pro
 		EventId:    eventId,
 		EventName:  eventName,
 		Ip:         ip,
-		Properties: properties,
 		Time:       now,
 		UUID:       uuid,
+		Properties: properties,
 	}
-
 	return i.consumer.Add(data)
+}
+
+func (i *DataAnalytics) Close() {
+	i.consumer.Close()
 }

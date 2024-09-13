@@ -118,7 +118,7 @@ func (k *K3LogConsumer) init() error {
 	go func() {
 		defer func() {
 			if e := recover(); e != nil {
-				K3LogError("panic: %s", e)
+				K3LogError("consumer log panic: %s", e)
 			}
 
 			k.wg.Done()

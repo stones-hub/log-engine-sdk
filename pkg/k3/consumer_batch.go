@@ -194,6 +194,10 @@ func initBatchConsumer(config K3BatchConsumerConfig) (protocol.K3Consumer, error
 		go func() {
 			t := time.NewTicker(time.Duration(interval) * time.Second)
 			defer func() {
+				if r := recover(); r != nil {
+					K3LogError("Auto flush goroutine panic: %v\n", r)
+				}
+
 				t.Stop()
 				k3BatchConsumer.wg.Done()
 			}()
