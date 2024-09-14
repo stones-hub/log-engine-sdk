@@ -33,6 +33,7 @@ test:
 	@go test -v ./...
 
 build:
+	@mkdir -p log
 	@go build -ldflags "-w -s $(GO_LDFLAGS)" -x -a -o $(SERVER_BIN) ./cmd/main.go
 
 clean:
