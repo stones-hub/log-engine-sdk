@@ -24,16 +24,17 @@ var (
 	GlobalWatchClose = make(chan struct{})
 	GlobalWatcher    *fsnotify.Watcher
 
-	// 用于存储文件读取状态
+	// GlobalFileStates 用于存储文件读取状态
 	GlobalFileStates   = make(map[string]*FileState)
 	GlobalFileStatesFd = make(map[string]*FileSateFd)
-	// 用于解决stateFile文件读写的锁
+	// GlobalSateFileLock 用于解决stateFile文件读写的锁
 	GlobalSateFileLock sync.Mutex
 )
 
+// TODO 考虑从配置文件读取相关信息,  同时考虑每次文件编号的offset的更新，避免长期不更新导致不可预估的问题
+
 var dataAnalytics k3.DataAnalytics
 
-// TODO 考虑从配置文件读取相关信息,  同时考虑每次文件编号的offset的更新，避免长期不更新导致不可预估的问题
 func InitConsumerLog() error {
 	var (
 		elk      *sender.ELKServer
@@ -150,7 +151,7 @@ func Run(directory string, stateFile string) error {
 
 	// 4.清理掉目录中已经不存在的文件
 	for fileName, _ = range GlobalFileStates {
-		if inArray(fileNames, fileName) == false {
+		if k3.InArray(fileNames, fileName) == false {
 			delete(GlobalFileStates, fileName)
 		}
 	}
@@ -408,15 +409,4 @@ func SyncToSateFile(filePath string) error {
 	}
 
 	return nil
-}
-
-func inArray(slice []string, item string) bool {
-
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-
-	return false
 }
