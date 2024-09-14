@@ -2,5 +2,5 @@
 system:
   print_enabled: true
   use_elk : true
-  read_path: ["/log/","/example/"]
+  read_path: ["/example/"]
   state_file_path: "/state/core.json"

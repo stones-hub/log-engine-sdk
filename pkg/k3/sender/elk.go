@@ -60,7 +60,9 @@ func NewELKServerWithConfig(elkServerConfig config.ELK) (*ELKServer, error) {
 func (e *ELKServer) Send(data []protocol.Data) error {
 
 	for _, d := range data {
-		fmt.Println(d)
+		if err := config.GlobalConsumer.Add(d); err != nil {
+			k3.K3LogError("Failed to add data to consumer: %v", err)
+		}
 	}
 
 	return nil

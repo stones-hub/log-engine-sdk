@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/koding/multiconfig"
+	"log-engine-sdk/pkg/k3/protocol"
 	"strings"
 	"sync"
 )
@@ -29,8 +30,9 @@ type System struct {
 }
 
 var (
-	once         sync.Once
-	GlobalConfig = new(Config)
+	once           sync.Once
+	GlobalConfig   = new(Config)
+	GlobalConsumer protocol.K3Consumer
 )
 
 func MustLoad(fpaths ...string) {

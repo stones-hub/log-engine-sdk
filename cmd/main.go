@@ -26,6 +26,17 @@ func main() {
 		config.GlobalConfig.System.RootPath = dir
 	}
 
+	// 初始化日志记录器
+	config.GlobalConsumer, _ = k3.NewLogConsumerWithConfig(k3.K3LogConsumerConfig{
+		Directory:      dir + "/log",
+		RoteMode:       k3.ROTATE_DAILY,
+		FileSize:       1024,
+		FileNamePrefix: "disk",
+		ChannelSize:    1024,
+	})
+
+	defer config.GlobalConsumer.Close()
+
 	// 获取configs文件目录所有文件
 	if configs, err = k3.FetchDirectory(dir+"/configs", -1); err != nil {
 		k3.K3LogError("fetch directory error: %s", err)
