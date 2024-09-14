@@ -1,7 +1,5 @@
 package main
 
-import "log-engine-sdk/pkg/k3/watch"
-
 type Temp struct {
 	Name string `json:"name,omitempty"`
 	Age  int    `json:"age,omitempty"`
@@ -9,8 +7,20 @@ type Temp struct {
 
 func main() {
 
-	fPath := "/Users/yelei/data/code/go-projects/log-engine-sdk/example/logs"
-	fStatePath := "/Users/yelei/data/code/go-projects/log-engine-sdk/example/logs/sate/state.json"
-	watch.Run(fPath, fStatePath)
+	/*
+		fPath := "/Users/yelei/data/code/go-projects/log-engine-sdk/example/logs"
+		fStatePath := "/Users/yelei/data/code/go-projects/log-engine-sdk/example/logs/sate/state.json"
+		watch.Run(fPath, fStatePath)
 
+
+	*/
 }
+1231231
+1231231
+1231231
+1231231
+1231231
+1231231
+1231231
+1231231
+1231231

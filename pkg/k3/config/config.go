@@ -7,31 +7,28 @@ import (
 )
 
 type Config struct {
-	ELK    ELK
-	System System
+	ELK    ELK    `yaml:"elk" json:"elk" toml:"elk"`
+	System System `yaml:"system" json:"system" toml:"system"`
 }
 
 // TODO 需要考虑ELK的真实的配置需要哪些，目前只写了一些
 type ELK struct {
-	Addresses []string `yaml:"addresses"` // A list of Elasticsearch nodes to use.
-	Username  string   `yaml:"username"`  // Username for HTTP Basic Authentication.
-	Password  string   `yaml:"password"`  // Password for HTTP Basic Authentication.
-	APIKey    string   `yaml:"api_key"`   // Base64-encoded token for authorization; if set, overrides username/password and service token.
+	Address  []string `yaml:"address" json:"addresses,omitempty" toml:"addresses"` // A list of Elasticsearch nodes to use.
+	Username string   `yaml:"username" json:"username,omitempty" toml:"username"`  // Username for HTTP Basic Authentication.
+	Password string   `yaml:"password" json:"password,omitempty" toml:"password"`  // Password for HTTP Basic Authentication.
+	ApiKey   string   `yaml:"api_key" json:"api_key,omitempty" toml:"api_key"`     // Base64-encoded token for authorization; if set, overrides username/password and service token.W0l
 }
 
 type System struct {
-	Version        string `yaml:"version"`
-	UseELK         bool   `yaml:"use_elk"`
-	ReadLogPath    string `yaml:"read_log_path"` // 要读取的日志文件路径
-	AccountId      string `yaml:"account_id"`
-	AppId          string `yaml:"app_id"`
-	WatchDirectory string `yaml:"watch_directory"`
-	StateFilePath  string `yaml:"state_file_path"`
+	PrintEnabled  bool     `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
+	UseELK        bool     `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
+	ReadPath      []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
+	StateFilePath string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
 }
 
 var (
 	once         sync.Once
-	GlobalConfig Config
+	GlobalConfig = new(Config)
 )
 
 func MustLoad(fpaths ...string) {
@@ -65,7 +62,6 @@ func MustLoad(fpaths ...string) {
 			Validator: multiconfig.MultiValidator(&multiconfig.RequiredValidator{}),
 		}
 
-		m.MustLoad(&GlobalConfig)
-
+		m.MustLoad(GlobalConfig)
 	})
 }

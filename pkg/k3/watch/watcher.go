@@ -56,7 +56,7 @@ func InitConsumerLog() error {
 }
 
 // InitWatcher 监听指定目录下的文件变化
-func InitWatcher(path string) (*fsnotify.Watcher, error) {
+func InitWatcher(paths []string) (*fsnotify.Watcher, error) {
 	var (
 		err error
 	)
@@ -74,8 +74,8 @@ func InitWatcher(path string) (*fsnotify.Watcher, error) {
 			if r := recover(); r != nil {
 				k3.K3LogError("InitWatcher Recover: %s", r)
 			}
-
 			GlobalWatchSg.Done()
+			ForceExit()
 		}()
 
 		for {
@@ -102,8 +102,26 @@ func InitWatcher(path string) (*fsnotify.Watcher, error) {
 		}
 	}()
 
-	if err = GlobalWatcher.Add(path); err != nil {
-		return GlobalWatcher, err
+	// 初始化时，需要监控所有的子目录
+	for _, dir := range paths {
+		err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				// 添加子目录到监视器
+				k3.K3LogInfo("Adding directory to watch: %s", path)
+				err = GlobalWatcher.Add(path)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return GlobalWatcher, nil
@@ -119,7 +137,7 @@ type FileSateFd struct {
 	Fd *os.File
 }
 
-func Run(directory string, stateFile string) error {
+func Run(directorys []string, stateFile string) error {
 	var (
 		err       error
 		fileNames []string
@@ -128,7 +146,7 @@ func Run(directory string, stateFile string) error {
 		file      *os.File
 	)
 
-	k3.K3LogInfo("WatchDirectory: %s, StateFile: %s", directory, stateFile)
+	k3.K3LogInfo("WatchDirectory: %s, StateFile: %s", directorys, stateFile)
 
 	if err = InitConsumerLog(); err != nil {
 		return err
@@ -145,8 +163,12 @@ func Run(directory string, stateFile string) error {
 	}
 
 	// 3. 遍历WatchDirectory下的所有文件
-	if fileNames, err = k3.FetchDirectory(directory, -1); err != nil {
-		return err
+	for _, dir := range directorys {
+		if names, err := k3.FetchDirectory(dir, -1); err != nil {
+			return err
+		} else {
+			fileNames = append(fileNames, names...)
+		}
 	}
 
 	// 4.清理掉目录中已经不存在的文件
@@ -184,7 +206,7 @@ func Run(directory string, stateFile string) error {
 	k3.K3LogInfo("数据初始化完毕: \n GlobalFileStates: %+v \n; GlobalFileStatesFd: %+v\n", GlobalFileStates, GlobalFileStatesFd)
 
 	// 8. 监听watchDirectory下的文件变化，当文件发生变化时，读取文件内容，直到最后一个\n 结束， 最后更新fileStates和stateFile
-	if _, err = InitWatcher(directory); err != nil {
+	if _, err = InitWatcher(directorys); err != nil {
 		Clean()
 		return err
 	}
@@ -261,10 +283,17 @@ func Clean() {
 func handleEvent(event fsnotify.Event) {
 	log.Println("event:", event)
 	if event.Op&fsnotify.Write == fsnotify.Write { // 写入
+
+		if GlobalFileStatesFd[event.Name] == nil {
+			k3.K3LogError("handleEvent write error : %s", event.Name)
+			return
+		}
+
 		offset, err := ReadFileByOffset(GlobalFileStatesFd[event.Name].Fd, GlobalFileStates[event.Name].Offset)
 		if err != nil {
 			k3.K3LogError("ReadFileByOffset error: %s", err)
 		}
+
 		UpdateFileStateOffset(event.Name, offset)
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove { // 删除
 		// TODO 删除文件， 更新状态文件
@@ -409,4 +438,8 @@ func SyncToSateFile(filePath string) error {
 	}
 
 	return nil
+}
+
+func ForceExit() {
+	_ = syscall.Kill(os.Getpid(), syscall.SIGHUP)
 }

@@ -1,8 +1,7 @@
-
+#elk configuration
 elk:
-  host: "localhost"
-  port: 9200
-  index: "elk"
-  type: "log"
-  index_type: "date"
+  address: ["http://localhost:9200", "http://localhost:9100"]
+  username: "elastic"
+  password: "changeme"
+  api_key: "elastic:changeme"
 

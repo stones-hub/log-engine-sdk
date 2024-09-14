@@ -1,7 +1,6 @@
-
+#system configuration
 system:
+  print_enabled: true
   use_elk : true
-  version: "1.0"
-  read_path: "logs/"
-  account_id : "000000000000"
-  app_id : "000000000000"
+  read_path: ["/log/","/example/"]
+  state_file_path: "/state/core.json"

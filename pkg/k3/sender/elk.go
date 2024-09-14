@@ -29,10 +29,10 @@ func NewELKServer(address []string, username, password, apikey string) (*ELKServ
 	}
 
 	return NewELKServerWithConfig(config.ELK{
-		Addresses: address,
-		Username:  username,
-		Password:  password,
-		APIKey:    apikey,
+		Address:  address,
+		Username: username,
+		Password: password,
+		ApiKey:   apikey,
 	})
 }
 
@@ -44,10 +44,10 @@ func NewELKServerWithConfig(elkServerConfig config.ELK) (*ELKServer, error) {
 	)
 
 	cfg = elasticsearch.Config{
-		Addresses: elkServerConfig.Addresses,
+		Addresses: elkServerConfig.Address,
 		Username:  elkServerConfig.Username,
 		Password:  elkServerConfig.Password,
-		APIKey:    elkServerConfig.APIKey,
+		APIKey:    elkServerConfig.ApiKey,
 	}
 
 	if client, err = elasticsearch.NewClient(cfg); err != nil {
