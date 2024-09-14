@@ -20,9 +20,10 @@ import (
 )
 
 var (
-	GlobalWatchSg    *sync.WaitGroup
-	GlobalWatchClose = make(chan struct{})
-	GlobalWatcher    *fsnotify.Watcher
+	GlobalWatchSg                *sync.WaitGroup
+	GlobalWatchClose             = make(chan struct{})
+	GlobalWatcher                *fsnotify.Watcher
+	GlobalForceSyncStateFileChan = make(chan struct{})
 
 	// GlobalFileStates 用于存储文件读取状态
 	GlobalFileStates   = make(map[string]*FileState)
@@ -30,8 +31,6 @@ var (
 	// GlobalSateFileLock 用于解决stateFile文件读写的锁
 	GlobalSateFileLock sync.Mutex
 )
-
-// TODO 考虑从配置文件读取相关信息,  同时考虑每次文件编号的offset的更新，避免长期不更新导致不可预估的问题
 
 var dataAnalytics k3.DataAnalytics
 
@@ -56,7 +55,7 @@ func InitConsumerLog() error {
 }
 
 // InitWatcher 监听指定目录下的文件变化
-func InitWatcher(paths []string) (*fsnotify.Watcher, error) {
+func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 	var (
 		err error
 	)
@@ -68,7 +67,6 @@ func InitWatcher(paths []string) (*fsnotify.Watcher, error) {
 	}
 
 	GlobalWatchSg.Add(1)
-
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -85,19 +83,24 @@ func InitWatcher(paths []string) (*fsnotify.Watcher, error) {
 					k3.K3LogError("WatchEvents error : %v", ok)
 					return
 				}
+				handleEvent(event, stateFile)
 
-				handleEvent(event)
 			case err, ok := <-GlobalWatcher.Errors:
 				if !ok {
 					k3.K3LogError("WatchErrors error : %v", ok)
 					return
 				}
-
 				k3.K3LogError("WatchErrors: %s", err)
 
 			case <-GlobalWatchClose:
 				k3.K3LogInfo("Watcher been Closed.")
 				return
+
+			case <-GlobalForceSyncStateFileChan:
+				k3.K3LogInfo("Force Sync StateFile")
+				if err := SyncToSateFile(stateFile); err != nil {
+					k3.K3LogError("SyncToSateFile error: %s", err)
+				}
 			}
 		}
 	}()
@@ -203,16 +206,36 @@ func Run(directorys []string, stateFile string) error {
 		}
 	}
 
-	k3.K3LogInfo("数据初始化完毕: \n GlobalFileStates: %+v \n; GlobalFileStatesFd: %+v\n", GlobalFileStates, GlobalFileStatesFd)
+	k3.K3LogInfo("数据初始化完毕: \n GlobalFileStates: %+v \n\n GlobalFileStatesFd: %+v\n", GlobalFileStates, GlobalFileStatesFd)
 
 	// 8. 监听watchDirectory下的文件变化，当文件发生变化时，读取文件内容，直到最后一个\n 结束， 最后更新fileStates和stateFile
-	if _, err = InitWatcher(directorys); err != nil {
+	if _, err = InitWatcher(directorys, stateFile); err != nil {
 		Clean()
 		return err
 	}
 
+	Clock()
+
 	GraceExit(stateFile)
 	return nil
+}
+
+// 定时器，定时更新statefile
+func Clock() {
+
+	var ticker = time.NewTicker(60 * time.Second)
+
+	go func() {
+		defer func() {
+			ticker.Stop()
+		}()
+
+		for {
+			<-ticker.C
+			k3.K3LogInfo("Clock: %s, update state file.", time.Now().Format("2006-01-02 15:04:05"))
+			GlobalForceSyncStateFileChan <- struct{}{}
+		}
+	}()
 }
 
 // GraceExit 保持进程常驻， 等待信号在退出
@@ -257,6 +280,7 @@ func GraceExit(stateFile string) {
 	os.Exit(state)
 }
 
+// Clean 关闭所有资源
 func Clean() {
 	// 终止watch进程
 	close(GlobalWatchClose)
@@ -275,32 +299,108 @@ func Clean() {
 		fileStatesFd.Fd.Close()
 	}
 
-	// 关闭数据收集器
+	// 关闭数据收集器, 并将所有内存数据提交给日志集群
 	dataAnalytics.Close()
 }
 
-// TODO 处理每次文件变化, 并将数据发送给consumer_batch
-func handleEvent(event fsnotify.Event) {
+// handleEvent 处理文件事件
+func handleEvent(event fsnotify.Event, stateFile string) {
 	log.Println("event:", event)
+
 	if event.Op&fsnotify.Write == fsnotify.Write { // 写入
 
 		if GlobalFileStatesFd[event.Name] == nil {
 			k3.K3LogError("handleEvent write error : %s", event.Name)
 			return
 		}
-
 		offset, err := ReadFileByOffset(GlobalFileStatesFd[event.Name].Fd, GlobalFileStates[event.Name].Offset)
 		if err != nil {
 			k3.K3LogError("ReadFileByOffset error: %s", err)
 		}
-
 		UpdateFileStateOffset(event.Name, offset)
+
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove { // 删除
-		// TODO 删除文件， 更新状态文件
+
+		// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
+		if err := GlobalWatcher.Remove(event.Name); err != nil {
+			k3.K3LogError("WatchRemove Remove watch [%s] error: %s", event.Name, err)
+		}
+
+		// 关闭文件
+		if _, ok := GlobalFileStatesFd[event.Name]; ok {
+			GlobalFileStatesFd[event.Name].Fd.Close()
+			delete(GlobalFileStatesFd, event.Name)
+		}
+
+		// 删除文件
+		if _, ok := GlobalFileStates[event.Name]; ok {
+			delete(GlobalFileStates, event.Name)
+		}
+
+		// 更新状态文件
+		if err := SyncToSateFile(stateFile); err != nil {
+			k3.K3LogError("WatchRemove SyncToSateFile error: %s", err)
+		}
+
 	} else if event.Op&fsnotify.Create == fsnotify.Create { // 创建
 
+		// 判断是否是目录，如果是目录需要添加监控
+		if fileInfo, err := os.Stat(event.Name); err != nil {
+			k3.K3LogError("WatchCreate Stat error: %s", err)
+		} else {
+			if fileInfo.IsDir() && GlobalWatcher != nil {
+				GlobalWatcher.Add(event.Name)
+				k3.K3LogInfo("WatchCreate add watch path: %s", event.Name)
+				return
+			}
+		}
+
+		// 添加到fileStates
+		if _, ok := GlobalFileStates[event.Name]; !ok {
+			GlobalFileStates[event.Name] = &FileState{
+				Path:   event.Name,
+				Offset: 0,
+			}
+		}
+
+		// 添加到fileStatesFd
+		if _, ok := GlobalFileStatesFd[event.Name]; !ok {
+			if file, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
+				k3.K3LogError("WatchCreate OpenFile error: %s", err)
+			} else {
+				GlobalFileStatesFd[event.Name] = &FileSateFd{
+					Fd: file,
+				}
+			}
+		}
+
+		if err := SyncToSateFile(stateFile); err != nil {
+			k3.K3LogError("WatchCreate SyncToSateFile error: %s", err)
+		}
+
 	} else if event.Op&fsnotify.Rename == fsnotify.Rename { // 重命名
-		log.Println("Rename event:", event.Name)
+
+		// 文件被改名了， Rename过来的名字是原来的名字，所有要更新
+		// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
+		if err := GlobalWatcher.Remove(event.Name); err != nil {
+			k3.K3LogError("WatchRename Rename watch [%s] error: %s", event.Name, err)
+		}
+
+		// 关闭文件
+		if _, ok := GlobalFileStatesFd[event.Name]; ok {
+			GlobalFileStatesFd[event.Name].Fd.Close()
+			delete(GlobalFileStatesFd, event.Name)
+		}
+
+		// 删除文件
+		if _, ok := GlobalFileStates[event.Name]; ok {
+			delete(GlobalFileStates, event.Name)
+		}
+
+		// 更新状态文件
+		if err := SyncToSateFile(stateFile); err != nil {
+			k3.K3LogError("WatchRemove SyncToSateFile error: %s", err)
+		}
 	}
 }
 
@@ -440,6 +540,7 @@ func SyncToSateFile(filePath string) error {
 	return nil
 }
 
+// ForceExit 强制退出当前程序
 func ForceExit() {
 	_ = syscall.Kill(os.Getpid(), syscall.SIGHUP)
 }
