@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"log-engine-sdk/pkg/k3"
+	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
 	"os"
@@ -407,11 +408,13 @@ func handleEvent(event fsnotify.Event, stateFile string) {
 // ReadFileByOffset 读取文件内容， 从offset开始，直到遇到\n, 返回读取后，最后的偏移量
 func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 	var (
-		err       error
-		reader    *bufio.Reader
-		content   string
-		newOffset int64
+		err              error
+		reader           *bufio.Reader
+		content          string
+		newOffset        int64
+		currentReadIndex int // 当前读取次数
 	)
+	currentReadIndex = 0
 	newOffset = offset
 
 	// 移动到offset位置, 从文件开始移动
@@ -420,7 +423,12 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 	}
 
 	reader = bufio.NewReader(fd)
-	for {
+
+	for currentReadIndex <= config.GlobalConfig.System.MaxReadCount {
+
+		// 控制最多读取次数
+		currentReadIndex++
+
 		line, err := reader.ReadString('\n')
 
 		if err != nil && err != io.EOF {
@@ -454,13 +462,12 @@ EXIT:
 func sendDataToConsumer(content string) {
 	var (
 		// TODO 后期可以考虑将参数作为配置文件
-		accountId  string
-		appId      string
-		eventName  string
-		uuid       string
-		ip         string
-		properties = make(map[string]interface{})
-		datas      []string
+		accountId string
+		appId     string
+		eventName string
+		uuid      string
+		ip        string
+		datas     []string
 	)
 
 	accountId = "yelei@3k.com"
@@ -484,11 +491,14 @@ func sendDataToConsumer(content string) {
 		if len(data) == 0 {
 			continue
 		}
-		properties[uuid] = data
+
+		if err := dataAnalytics.Track(accountId, appId, eventName, uuid, ip, map[string]interface{}{
+			"data": data,
+		}); err != nil {
+			k3.K3LogError("sendDataToConsumer error: %s", err)
+		}
 	}
-	if err := dataAnalytics.Track(accountId, appId, eventName, uuid, ip, properties); err != nil {
-		k3.K3LogError("sendDataToConsumer error: %s", err)
-	}
+
 }
 
 func UpdateFileStateOffset(fileName string, offset int64) {

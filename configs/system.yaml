@@ -2,5 +2,7 @@
 system:
   print_enabled: true
   use_elk : true
-  read_path: ["/example/"]
+  read_path: ["/Users/yelei/data/code/go-projects/logs"]
+  max_read_count: 100
   state_file_path: "/state/core.json"
+  root_path: ""
