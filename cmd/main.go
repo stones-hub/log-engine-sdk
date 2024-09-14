@@ -57,7 +57,7 @@ func main() {
 	)
 
 	for _, readDir := range config.GlobalConfig.System.ReadPath {
-		ReadDirectory = append(ReadDirectory, dir+readDir)
+		ReadDirectory = append(ReadDirectory, readDir)
 	}
 
 	err = watch.Run(ReadDirectory, dir+config.GlobalConfig.System.StateFilePath)
