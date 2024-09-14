@@ -21,6 +21,11 @@ func main() {
 		return
 	}
 
+	// 注入RootPath
+	if len(config.GlobalConfig.System.RootPath) == 0 {
+		config.GlobalConfig.System.RootPath = dir
+	}
+
 	// 获取configs文件目录所有文件
 	if configs, err = k3.FetchDirectory(dir+"/configs", -1); err != nil {
 		k3.K3LogError("fetch directory error: %s", err)

@@ -17,6 +17,7 @@ type ELK struct {
 	Username string   `yaml:"username" json:"username,omitempty" toml:"username"`  // Username for HTTP Basic Authentication.
 	Password string   `yaml:"password" json:"password,omitempty" toml:"password"`  // Password for HTTP Basic Authentication.
 	ApiKey   string   `yaml:"api_key" json:"api_key,omitempty" toml:"api_key"`     // Base64-encoded token for authorization; if set, overrides username/password and service token.W0l
+
 }
 
 type System struct {
@@ -24,6 +25,7 @@ type System struct {
 	UseELK        bool     `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
 	ReadPath      []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
 	StateFilePath string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
+	RootPath      string   `yaml:"root_path" json:"root_path" toml:"root_path"`
 }
 
 var (

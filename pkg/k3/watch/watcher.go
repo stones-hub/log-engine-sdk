@@ -220,7 +220,7 @@ func Run(directorys []string, stateFile string) error {
 	return nil
 }
 
-// 定时器，定时更新statefile
+// Clock 定时器，定时更新statefile
 func Clock() {
 
 	var ticker = time.NewTicker(60 * time.Second)
@@ -445,16 +445,50 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 	}
 
 EXIT:
-	k3.K3LogInfo("ReadFileByOffset: %s, content: %s", fd.Name(), content)
-
-	// TODO 封装发送函数
-	if err = dataAnalytics.Track("1001", "appid-1001", "file_read", k3.GenerateUUID(), "", map[string]interface{}{
-		"content": content,
-	}); err != nil {
-		k3.K3LogError("Track error: %s", err)
-	}
-
+	// k3.K3LogInfo("ReadFileByOffset: %s, content: %s", fd.Name(), content)
+	sendDataToConsumer(content)
 	return newOffset, nil
+}
+
+// sendDataToConsumer 将数据发送到数据收集器
+func sendDataToConsumer(content string) {
+	var (
+		// TODO 后期可以考虑将参数作为配置文件
+		accountId  string
+		appId      string
+		eventName  string
+		uuid       string
+		ip         string
+		properties = make(map[string]interface{})
+		datas      []string
+	)
+
+	accountId = "yelei@3k.com"
+	appId = "center.3k.com"
+	eventName = "admin_log"
+	uuid = k3.GenerateUUID()
+	if ips, err := k3.GetLocalIPs(); err != nil {
+		k3.K3LogError("GetLocalIPs error: %s", err)
+		ip = "10.10.10.1"
+	} else {
+		if len(ips) >= 1 {
+			ip = ips[0]
+		}
+	}
+	datas = strings.Split(content, "\n")
+
+	for _, data := range datas {
+		data = strings.TrimSpace(data)
+		data = strings.Trim(data, "\n")
+
+		if len(data) == 0 {
+			continue
+		}
+		properties[uuid] = data
+	}
+	if err := dataAnalytics.Track(accountId, appId, eventName, uuid, ip, properties); err != nil {
+		k3.K3LogError("sendDataToConsumer error: %s", err)
+	}
 }
 
 func UpdateFileStateOffset(fileName string, offset int64) {
