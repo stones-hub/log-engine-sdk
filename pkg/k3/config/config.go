@@ -10,6 +10,7 @@ import (
 type Config struct {
 	ELK    ELK    `yaml:"elk" json:"elk" toml:"elk"`
 	System System `yaml:"system" json:"system" toml:"system"`
+	Http   Http   `yaml:"http" json:"http" toml:"http"`
 }
 
 // TODO 需要考虑ELK的真实的配置需要哪些，目前只写了一些
@@ -32,6 +33,14 @@ type System struct {
 	ConsumerBatchSize      int      `yaml:"consumer_batch_size"`
 	ConsumerBatchInterval  int      `yaml:"consumer_batch_interval"` // 秒
 	ConsumerBatchCapacity  int      `yaml:"consumer_batch_capacity"`
+}
+
+type Http struct {
+	Port         int    `yaml:"port"`
+	Host         string `yaml:"host"`
+	ReadTimeout  int    `yaml:"read_timeout"`
+	WriteTimeout int    `yaml:"write_timeout"`
+	IdleTimeout  int    `yaml:"idle_timeout"`
 }
 
 var (

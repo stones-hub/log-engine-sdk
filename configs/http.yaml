@@ -1,0 +1,6 @@
+http:
+  port: 8080
+  host: localhost
+  read_timeout: 5
+  write_timeout: 5
+  idle_timeout: 5

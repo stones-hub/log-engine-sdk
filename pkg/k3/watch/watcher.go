@@ -217,6 +217,8 @@ func Run(directorys []string, stateFile string) error {
 
 	Clock()
 
+	k3.HttpServer()
+
 	GraceExit(stateFile)
 	return nil
 }
