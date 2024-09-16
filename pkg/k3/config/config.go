@@ -22,12 +22,16 @@ type ELK struct {
 }
 
 type System struct {
-	PrintEnabled  bool     `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
-	UseELK        bool     `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
-	ReadPath      []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
-	StateFilePath string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
-	RootPath      string   `yaml:"root_path" json:"root_path" toml:"root_path"`
-	MaxReadCount  int      `yaml:"max_read_count"` // max_read_count
+	PrintEnabled           bool     `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
+	UseELK                 bool     `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
+	ReadPath               []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
+	StateFilePath          string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
+	RootPath               string   `yaml:"root_path" json:"root_path" toml:"root_path"`
+	MaxReadCount           int      `yaml:"max_read_count"` // max_read_count
+	ConsumerLogChannelSize int      `yaml:"consumer_log_channel_size"`
+	ConsumerBatchSize      int      `yaml:"consumer_batch_size"`
+	ConsumerBatchInterval  int      `yaml:"consumer_batch_interval"` // 秒
+	ConsumerBatchCapacity  int      `yaml:"consumer_batch_capacity"`
 }
 
 var (
