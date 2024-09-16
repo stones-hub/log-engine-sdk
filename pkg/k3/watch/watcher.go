@@ -217,7 +217,8 @@ func Run(directorys []string, stateFile string) error {
 
 	Clock()
 
-	k3.HttpServer()
+	// TODO 考虑失败情况下需要清理资源
+	// clean, err := k3.HttpServer(context.Background())
 
 	GraceExit(stateFile)
 	return nil
