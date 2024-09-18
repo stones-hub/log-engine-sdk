@@ -36,11 +36,12 @@ type System struct {
 }
 
 type Http struct {
-	Port         int    `yaml:"port"`
-	Host         string `yaml:"host"`
-	ReadTimeout  int    `yaml:"read_timeout"`
-	WriteTimeout int    `yaml:"write_timeout"`
-	IdleTimeout  int    `yaml:"idle_timeout"`
+	Port            int    `yaml:"port"`
+	Host            string `yaml:"host"`
+	ReadTimeout     int    `yaml:"read_timeout"`
+	WriteTimeout    int    `yaml:"write_timeout"`
+	IdleTimeout     int    `yaml:"idle_timeout"`
+	ShutdownTimeout int    `yaml:"shutdown_timeout"`
 }
 
 var (

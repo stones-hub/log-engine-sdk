@@ -4,3 +4,4 @@ http:
   read_timeout: 5
   write_timeout: 5
   idle_timeout: 5
+  shutdown_timeout: 5

@@ -2,6 +2,7 @@ package watch
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
@@ -217,10 +218,10 @@ func Run(directorys []string, stateFile string) error {
 
 	Clock()
 
-	// TODO 考虑失败情况下需要清理资源
-	// clean, err := k3.HttpServer(context.Background())
+	// 启动http服务器
+	httpClean, _ := k3.HttpServer(context.Background())
 
-	GraceExit(stateFile)
+	GraceExit(stateFile, httpClean)
 	return nil
 }
 
@@ -243,7 +244,7 @@ func Clock() {
 }
 
 // GraceExit 保持进程常驻， 等待信号在退出
-func GraceExit(stateFile string) {
+func GraceExit(stateFile string, cleanFuncs ...func()) {
 	var (
 		state      = -1
 		signalChan = make(chan os.Signal, 1)
@@ -278,6 +279,11 @@ func GraceExit(stateFile string) {
 	// 退出前全量更新一次state file文件内容
 	if err = SyncToSateFile(stateFile); err != nil {
 		k3.K3LogError("Closed watcher run save stateFile error: %s", err)
+	}
+
+	// 清理各种资源
+	for _, cleanFunc := range cleanFuncs {
+		cleanFunc()
 	}
 
 	time.Sleep(1 * time.Second)
