@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	GlobalWatchSg                *sync.WaitGroup
+	GlobalWatchSg                = &sync.WaitGroup{}
 	GlobalWatchClose             = make(chan struct{})
 	GlobalWatcher                *fsnotify.Watcher
 	GlobalForceSyncStateFileChan = make(chan struct{})
@@ -58,7 +58,6 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 	var (
 		err error
 	)
-	GlobalWatchSg = &sync.WaitGroup{}
 
 	if GlobalWatcher, err = fsnotify.NewWatcher(); err != nil {
 		k3.K3LogError("WatchDirectory: %s", err)
@@ -105,7 +104,7 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 		}
 	}()
 
-	// 初始化时，需要监控所有的子目录
+	// 初始化时，需要监控所有的子目录, 递归遍历目录下的所有文件
 	for _, dir := range paths {
 		err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -219,7 +218,7 @@ func Run(directorys []string, stateFile string) error {
 	return nil
 }
 
-// Clean 关闭所有资源
+// Clean 关闭所有资源, 其中包含 watch和数据收集器的
 func Clean() {
 	// 终止watch进程
 	close(GlobalWatchClose)
@@ -252,11 +251,11 @@ func handleEvent(event fsnotify.Event, stateFile string) {
 			k3.K3LogError("handleEvent write error : %s", event.Name)
 			return
 		}
-		offset, err := ReadFileByOffset(GlobalFileStatesFd[event.Name].Fd, GlobalFileStates[event.Name].Offset)
+		offset, err := readFileByOffset(GlobalFileStatesFd[event.Name].Fd, GlobalFileStates[event.Name].Offset)
 		if err != nil {
 			k3.K3LogError("ReadFileByOffset error: %s", err)
 		}
-		UpdateFileStateOffset(event.Name, offset)
+		updateFileStateOffset(event.Name, offset)
 
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove { // 删除
 
@@ -344,7 +343,7 @@ func handleEvent(event fsnotify.Event, stateFile string) {
 }
 
 // ReadFileByOffset 读取文件内容， 从offset开始，直到遇到\n, 返回读取后，最后的偏移量
-func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
+func readFileByOffset(fd *os.File, offset int64) (int64, error) {
 	var (
 		err              error
 		reader           *bufio.Reader
@@ -439,7 +438,7 @@ func sendDataToConsumer(content string) {
 
 }
 
-func UpdateFileStateOffset(fileName string, offset int64) {
+func updateFileStateOffset(fileName string, offset int64) {
 	GlobalFileStates[fileName].Offset = offset
 }
 
