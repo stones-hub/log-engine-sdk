@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -70,7 +71,8 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 				k3.K3LogError("InitWatcher Recover: %s", r)
 			}
 			GlobalWatchSg.Done()
-			k3.ForceExit()
+			// 强制给自己发一个结束进程信号, 因为watch没有，毫无意义
+			syscall.Kill(os.Getpid(), syscall.SIGHUP)
 		}()
 
 		for {
