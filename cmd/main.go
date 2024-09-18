@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
@@ -21,12 +22,7 @@ func main() {
 		return
 	}
 
-	// 注入RootPath
-	if len(config.GlobalConfig.System.RootPath) == 0 {
-		config.GlobalConfig.System.RootPath = dir
-	}
-
-	// 初始化日志记录器
+	// 初始化日志记录器, 用于记录日志
 	config.GlobalConsumer, _ = k3.NewLogConsumerWithConfig(k3.K3LogConsumerConfig{
 		Directory:      dir + "/log",
 		RoteMode:       k3.ROTATE_DAILY,
@@ -34,7 +30,6 @@ func main() {
 		FileNamePrefix: "disk",
 		ChannelSize:    1024,
 	})
-
 	defer config.GlobalConsumer.Close()
 
 	// 获取configs文件目录所有文件
@@ -42,6 +37,11 @@ func main() {
 		k3.K3LogError("fetch directory error: %s", err)
 	}
 	config.MustLoad(configs...)
+
+	// 注入RootPath
+	if len(config.GlobalConfig.System.RootPath) == 0 {
+		config.GlobalConfig.System.RootPath = dir
+	}
 
 	if config.GlobalConfig.System.PrintEnabled == true {
 		if configJson, err := json.Marshal(config.GlobalConfig); err != nil {
@@ -65,4 +65,9 @@ func main() {
 	if err != nil {
 		k3.K3LogError("watch error: %s", err)
 	}
+
+	// 启动http服务器
+	httpClean, _ := k3.HttpServer(context.Background())
+
+	k3.GraceExit(dir+config.GlobalConfig.System.StateFilePath, httpClean)
 }

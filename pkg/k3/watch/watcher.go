@@ -2,7 +2,6 @@ package watch
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
@@ -13,11 +12,9 @@ import (
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -75,7 +72,7 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 				k3.K3LogError("InitWatcher Recover: %s", r)
 			}
 			GlobalWatchSg.Done()
-			ForceExit()
+			k3.ForceExit()
 		}()
 
 		for {
@@ -216,17 +213,13 @@ func Run(directorys []string, stateFile string) error {
 		return err
 	}
 
-	Clock()
+	ClockUpdateStateFile()
 
-	// 启动http服务器
-	httpClean, _ := k3.HttpServer(context.Background())
-
-	GraceExit(stateFile, httpClean)
 	return nil
 }
 
-// Clock 定时器，定时更新statefile
-func Clock() {
+// ClockUpdateStateFile 定时器，定时更新statefile
+func ClockUpdateStateFile() {
 
 	var ticker = time.NewTicker(60 * time.Second)
 
@@ -241,53 +234,6 @@ func Clock() {
 			GlobalForceSyncStateFileChan <- struct{}{}
 		}
 	}()
-}
-
-// GraceExit 保持进程常驻， 等待信号在退出
-func GraceExit(stateFile string, cleanFuncs ...func()) {
-	var (
-		state      = -1
-		signalChan = make(chan os.Signal, 1)
-		err        error
-	)
-
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
-
-	{
-	EXIT:
-		select {
-		case sig, ok := <-signalChan:
-			if !ok {
-				// 直接退出，关闭
-				break EXIT
-			}
-			switch sig {
-			case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-				state = 0
-				break EXIT
-			case syscall.SIGHUP:
-			default:
-				state = -1
-				break EXIT
-			}
-		}
-	}
-
-	// 关闭资源退出
-	Clean()
-
-	// 退出前全量更新一次state file文件内容
-	if err = SyncToSateFile(stateFile); err != nil {
-		k3.K3LogError("Closed watcher run save stateFile error: %s", err)
-	}
-
-	// 清理各种资源
-	for _, cleanFunc := range cleanFuncs {
-		cleanFunc()
-	}
-
-	time.Sleep(1 * time.Second)
-	os.Exit(state)
 }
 
 // Clean 关闭所有资源
@@ -591,9 +537,4 @@ func SyncToSateFile(filePath string) error {
 	}
 
 	return nil
-}
-
-// ForceExit 强制退出当前程序
-func ForceExit() {
-	_ = syscall.Kill(os.Getpid(), syscall.SIGHUP)
 }
