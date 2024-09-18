@@ -319,6 +319,8 @@ func doRemoveAndRenameEvent(name string, stateFile string) {
 	// 更新状态文件
 	if err := SyncToSateFile(stateFile); err != nil {
 		k3.K3LogError("WatchRemove SyncToSateFile error: %s", err)
+	} else {
+		k3.K3LogInfo("WatchRemove update state file success，delete file : %s", name)
 	}
 
 }
