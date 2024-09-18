@@ -43,7 +43,7 @@ func GraceExit(stateFile string, cleanFuncs ...func()) {
 		}
 	}
 
-	// 关闭资源退出
+	// 关闭资源退出, 清理 watch 和 batch 日志提交资源
 	watch.Clean()
 
 	// 退出前全量更新一次state file文件内容

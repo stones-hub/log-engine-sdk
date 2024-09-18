@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"io"
-	"log"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
@@ -96,7 +95,6 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 
 				// 强制同步一次state file
 			case <-GlobalForceSyncStateFileChan:
-				k3.K3LogInfo("Force Sync StateFile")
 				if err := SyncToSateFile(stateFile); err != nil {
 					k3.K3LogError("SyncToSateFile error: %s", err)
 				}
@@ -104,7 +102,7 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 		}
 	}()
 
-	// 初始化时，需要监控所有的子目录, 递归遍历目录下的所有文件
+	// 初始化时，需要监控所有的子目录, 递归遍历目录下的所有子目录
 	for _, dir := range paths {
 		err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -243,7 +241,6 @@ func Clean() {
 
 // handleEvent 处理文件事件
 func handleEvent(event fsnotify.Event, stateFile string) {
-	log.Println("event:", event)
 
 	if event.Op&fsnotify.Write == fsnotify.Write { // 写入
 
@@ -257,34 +254,12 @@ func handleEvent(event fsnotify.Event, stateFile string) {
 		}
 		updateFileStateOffset(event.Name, offset)
 
-	} else if event.Op&fsnotify.Remove == fsnotify.Remove { // 删除
-
-		// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
-		if err := GlobalWatcher.Remove(event.Name); err != nil {
-			k3.K3LogError("WatchRemove Remove watch [%s] error: %s", event.Name, err)
-		}
-
-		// 关闭文件
-		if _, ok := GlobalFileStatesFd[event.Name]; ok {
-			GlobalFileStatesFd[event.Name].Fd.Close()
-			delete(GlobalFileStatesFd, event.Name)
-		}
-
-		// 删除文件
-		if _, ok := GlobalFileStates[event.Name]; ok {
-			delete(GlobalFileStates, event.Name)
-		}
-
-		// 更新状态文件
-		if err := SyncToSateFile(stateFile); err != nil {
-			k3.K3LogError("WatchRemove SyncToSateFile error: %s", err)
-		}
-
 	} else if event.Op&fsnotify.Create == fsnotify.Create { // 创建
 
 		// 判断是否是目录，如果是目录需要添加监控
 		if fileInfo, err := os.Stat(event.Name); err != nil {
 			k3.K3LogError("WatchCreate Stat error: %s", err)
+			return
 		} else {
 			if fileInfo.IsDir() && GlobalWatcher != nil {
 				GlobalWatcher.Add(event.Name)
@@ -316,30 +291,34 @@ func handleEvent(event fsnotify.Event, stateFile string) {
 			k3.K3LogError("WatchCreate SyncToSateFile error: %s", err)
 		}
 
-	} else if event.Op&fsnotify.Rename == fsnotify.Rename { // 重命名
-
-		// 文件被改名了， Rename过来的名字是原来的名字，所有要更新
-		// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
-		if err := GlobalWatcher.Remove(event.Name); err != nil {
-			k3.K3LogError("WatchRename Rename watch [%s] error: %s", event.Name, err)
-		}
-
-		// 关闭文件
-		if _, ok := GlobalFileStatesFd[event.Name]; ok {
-			GlobalFileStatesFd[event.Name].Fd.Close()
-			delete(GlobalFileStatesFd, event.Name)
-		}
-
-		// 删除文件
-		if _, ok := GlobalFileStates[event.Name]; ok {
-			delete(GlobalFileStates, event.Name)
-		}
-
-		// 更新状态文件
-		if err := SyncToSateFile(stateFile); err != nil {
-			k3.K3LogError("WatchRemove SyncToSateFile error: %s", err)
-		}
+	} else if event.Op&fsnotify.Rename == fsnotify.Rename || event.Op&fsnotify.Remove == fsnotify.Remove { // 重命名
+		doRemoveAndRenameEvent(event.Name, stateFile)
 	}
+}
+
+func doRemoveAndRenameEvent(name string, stateFile string) {
+
+	// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
+	if err := GlobalWatcher.Remove(name); err != nil {
+		k3.K3LogError("WatchRemove Remove watch [%s] error: %s", name, err)
+	}
+
+	// 关闭文件
+	if _, ok := GlobalFileStatesFd[name]; ok {
+		GlobalFileStatesFd[name].Fd.Close()
+		delete(GlobalFileStatesFd, name)
+	}
+
+	// 删除文件
+	if _, ok := GlobalFileStates[name]; ok {
+		delete(GlobalFileStates, name)
+	}
+
+	// 更新状态文件
+	if err := SyncToSateFile(stateFile); err != nil {
+		k3.K3LogError("WatchRemove SyncToSateFile error: %s", err)
+	}
+
 }
 
 // ReadFileByOffset 读取文件内容， 从offset开始，直到遇到\n, 返回读取后，最后的偏移量

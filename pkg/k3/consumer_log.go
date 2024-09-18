@@ -132,7 +132,7 @@ func (k *K3LogConsumer) init() error {
 				}
 
 				jsonStr := parseTime(res)
-				K3LogInfo("write event data :%s", jsonStr)
+				// K3LogInfo("write event data :%s", jsonStr)
 				// 将管道的数据写入到 log 文件
 				k.rsyncFile(jsonStr)
 			}

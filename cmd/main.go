@@ -64,6 +64,7 @@ func main() {
 
 	if err != nil {
 		k3.K3LogError("watch error: %s", err)
+		return
 	}
 
 	// 启动http服务器
