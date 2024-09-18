@@ -22,7 +22,7 @@ func main() {
 		return
 	}
 
-	// 初始化日志记录器, 用于记录日志
+	// 初始化日志记录器, 用于记录日志同K3_log一样，只是单纯的用于记录日志而已
 	config.GlobalConsumer, _ = k3.NewLogConsumerWithConfig(k3.K3LogConsumerConfig{
 		Directory:      dir + "/log",
 		RoteMode:       k3.ROTATE_DAILY,
