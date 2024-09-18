@@ -68,6 +68,5 @@ func main() {
 
 	// 启动http服务器
 	httpClean, _ := k3.HttpServer(context.Background())
-
 	k3.GraceExit(dir+config.GlobalConfig.System.StateFilePath, httpClean)
 }

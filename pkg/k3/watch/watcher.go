@@ -33,7 +33,7 @@ var (
 
 var dataAnalytics k3.DataAnalytics
 
-func InitConsumerLog() error {
+func InitConsumerBatchLog() error {
 	var (
 		elk      *sender.ELKServer
 		err      error
@@ -86,7 +86,7 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 
 			case err, ok := <-GlobalWatcher.Errors:
 				if !ok {
-					k3.K3LogError("WatchErrors error : %v", ok)
+					k3.K3LogError("WatchErrors error : %v, %v", err, ok)
 					return
 				}
 				k3.K3LogError("WatchErrors: %s", err)
@@ -95,6 +95,7 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 				k3.K3LogInfo("Watcher been Closed.")
 				return
 
+				// 强制同步一次state file
 			case <-GlobalForceSyncStateFileChan:
 				k3.K3LogInfo("Force Sync StateFile")
 				if err := SyncToSateFile(stateFile); err != nil {
@@ -150,7 +151,7 @@ func Run(directorys []string, stateFile string) error {
 
 	k3.K3LogInfo("WatchDirectory: %s, StateFile: %s", directorys, stateFile)
 
-	if err = InitConsumerLog(); err != nil {
+	if err = InitConsumerBatchLog(); err != nil {
 		return err
 	}
 
@@ -216,24 +217,6 @@ func Run(directorys []string, stateFile string) error {
 	ClockUpdateStateFile()
 
 	return nil
-}
-
-// ClockUpdateStateFile 定时器，定时更新statefile
-func ClockUpdateStateFile() {
-
-	var ticker = time.NewTicker(60 * time.Second)
-
-	go func() {
-		defer func() {
-			ticker.Stop()
-		}()
-
-		for {
-			<-ticker.C
-			k3.K3LogInfo("Clock: %s, update state file.", time.Now().Format("2006-01-02 15:04:05"))
-			GlobalForceSyncStateFileChan <- struct{}{}
-		}
-	}()
 }
 
 // Clean 关闭所有资源
@@ -537,4 +520,22 @@ func SyncToSateFile(filePath string) error {
 	}
 
 	return nil
+}
+
+// ClockUpdateStateFile 定时器，定时更新statefile
+func ClockUpdateStateFile() {
+
+	var ticker = time.NewTicker(60 * time.Second)
+
+	go func() {
+		defer func() {
+			ticker.Stop()
+		}()
+
+		for {
+			<-ticker.C
+			k3.K3LogInfo("Clock: %s, update state file.", time.Now().Format("2006-01-02 15:04:05"))
+			GlobalForceSyncStateFileChan <- struct{}{}
+		}
+	}()
 }
