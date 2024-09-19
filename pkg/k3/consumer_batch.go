@@ -114,7 +114,10 @@ func (k *K3BatchConsumer) Close() error {
 		close(k.closed)
 		k.wg.Wait()
 	}
-	return k.FlushAll()
+	if err := k.FlushAll(); err != nil {
+		return err
+	}
+	return k.sender.Close()
 }
 
 type K3BatchConsumerConfig struct {

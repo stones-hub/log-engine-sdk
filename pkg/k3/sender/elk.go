@@ -157,10 +157,11 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 	}
 }
 
-func (e *ElasticSearchClient) Close() {
+func (e *ElasticSearchClient) Close() error {
 	close(e.dataChan)
 	e.sg.Wait()
 	// TODO 关闭客户端
+	return nil
 }
 
 func (e *ElasticSearchClient) Send(data []protocol.Data) error {

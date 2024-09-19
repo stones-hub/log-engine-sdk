@@ -20,4 +20,5 @@ type K3Consumer interface {
 
 type Sender interface {
 	Send(data []Data) error
+	Close() error
 }
