@@ -208,7 +208,7 @@ func Run(directorys []string, stateFile string) error {
 		}
 	}
 
-	k3.K3LogInfo("数据初始化完毕: \n GlobalFileStates: %+v \n\n GlobalFileStatesFd: %+v\n", GlobalFileStates, GlobalFileStatesFd)
+	k3.K3LogInfo("数据初始化完毕: File states count (%+v) ; File states fd count (%+v)", len(GlobalFileStates), len(GlobalFileStatesFd))
 
 	// 8. 监听watchDirectory下的文件变化，当文件发生变化时，读取文件内容，直到最后一个\n 结束， 最后更新fileStates和stateFile
 	if _, err = InitWatcher(directorys, stateFile); err != nil {
