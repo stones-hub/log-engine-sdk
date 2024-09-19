@@ -75,8 +75,9 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 			if r := recover(); r != nil {
 				k3.K3LogError("InitWatcher Recover: %s", r)
 			}
+
 			GlobalWatchSg.Done()
-			// 强制给自己发一个结束进程信号, 因为watch没有，毫无意义
+			// 目录监控程序出现了异常或者退出了，整个程序在继续已经没有意义, 强制给自己发一个结束进程信号, 结束整个程序
 			syscall.Kill(os.Getpid(), syscall.SIGHUP)
 		}()
 
@@ -89,12 +90,9 @@ func InitWatcher(paths []string, stateFile string) (*fsnotify.Watcher, error) {
 				}
 				handleEvent(event, stateFile)
 
-			case err, ok := <-GlobalWatcher.Errors:
-				if !ok {
-					k3.K3LogError("WatchErrors error : %v, %v", err, ok)
-					return
-				}
-				k3.K3LogError("WatchErrors: %s", err)
+			case err := <-GlobalWatcher.Errors:
+				k3.K3LogError("WatchErrors: %s", err.Error())
+				return
 
 			case <-GlobalWatchClose:
 				k3.K3LogInfo("Watcher been Closed.")
@@ -144,7 +142,7 @@ type FileSateFd struct {
 	Fd *os.File
 }
 
-func Run(directorys []string, stateFile string) error {
+func Run(directory []string, stateFile string) error {
 	var (
 		err       error
 		fileNames []string
@@ -153,8 +151,9 @@ func Run(directorys []string, stateFile string) error {
 		file      *os.File
 	)
 
-	k3.K3LogInfo("WatchDirectory: %s, StateFile: %s", directorys, stateFile)
+	k3.K3LogInfo("WatchDirectory: %s, StateFile: %s", directory, stateFile)
 
+	// 初始化批量消费
 	if err = InitConsumerBatchLog(); err != nil {
 		return err
 	}
@@ -170,7 +169,7 @@ func Run(directorys []string, stateFile string) error {
 	}
 
 	// 3. 遍历WatchDirectory下的所有文件
-	for _, dir := range directorys {
+	for _, dir := range directory {
 		if names, err := k3.FetchDirectory(dir, -1); err != nil {
 			return err
 		} else {
@@ -178,14 +177,14 @@ func Run(directorys []string, stateFile string) error {
 		}
 	}
 
-	// 4.清理掉目录中已经不存在的文件
+	// 4.清理掉目录中已经不存在的文件, fileNames 是遍历出来当前文件目录中所有的文件
 	for fileName, _ = range GlobalFileStates {
 		if k3.InArray(fileNames, fileName) == false {
 			delete(GlobalFileStates, fileName)
 		}
 	}
 
-	// 5. 将新增的文件补充到filestates
+	// 5. 将新增的文件补充到file states
 	for _, fileName = range fileNames {
 		if _, ok := GlobalFileStates[fileName]; !ok {
 			GlobalFileStates[fileName] = &FileState{
@@ -213,7 +212,8 @@ func Run(directorys []string, stateFile string) error {
 	k3.K3LogInfo("数据初始化完毕: File states count (%+v) ; File states fd count (%+v)", len(GlobalFileStates), len(GlobalFileStatesFd))
 
 	// 8. 监听watchDirectory下的文件变化，当文件发生变化时，读取文件内容，直到最后一个\n 结束， 最后更新fileStates和stateFile
-	if _, err = InitWatcher(directorys, stateFile); err != nil {
+	if _, err = InitWatcher(directory, stateFile); err != nil {
+		// 初始化目录监控程序的时候，如果返回error， 关闭所有资源
 		Clean()
 		return err
 	}
@@ -275,7 +275,7 @@ func handleEvent(event fsnotify.Event, stateFile string) {
 			}
 		}
 
-		// 添加到fileStates
+		// 如果不是目录，则需要将文件添加到fileStates
 		if _, ok := GlobalFileStates[event.Name]; !ok {
 			GlobalFileStates[event.Name] = &FileState{
 				Path:   event.Name,
@@ -349,6 +349,7 @@ func readFileByOffset(fd *os.File, offset int64) (int64, error) {
 
 	reader = bufio.NewReader(fd)
 
+	// 循环读取，循环次数  config.GlobalConfig.System.MaxReadCount, 防止文件过大，导致数据一直读不完
 	for currentReadIndex <= config.GlobalConfig.System.MaxReadCount {
 
 		// 控制最多读取次数
@@ -378,7 +379,7 @@ func readFileByOffset(fd *os.File, offset int64) (int64, error) {
 	}
 
 EXIT:
-	// k3.K3LogInfo("ReadFileByOffset: %s, content: %s", fd.Name(), content)
+	// 将读取的数据发送给consumer
 	sendDataToConsumer(content)
 	return newOffset, nil
 }
@@ -391,8 +392,10 @@ func sendDataToConsumer(content string) {
 		datas []string
 	)
 
+	// 获取数据唯一ID
 	uuid = k3.GenerateUUID()
 
+	// 获取本地IP
 	if ips, err := k3.GetLocalIPs(); err != nil {
 		k3.K3LogError("GetLocalIPs error: %s", err)
 		ip = "10.10.10.1"
@@ -402,6 +405,7 @@ func sendDataToConsumer(content string) {
 		}
 	}
 
+	// 发送的数据有可能是多条，因此做拆分, 循环提交
 	datas = strings.Split(content, "\n")
 	for _, data := range datas {
 		data = strings.TrimSpace(data)
@@ -409,6 +413,7 @@ func sendDataToConsumer(content string) {
 		if len(data) == 0 {
 			continue
 		}
+
 		if err := dataAnalytics.Track(config.GlobalConfig.Account.AccountId,
 			config.GlobalConfig.Account.AppId,
 			config.GlobalConfig.Account.EventName, uuid, ip, map[string]interface{}{
@@ -470,6 +475,7 @@ func LoadStateFile(filePath string) error {
 			defer fd.Close()
 
 			decoder = json.NewDecoder(fd)
+			// 将json数据写入到GlobalFileStates
 			if err = decoder.Decode(&GlobalFileStates); err != nil {
 				return fmt.Errorf("load state file error: %s", err)
 			}
@@ -496,6 +502,7 @@ func SyncToSateFile(filePath string) error {
 	defer fd.Close()
 
 	encoder = json.NewEncoder(fd)
+	// 将GlobalFileStates json序列化写入 filePath
 	if err = encoder.Encode(&GlobalFileStates); err != nil {
 		return fmt.Errorf("sync state file error: %s", err)
 	}

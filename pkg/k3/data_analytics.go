@@ -54,6 +54,7 @@ func (i *DataAnalytics) track(accountId, appId, eventName, eventId, ip string, p
 	)
 
 	defer func() {
+		// 防止异常导致整个程序结束, 并不是协程的问题
 		if r := recover(); r != nil {
 			K3LogError("Recovered in track: %v", r)
 		}

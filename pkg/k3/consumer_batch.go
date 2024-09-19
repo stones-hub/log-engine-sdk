@@ -1,7 +1,6 @@
 package k3
 
 import (
-	"fmt"
 	"log-engine-sdk/pkg/k3/protocol"
 	"sync"
 	"time"
@@ -97,7 +96,6 @@ func (k *K3BatchConsumer) FlushAll() error {
 	)
 	// 缓存中一直有数据，就需要不断的send， 直到结束
 	for k.fetchCacheLength() > 0 || k.fetchBufferLength() > 0 {
-		fmt.Println("FlushAll")
 		k.cacheBuffer = append(k.cacheBuffer, k.buffer)
 		k.buffer = make([]protocol.Data, 0, k.batchSize)
 		if err = k.sender.Send(k.cacheBuffer[0]); err != nil {

@@ -11,6 +11,7 @@ import (
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,7 @@ type ElasticSearchClient struct {
 	maxRetries    int                 // 最大重试次数
 	retryInterval int                 // 每次重试时间间隔
 	timeout       int                 // 最后超时时间
+	sg            *sync.WaitGroup
 }
 
 func NewElasticsearch(address []string, username, password string) (*ElasticSearchClient, error) {
@@ -86,8 +88,10 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 		maxRetries:    elasticsearchConfig.MaxRetry,
 		retryInterval: elasticsearchConfig.RetryInterval,
 		timeout:       elasticsearchConfig.Timeout,
+		sg:            &sync.WaitGroup{},
 	}
 
+	c.sg.Add(1)
 	go WriteDataToElasticSearch(c)
 
 	return c, nil
@@ -95,6 +99,13 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 
 // WriteDataToElasticSearch 从管道读取数据，写入elk
 func WriteDataToElasticSearch(client *ElasticSearchClient) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			k3.K3LogError("Recovered WriteDataToElasticSearch from panic: %v", r)
+		}
+		client.sg.Done()
+	}()
 
 	for {
 
@@ -107,7 +118,11 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 		)
 
 		select {
-		case data := <-client.dataChan:
+		case data, ok := <-client.dataChan:
+			if !ok {
+				k3.K3LogError("WriteDataToElasticSearch Data channel closed !")
+				return
+			}
 			// 解析数据
 			if b, err = json.Marshal(data); err != nil {
 				k3.K3LogError("Failed to marshal data: %v", err)
@@ -144,6 +159,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 
 func (e *ElasticSearchClient) Close() {
 	close(e.dataChan)
+	e.sg.Wait()
 	// TODO 关闭客户端
 }
 
