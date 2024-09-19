@@ -15,7 +15,6 @@ type Config struct {
 	Account  Account  `yaml:"account" json:"account"`
 }
 
-// TODO 需要考虑ELK的真实的配置需要哪些，目前只写了一些
 type ELK struct {
 	Address        []string `yaml:"address" json:"addresses,omitempty" toml:"addresses"` // A list of Elasticsearch nodes to use.
 	Username       string   `yaml:"username" json:"username,omitempty" toml:"username"`  // Username for HTTP Basic Authentication.

@@ -160,7 +160,6 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 func (e *ElasticSearchClient) Close() error {
 	close(e.dataChan)
 	e.sg.Wait()
-	// TODO 关闭客户端
 	return nil
 }
 
