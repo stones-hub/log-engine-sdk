@@ -16,18 +16,36 @@ import (
 
 var (
 	DefaultMaxChannelSize = 1000
+	DefaultMaxRetry       = 3
+	DefaultTimeout        = 5
+	DefaultRetryInterval  = 1
 )
 
 type ElasticSearchClient struct {
-	config   elasticsearch.Config
-	client   *elasticsearch.Client
-	dataChan chan *protocol.Data // 最大队列
+	config        elasticsearch.Config
+	client        *elasticsearch.Client
+	dataChan      chan *protocol.Data // 最大队列
+	maxRetries    int                 // 最大重试次数
+	retryInterval int                 // 每次重试时间间隔
+	timeout       int                 // 最后超时时间
 }
 
 func NewElasticsearch(address []string, username, password string) (*ElasticSearchClient, error) {
 
-	if config.GlobalConfig.ELK.MaxChannelSize >= DefaultMaxChannelSize {
+	if config.GlobalConfig.ELK.MaxChannelSize == 0 || config.GlobalConfig.ELK.MaxChannelSize >= DefaultMaxChannelSize {
 		config.GlobalConfig.ELK.MaxChannelSize = DefaultMaxChannelSize
+	}
+
+	if config.GlobalConfig.ELK.MaxRetry == 0 || config.GlobalConfig.ELK.MaxRetry >= DefaultMaxRetry {
+		config.GlobalConfig.ELK.MaxRetry = DefaultMaxRetry
+	}
+
+	if config.GlobalConfig.ELK.RetryInterval == 0 || config.GlobalConfig.ELK.RetryInterval >= DefaultRetryInterval {
+		config.GlobalConfig.ELK.RetryInterval = DefaultRetryInterval
+	}
+
+	if config.GlobalConfig.ELK.Timeout == 0 || config.GlobalConfig.ELK.Timeout >= DefaultTimeout {
+		config.GlobalConfig.ELK.Timeout = DefaultTimeout
 	}
 
 	return NewElasticsearchWithConfig(config.ELK{
@@ -35,6 +53,9 @@ func NewElasticsearch(address []string, username, password string) (*ElasticSear
 		Username:       username,
 		Password:       password,
 		MaxChannelSize: config.GlobalConfig.ELK.MaxChannelSize,
+		MaxRetry:       config.GlobalConfig.ELK.MaxRetry,
+		RetryInterval:  config.GlobalConfig.ELK.RetryInterval,
+		Timeout:        config.GlobalConfig.ELK.Timeout,
 	})
 }
 
@@ -59,9 +80,12 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 	// 开启协程，从管道中读取数据， 写入集群
 
 	c := &ElasticSearchClient{
-		config:   cfg,
-		client:   client,
-		dataChan: make(chan *protocol.Data, elasticsearchConfig.MaxChannelSize),
+		config:        cfg,
+		client:        client,
+		dataChan:      make(chan *protocol.Data, elasticsearchConfig.MaxChannelSize),
+		maxRetries:    elasticsearchConfig.MaxRetry,
+		retryInterval: elasticsearchConfig.RetryInterval,
+		timeout:       elasticsearchConfig.Timeout,
 	}
 
 	go WriteDataToElasticSearch(c)
@@ -104,43 +128,57 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 
 			if res.IsError() {
 				if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
-					fmt.Printf("Error parsing the response body: %s", err)
+					k3.K3LogError("Error parsing the response body: %s", err)
 					continue
 				} else {
-					fmt.Printf("Error response: %s: %s\n", res.Status(), e["error"])
+					k3.K3LogError("Error response: %s: %s\n", res.Status(), e["error"])
 					continue
 				}
 			}
 			// TODO 考虑循环结束一次退出，会不会有问题，需要测试
 			res.Body.Close()
+			k3.K3LogInfo("Send data to Elasticsearch successfully.")
 		}
 	}
-
 }
 
 func (e *ElasticSearchClient) Close() {
-
 	close(e.dataChan)
 	// TODO 关闭客户端
-
 }
 
 func (e *ElasticSearchClient) Send(data []protocol.Data) error {
-
 	// 循环发送数据
 	for _, d := range data {
-		select {
-		// TODO 测试一下当管道满了， default语句continue的时候，会不会丢弃当前循环的d数据
-		case e.dataChan <- &d:
-		default:
-			k3.K3LogInfo("Data channel is full, data will be discarded.")
-			time.Sleep(1 * time.Second)
-			continue
+		if err := e.sendWithRetries(&d); err != nil {
+			k3.K3LogInfo(fmt.Sprintf("Failed to send data (UUID: %d): %v", d.UUID, err))
 		}
 	}
 	return nil
 }
 
+func (e *ElasticSearchClient) sendWithRetries(d *protocol.Data) error {
+	timeout, cancel := context.WithTimeout(context.Background(), time.Duration(e.timeout)*time.Second)
+	defer cancel()
+
+	for i := 0; i < e.maxRetries; i++ {
+		select {
+		case <-timeout.Done():
+			k3.K3LogError("Timeout exceeded while sending data to Elasticsearch")
+			return timeout.Err()
+		case e.dataChan <- d:
+			return nil
+		default:
+			time.Sleep(time.Duration(e.retryInterval) * time.Second)
+			k3.K3LogError("Data channel is full, retrying...")
+		}
+	}
+
+	k3.K3LogError("Data channel is still full, data will be discarded, data (UUID: %d): %v", d.UUID, d)
+	return fmt.Errorf("data channel is full after retries")
+}
+
+// 将多条数据封装成1条数据, 暂时先不测试
 func (e *ElasticSearchClient) prepareBulkData(data []protocol.Data) ([]byte, error) {
 	var bulkData bytes.Buffer
 

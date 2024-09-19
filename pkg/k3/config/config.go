@@ -20,6 +20,9 @@ type ELK struct {
 	Username       string   `yaml:"username" json:"username,omitempty" toml:"username"`  // Username for HTTP Basic Authentication.
 	Password       string   `yaml:"password" json:"password,omitempty" toml:"password"`  // Password for HTTP Basic Authentication.
 	MaxChannelSize int      `yaml:"max_channel_size"`                                    // 最大管道
+	MaxRetry       int      `yaml:"max_retry"`
+	RetryInterval  int      `yaml:"retry_interval"`
+	Timeout        int      `yaml:"timeout"`
 }
 
 type System struct {
