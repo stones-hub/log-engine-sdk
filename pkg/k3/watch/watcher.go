@@ -387,13 +387,9 @@ EXIT:
 // sendDataToConsumer 将数据发送到数据收集器
 func sendDataToConsumer(content string) {
 	var (
-		uuid  string
 		ip    string
 		datas []string
 	)
-
-	// 获取数据唯一ID
-	uuid = k3.GenerateUUID()
 
 	// 获取本地IP
 	if ips, err := k3.GetLocalIPs(); err != nil {
@@ -416,7 +412,8 @@ func sendDataToConsumer(content string) {
 
 		if err := dataAnalytics.Track(config.GlobalConfig.Account.AccountId,
 			config.GlobalConfig.Account.AppId,
-			config.GlobalConfig.Account.EventName, uuid, ip, map[string]interface{}{
+			config.GlobalConfig.Account.EventName,
+			config.GlobalConfig.Account.EventId, ip, map[string]interface{}{
 				"data":      data,
 				"timestamp": time.Now().Unix(),
 			}); err != nil {

@@ -30,6 +30,7 @@ type Account struct {
 	AccountId string `yaml:"account_id"`
 	AppId     string `yaml:"app_id"`
 	EventName string `yaml:"event_name"` // 前缀
+	EventId   string `yaml:"event_id"`
 }
 
 type System struct {
