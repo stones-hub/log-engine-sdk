@@ -25,6 +25,6 @@ go.work.sum
 .env
 .idea
 log/*
-example/*
+example/*.log
 state/*
 cmd/log-engine-sdk/*
