@@ -2,37 +2,43 @@ package sender
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
+	"strings"
+	"time"
 )
 
-type ELKServer struct {
-	config elasticsearch.Config
-	client *elasticsearch.Client
+var (
+	DefaultMaxChannelSize = 1000
+)
+
+type ElasticSearchClient struct {
+	config   elasticsearch.Config
+	client   *elasticsearch.Client
+	dataChan chan *protocol.Data // 最大队列
 }
 
-func NewELKServer(address []string, username, password, apikey string) (*ELKServer, error) {
-	{
-		// TODO 方便测试，ELK还未搭建
-		return &ELKServer{
-			config: elasticsearch.Config{},
-			client: nil,
-		}, nil
+func NewElasticsearch(address []string, username, password string) (*ElasticSearchClient, error) {
+
+	if config.GlobalConfig.ELK.MaxChannelSize >= DefaultMaxChannelSize {
+		config.GlobalConfig.ELK.MaxChannelSize = DefaultMaxChannelSize
 	}
 
-	return NewELKServerWithConfig(config.ELK{
-		Address:  address,
-		Username: username,
-		Password: password,
-		ApiKey:   apikey,
+	return NewElasticsearchWithConfig(config.ELK{
+		Address:        address,
+		Username:       username,
+		Password:       password,
+		MaxChannelSize: config.GlobalConfig.ELK.MaxChannelSize,
 	})
 }
 
-func NewELKServerWithConfig(elkServerConfig config.ELK) (*ELKServer, error) {
+func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchClient, error) {
 	var (
 		cfg    elasticsearch.Config
 		client *elasticsearch.Client
@@ -40,10 +46,9 @@ func NewELKServerWithConfig(elkServerConfig config.ELK) (*ELKServer, error) {
 	)
 
 	cfg = elasticsearch.Config{
-		Addresses: elkServerConfig.Address,
-		Username:  elkServerConfig.Username,
-		Password:  elkServerConfig.Password,
-		APIKey:    elkServerConfig.ApiKey,
+		Addresses: elasticsearchConfig.Address,
+		Username:  elasticsearchConfig.Username,
+		Password:  elasticsearchConfig.Password,
 	}
 
 	if client, err = elasticsearch.NewClient(cfg); err != nil {
@@ -51,80 +56,92 @@ func NewELKServerWithConfig(elkServerConfig config.ELK) (*ELKServer, error) {
 		return nil, err
 	}
 
-	return &ELKServer{
-		config: cfg,
-		client: client,
-	}, nil
+	// 开启协程，从管道中读取数据， 写入集群
+
+	c := &ElasticSearchClient{
+		config:   cfg,
+		client:   client,
+		dataChan: make(chan *protocol.Data, elasticsearchConfig.MaxChannelSize),
+	}
+
+	go WriteDataToElasticSearch(c)
+
+	return c, nil
 }
 
-func (e *ELKServer) Send(data []protocol.Data) error {
+// WriteDataToElasticSearch 从管道读取数据，写入elk
+func WriteDataToElasticSearch(client *ElasticSearchClient) {
 
-	for _, d := range data {
-		if err := config.GlobalConsumer.Add(d); err != nil {
-			k3.K3LogError("Failed to add data to consumer: %v", err)
+	for {
+
+		var (
+			b   []byte
+			err error
+			req esapi.IndexRequest
+			res *esapi.Response
+			e   map[string]interface{}
+		)
+
+		select {
+		case data := <-client.dataChan:
+			// 解析数据
+			if b, err = json.Marshal(data); err != nil {
+				k3.K3LogError("Failed to marshal data: %v", err)
+				continue
+			}
+
+			req = esapi.IndexRequest{
+				Index:      data.EventName,
+				DocumentID: fmt.Sprintf("%s", data.UUID),
+				Body:       strings.NewReader(string(b)),
+				Pretty:     true,
+			}
+
+			if res, err = req.Do(context.Background(), client.client); err != nil {
+				k3.K3LogError("Failed to send data to Elasticsearch: %v", err)
+				continue
+			}
+
+			if res.IsError() {
+				if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+					fmt.Printf("Error parsing the response body: %s", err)
+					continue
+				} else {
+					fmt.Printf("Error response: %s: %s\n", res.Status(), e["error"])
+					continue
+				}
+			}
+			// TODO 考虑循环结束一次退出，会不会有问题，需要测试
+			res.Body.Close()
 		}
 	}
 
-	return nil
-
-	/*
-		var (
-			err         error
-			bulkData    []byte
-			bulkRequest esapi.BulkRequest
-			msg         string
-			res         *esapi.Response
-			body        []byte
-		)
-
-		// TODO 方便测试，ELK还未搭建
-		// 批量插入数据
-		if bulkData, err = e.prepareBulkData(data); err != nil {
-			msg = "Error preparing bulk data: " + err.Error()
-			return errors.New(msg)
-		}
-
-		bulkRequest = esapi.BulkRequest{
-			Index:                 "",
-			Body:                  bytes.NewReader(bulkData),
-			ListExecutedPipelines: nil,
-			Pipeline:              "",
-			Refresh:               "",
-			RequireAlias:          nil,
-			RequireDataStream:     nil,
-			Routing:               "",
-			Source:                nil,
-			SourceExcludes:        nil,
-			SourceIncludes:        nil,
-			Timeout:               0,
-			DocumentType:          "",
-			WaitForActiveShards:   "",
-			Pretty:                false,
-			Human:                 false,
-			ErrorTrace:            false,
-			FilterPath:            nil,
-			Header:                nil,
-		}
-
-		// 发送批量请求
-		if res, err = bulkRequest.Do(context.Background(), e.client); err != nil {
-			return err
-		}
-
-		defer res.Body.Close()
-
-		if res.IsError() {
-			body, _ = io.ReadAll(res.Body)
-			return errors.New(string(body))
-		} else {
-			k3.K3LogInfo("Document send successfully")
-		}
-		return nil
-
-	*/
 }
 
-func (e *ELKServer) prepareBulkData(data []protocol.Data) ([]byte, error) {
+func (e *ElasticSearchClient) Close() {
+
+	close(e.dataChan)
+	// TODO 关闭客户端
+
+}
+
+func (e *ElasticSearchClient) Send(data []protocol.Data) error {
+
+	// 循环发送数据
+	for _, d := range data {
+		select {
+		// TODO 测试一下当管道满了， default语句continue的时候，会不会丢弃当前循环的d数据
+		case e.dataChan <- &d:
+		default:
+			k3.K3LogInfo("Data channel is full, data will be discarded.")
+			time.Sleep(1 * time.Second)
+			continue
+		}
+	}
+	return nil
+}
+
+func (e *ElasticSearchClient) prepareBulkData(data []protocol.Data) ([]byte, error) {
 	var bulkData bytes.Buffer
 
 	for _, d := range data {

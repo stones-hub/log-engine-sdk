@@ -1,7 +1,7 @@
 #elk configuration
 elk:
-  address: ["http://localhost:9200", "http://localhost:9100"]
-  username: "elastic"
-  password: "changeme"
-  api_key: "elastic:changeme"
-
+  address: ["http://192.168.3.35:9200"]
+  username: "logstash_user_custom"
+  password: "BHYsvRU5JG-W0Ysvt+u"
+  max_channel_size: 1000
+  logstash: ["http://192.168.3.35:5044"]

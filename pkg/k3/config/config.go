@@ -16,11 +16,10 @@ type Config struct {
 
 // TODO 需要考虑ELK的真实的配置需要哪些，目前只写了一些
 type ELK struct {
-	Address  []string `yaml:"address" json:"addresses,omitempty" toml:"addresses"` // A list of Elasticsearch nodes to use.
-	Username string   `yaml:"username" json:"username,omitempty" toml:"username"`  // Username for HTTP Basic Authentication.
-	Password string   `yaml:"password" json:"password,omitempty" toml:"password"`  // Password for HTTP Basic Authentication.
-	ApiKey   string   `yaml:"api_key" json:"api_key,omitempty" toml:"api_key"`     // Base64-encoded token for authorization; if set, overrides username/password and service token.W0l
-
+	Address        []string `yaml:"address" json:"addresses,omitempty" toml:"addresses"` // A list of Elasticsearch nodes to use.
+	Username       string   `yaml:"username" json:"username,omitempty" toml:"username"`  // Username for HTTP Basic Authentication.
+	Password       string   `yaml:"password" json:"password,omitempty" toml:"password"`  // Password for HTTP Basic Authentication.
+	MaxChannelSize int      `yaml:"max_channel_size"`                                    // 最大管道
 }
 
 type System struct {

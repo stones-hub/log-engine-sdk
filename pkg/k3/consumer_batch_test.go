@@ -11,12 +11,12 @@ import (
 func TestBatchConsumer(t *testing.T) {
 	var (
 		ips      []string
-		elk      *sender.ELKServer
+		elk      *sender.ElasticSearchClient
 		err      error
 		consumer protocol.K3Consumer
 	)
 
-	if elk, err = sender.NewELKServer([]string{"http://127.0.0.1:8080"}, "", "", ""); err != nil {
+	if elk, err = sender.NewElasticsearch([]string{"http://127.0.0.1:8080"}, "", ""); err != nil {
 		fmt.Println(err)
 		return
 	}

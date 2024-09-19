@@ -35,11 +35,13 @@ var dataAnalytics k3.DataAnalytics
 
 func InitConsumerBatchLog() error {
 	var (
-		elk      *sender.ELKServer
+		elk      *sender.ElasticSearchClient
 		err      error
 		consumer protocol.K3Consumer
 	)
-	if elk, err = sender.NewELKServer([]string{"http://127.0.0.1:9200"}, "admin", "admin", ""); err != nil {
+	if elk, err = sender.NewElasticsearch(config.GlobalConfig.ELK.Address,
+		config.GlobalConfig.ELK.Username,
+		config.GlobalConfig.ELK.Password); err != nil {
 		return err
 	}
 
