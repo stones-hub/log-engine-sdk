@@ -386,19 +386,13 @@ EXIT:
 // sendDataToConsumer 将数据发送到数据收集器
 func sendDataToConsumer(content string) {
 	var (
-		// TODO 后期可以考虑将参数作为配置文件
-		accountId string
-		appId     string
-		eventName string
-		uuid      string
-		ip        string
-		datas     []string
+		uuid  string
+		ip    string
+		datas []string
 	)
 
-	accountId = "yelei@3k.com"
-	appId = "center.3k.com"
-	eventName = "admin_log"
 	uuid = k3.GenerateUUID()
+
 	if ips, err := k3.GetLocalIPs(); err != nil {
 		k3.K3LogError("GetLocalIPs error: %s", err)
 		ip = "10.10.10.1"
@@ -407,23 +401,23 @@ func sendDataToConsumer(content string) {
 			ip = ips[0]
 		}
 	}
-	datas = strings.Split(content, "\n")
 
+	datas = strings.Split(content, "\n")
 	for _, data := range datas {
 		data = strings.TrimSpace(data)
 		data = strings.Trim(data, "\n")
-
 		if len(data) == 0 {
 			continue
 		}
-
-		if err := dataAnalytics.Track(accountId, appId, eventName, uuid, ip, map[string]interface{}{
-			"data": data,
-		}); err != nil {
+		if err := dataAnalytics.Track(config.GlobalConfig.Account.AccountId,
+			config.GlobalConfig.Account.AppId,
+			config.GlobalConfig.Account.EventName, uuid, ip, map[string]interface{}{
+				"data":      data,
+				"timestamp": time.Now().Unix(),
+			}); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)
 		}
 	}
-
 }
 
 func updateFileStateOffset(fileName string, offset int64) {

@@ -11,7 +11,8 @@ type Config struct {
 	ELK      ELK      `yaml:"elk" json:"elk" toml:"elk"`
 	System   System   `yaml:"system" json:"system" toml:"system"`
 	Http     Http     `yaml:"http" json:"http" toml:"http"`
-	Consumer Consumer `yaml:"consumer" json:"consumer" toml:"cosumer"`
+	Consumer Consumer `yaml:"consumer" json:"consumer" toml:"consumer"`
+	Account  Account  `yaml:"account" json:"account"`
 }
 
 // TODO 需要考虑ELK的真实的配置需要哪些，目前只写了一些
@@ -23,6 +24,12 @@ type ELK struct {
 	MaxRetry       int      `yaml:"max_retry"`
 	RetryInterval  int      `yaml:"retry_interval"`
 	Timeout        int      `yaml:"timeout"`
+}
+
+type Account struct {
+	AccountId string `yaml:"account_id"`
+	AppId     string `yaml:"app_id"`
+	EventName string `yaml:"event_name"` // 前缀
 }
 
 type System struct {
@@ -50,6 +57,7 @@ type Http struct {
 	WriteTimeout    int    `yaml:"write_timeout"`
 	IdleTimeout     int    `yaml:"idle_timeout"`
 	ShutdownTimeout int    `yaml:"shutdown_timeout"`
+	Enable          bool   `yaml:"enable"`
 }
 
 var (

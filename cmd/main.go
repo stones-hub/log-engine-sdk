@@ -57,6 +57,7 @@ func main() {
 
 	var (
 		ReadDirectory []string
+		httpClean     func()
 	)
 
 	for _, readDir := range config.GlobalConfig.System.ReadPath {
@@ -70,8 +71,10 @@ func main() {
 		return
 	}
 
-	// 启动http服务器
-	httpClean, _ := k3.HttpServer(context.Background())
+	if config.GlobalConfig.Http.Enable == true {
+		// 启动http服务器
+		httpClean, _ = k3.HttpServer(context.Background())
+	}
 	graceExit(dir+config.GlobalConfig.System.StateFilePath, httpClean)
 }
 
@@ -115,7 +118,9 @@ func graceExit(stateFile string, cleanFuncs ...func()) {
 
 	// 清理各种资源
 	for _, cleanFunc := range cleanFuncs {
-		cleanFunc()
+		if cleanFunc != nil {
+			cleanFunc()
+		}
 	}
 
 	time.Sleep(1 * time.Second)

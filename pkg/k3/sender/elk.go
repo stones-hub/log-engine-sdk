@@ -137,7 +137,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			}
 			// TODO 考虑循环结束一次退出，会不会有问题，需要测试
 			res.Body.Close()
-			k3.K3LogInfo("Send data to Elasticsearch successfully.")
+			k3.K3LogInfo("Send data (event_id : %v) to Elasticsearch successfully.", data.EventId)
 		}
 	}
 }
