@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	ELK    ELK    `yaml:"elk" json:"elk" toml:"elk"`
-	System System `yaml:"system" json:"system" toml:"system"`
-	Http   Http   `yaml:"http" json:"http" toml:"http"`
+	ELK      ELK      `yaml:"elk" json:"elk" toml:"elk"`
+	System   System   `yaml:"system" json:"system" toml:"system"`
+	Http     Http     `yaml:"http" json:"http" toml:"http"`
+	Consumer Consumer `yaml:"consumer" json:"consumer" toml:"cosumer"`
 }
 
 // TODO 需要考虑ELK的真实的配置需要哪些，目前只写了一些
@@ -23,16 +24,21 @@ type ELK struct {
 }
 
 type System struct {
-	PrintEnabled           bool     `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
-	UseELK                 bool     `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
-	ReadPath               []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
-	StateFilePath          string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
-	RootPath               string   `yaml:"root_path" json:"root_path" toml:"root_path"`
-	MaxReadCount           int      `yaml:"max_read_count"` // max_read_count
-	ConsumerLogChannelSize int      `yaml:"consumer_log_channel_size"`
-	ConsumerBatchSize      int      `yaml:"consumer_batch_size"`
-	ConsumerBatchInterval  int      `yaml:"consumer_batch_interval"` // 秒
-	ConsumerBatchCapacity  int      `yaml:"consumer_batch_capacity"`
+	PrintEnabled  bool     `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
+	UseELK        bool     `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
+	ReadPath      []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
+	StateFilePath string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
+	RootPath      string   `yaml:"root_path" json:"root_path" toml:"root_path"`
+	MaxReadCount  int      `yaml:"max_read_count"` // max_read_count
+
+}
+
+type Consumer struct {
+	ConsumerLogChannelSize int  `yaml:"consumer_log_channel_size"` // 批量日志检查缓存列表时间间隔
+	ConsumerBatchInterval  int  `yaml:"consumer_batch_interval"`   // 秒
+	ConsumerBatchSize      int  `yaml:"consumer_batch_size"`       // 批量日志单次批量提交最大值
+	ConsumerBatchCapacity  int  `yaml:"consumer_batch_capacity"`   // 批量日志缓存容量
+	ConsumerBatchAutoFlush bool `yaml:"consumer_batch_auto_flush"` // 批量日志是否自动刷新
 }
 
 type Http struct {

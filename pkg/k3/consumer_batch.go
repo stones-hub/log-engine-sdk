@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	DefaultInterval      = 5    // 默认定时检查缓存时间间隔
-	DefaultBatchSize     = 10   // 默认批量提交大小
-	MaxBatchSize         = 1000 // 批量提交最大值, 需要控制一下
-	DefaultCacheCapacity = 100  // 默认缓存容量
+	DefaultInterval      = 5   // 默认定时检查缓存时间间隔
+	DefaultBatchSize     = 100 // 默认批量提交大小
+	MaxBatchSize         = 200 // 批量提交最大值, 需要控制一下
+	DefaultCacheCapacity = 100 // 默认缓存容量
 )
 
 type K3BatchConsumer struct {

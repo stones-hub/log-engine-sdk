@@ -27,3 +27,4 @@ go.work.sum
 log/*
 example/*
 state/*
+cmd/log-engine-sdk/*

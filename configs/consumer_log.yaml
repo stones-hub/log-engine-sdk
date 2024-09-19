@@ -1,0 +1,6 @@
+consumer:
+  consumer_log_channel_size: 1000
+  consumer_batch_interval: 5 # 秒， 批量日志检查缓存列表时间间隔
+  consumer_batch_size: 10 # 批量日志单次批量提交最大值
+  consumer_batch_capacity: 100 # 批量日志缓存容量
+  consumer_batch_auto_flush: true # 批量日志是否自动刷新

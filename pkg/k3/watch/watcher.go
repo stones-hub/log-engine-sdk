@@ -44,8 +44,11 @@ func InitConsumerBatchLog() error {
 	}
 
 	if consumer, err = k3.NewBatchConsumerWithConfig(k3.K3BatchConsumerConfig{
-		Sender:    elk,
-		AutoFlush: true,
+		Sender:        elk,
+		BatchSize:     config.GlobalConfig.Consumer.ConsumerBatchSize,
+		AutoFlush:     config.GlobalConfig.Consumer.ConsumerBatchAutoFlush,
+		Interval:      config.GlobalConfig.Consumer.ConsumerBatchInterval,
+		CacheCapacity: config.GlobalConfig.Consumer.ConsumerBatchCapacity,
 	}); err != nil {
 		return err
 	}

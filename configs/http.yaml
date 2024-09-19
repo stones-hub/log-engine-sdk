@@ -1,4 +1,5 @@
 http:
+  enable: true
   port: 8080
   host: localhost
   read_timeout: 5
