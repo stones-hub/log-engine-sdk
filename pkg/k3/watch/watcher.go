@@ -415,7 +415,7 @@ func sendDataToConsumer(content string) {
 			config.GlobalConfig.Account.EventName,
 			config.GlobalConfig.Account.EventId, ip, map[string]interface{}{
 				"data":      data,
-				"timestamp": time.Now().Unix(),
+				"Timestamp": time.Now(),
 			}); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)
 		}
