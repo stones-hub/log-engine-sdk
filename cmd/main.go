@@ -46,6 +46,10 @@ func main() {
 		config.GlobalConfig.System.RootPath = dir
 	}
 
+	if config.GlobalConfig.System.LogLevel > 0 {
+		k3.CurrentLogLevel = k3.K3LogLevel(config.GlobalConfig.System.LogLevel)
+	}
+
 	if config.GlobalConfig.System.PrintEnabled == true {
 		if configJson, err := json.Marshal(config.GlobalConfig); err != nil {
 			k3.K3LogError("json marshal error: %s", err)

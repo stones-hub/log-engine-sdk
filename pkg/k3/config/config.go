@@ -43,6 +43,7 @@ type System struct {
 	PrintEnabled bool   `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
 	UseELK       bool   `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
 	RootPath     string `yaml:"root_path" json:"root_path" toml:"root_path"`
+	LogLevel     int    `yaml:"log_level"`
 }
 
 type Consumer struct {

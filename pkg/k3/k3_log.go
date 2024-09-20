@@ -39,6 +39,7 @@ func InitLogger(logger K3Logger, level K3LogLevel) {
 
 // K3Log print log
 func K3Log(level K3LogLevel, format string, v ...interface{}) {
+
 	if level > CurrentLogLevel {
 		return
 	}
