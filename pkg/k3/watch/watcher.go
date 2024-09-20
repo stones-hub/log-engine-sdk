@@ -519,7 +519,6 @@ func ClockUpdateStateFile() {
 
 		for {
 			<-ticker.C
-			k3.K3LogInfo("Clock: %s, update state file.", time.Now().Format("2006-01-02 15:04:05"))
 			GlobalForceSyncStateFileChan <- struct{}{}
 		}
 	}()
