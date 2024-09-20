@@ -223,7 +223,7 @@ func (k *K3LogConsumer) rsyncFile(jsonStr string) {
 
 	// 数据写入文件
 	if _, err = fmt.Fprint(k.currentFile, jsonStr+"\n"); err != nil {
-		K3LogInfo("write file error: %s", err.Error())
+		K3LogError("write file error: %s", err.Error())
 		return
 	}
 }

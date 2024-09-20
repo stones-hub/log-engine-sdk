@@ -151,7 +151,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				}
 			}
 			res.Body.Close()
-			k3.K3LogInfo("Send data (event_name : %v, document_id: %v) to Elasticsearch successfully.", data.EventName, data.UUID)
+			k3.K3LogDebug("Send data (event_name : %v, document_id: %v) to Elasticsearch successfully.", data.EventName, data.UUID)
 		}
 	}
 }
@@ -166,7 +166,7 @@ func (e *ElasticSearchClient) Send(data []protocol.Data) error {
 	// 循环发送数据
 	for _, d := range data {
 		if err := e.sendWithRetries(&d); err != nil {
-			k3.K3LogInfo(fmt.Sprintf("Failed to send data (UUID: %d): %v", d.UUID, err))
+			k3.K3LogError("Failed to send data(UUID: %s) to Elasticsearch: %v", d.UUID, err)
 		}
 	}
 	return nil
