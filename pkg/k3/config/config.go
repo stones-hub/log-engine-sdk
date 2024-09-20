@@ -13,6 +13,7 @@ type Config struct {
 	Http     Http     `yaml:"http" json:"http" toml:"http"`
 	Consumer Consumer `yaml:"consumer" json:"consumer" toml:"consumer"`
 	Account  Account  `yaml:"account" json:"account"`
+	Watch    Watch    `yaml:"watch" json:"watch" toml:"watch"`
 }
 
 type ELK struct {
@@ -25,6 +26,12 @@ type ELK struct {
 	Timeout        int      `yaml:"timeout"`
 }
 
+type Watch struct {
+	ReadPath      []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
+	StateFilePath string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
+	MaxReadCount  int      `yaml:"max_read_count"` // max_read_count
+}
+
 type Account struct {
 	AccountId string `yaml:"account_id"`
 	AppId     string `yaml:"app_id"`
@@ -33,13 +40,9 @@ type Account struct {
 }
 
 type System struct {
-	PrintEnabled  bool     `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
-	UseELK        bool     `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
-	ReadPath      []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
-	StateFilePath string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
-	RootPath      string   `yaml:"root_path" json:"root_path" toml:"root_path"`
-	MaxReadCount  int      `yaml:"max_read_count"` // max_read_count
-
+	PrintEnabled bool   `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
+	UseELK       bool   `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
+	RootPath     string `yaml:"root_path" json:"root_path" toml:"root_path"`
 }
 
 type Consumer struct {

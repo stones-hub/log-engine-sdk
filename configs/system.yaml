@@ -2,9 +2,6 @@
 system:
   print_enabled: true # 是否打印配置信息
   use_elk : true # 是否使用elk
-  read_path: ["/Users/yelei/data/code/go-projects/logs"] # watch监控目录列表
-  max_read_count: 100 # 监控到文件变化时，读取文件最大次数
-  state_file_path: "/state/core.json" # 记录监控文件的offset
   root_path: "" # app系统根目录
 
 

@@ -60,11 +60,11 @@ func main() {
 		httpClean     func()
 	)
 
-	for _, readDir := range config.GlobalConfig.System.ReadPath {
+	for _, readDir := range config.GlobalConfig.Watch.ReadPath {
 		ReadDirectory = append(ReadDirectory, readDir)
 	}
 
-	err = watch.Run(ReadDirectory, dir+config.GlobalConfig.System.StateFilePath)
+	err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
 
 	if err != nil {
 		k3.K3LogError("watch error: %s", err)
@@ -75,7 +75,7 @@ func main() {
 		// 启动http服务器
 		httpClean, _ = k3.HttpServer(context.Background())
 	}
-	graceExit(dir+config.GlobalConfig.System.StateFilePath, httpClean)
+	graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
 }
 
 // GraceExit 保持进程常驻， 等待信号在退出

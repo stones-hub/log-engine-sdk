@@ -350,7 +350,7 @@ func readFileByOffset(fd *os.File, offset int64) (int64, error) {
 	reader = bufio.NewReader(fd)
 
 	// 循环读取，循环次数  config.GlobalConfig.System.MaxReadCount, 防止文件过大，导致数据一直读不完
-	for currentReadIndex <= config.GlobalConfig.System.MaxReadCount {
+	for currentReadIndex <= config.GlobalConfig.Watch.MaxReadCount {
 
 		// 控制最多读取次数
 		currentReadIndex++
