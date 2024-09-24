@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	DefaultMaxChannelSize = 1000
-	DefaultMaxRetry       = 3
-	DefaultTimeout        = 5
-	DefaultRetryInterval  = 1
+	DefaultMaxChannelSize = 10000 // 队列管道的最大长度
+	DefaultMaxRetry       = 10    // 重试次数
+	DefaultTimeout        = 30    // 秒, 数据发送的超时时间
+	DefaultRetryInterval  = 3     // 秒， 默认队列满等待时间间隔
 )
 
 type ElasticSearchClient struct {
@@ -185,7 +185,7 @@ func (e *ElasticSearchClient) sendWithRetries(d *protocol.Data) error {
 			return nil
 		default:
 			time.Sleep(time.Duration(e.retryInterval) * time.Second)
-			k3.K3LogError("Data channel is full, retrying...")
+			k3.K3LogWarn("%d attempt, the data channel is full, data number [%s], retry ......", i, d.UUID)
 		}
 	}
 

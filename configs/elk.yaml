@@ -3,8 +3,8 @@ elk:
   address: ["http://192.168.3.35:9200"]
   username: "logstash_user_custom"
   password: "BHYsvRU5JG-W0Ysvt+u"
-  max_channel_size: 1000
+  max_channel_size: 5000 # 队列最大长度
   logstash: ["http://192.168.3.35:5044"]
-  max_retries: 3
-  retry_interval: 1
-  timeout: 5
+  max_retries: 5 # 最大重试次数
+  retry_interval: 1 # 重试等待时间
+  timeout: 5 # 超时时间
