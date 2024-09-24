@@ -307,7 +307,7 @@ func doRemoveAndRenameEvent(name string, stateFile string) {
 
 	// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
 	if err := GlobalWatcher.Remove(name); err != nil {
-		k3.K3LogError("WatchRemove Remove watch [%s] error: %s", name, err)
+		k3.K3LogWarn("WatchRemove Remove watch [%s] error: %s", name, err)
 	}
 
 	// 关闭文件
