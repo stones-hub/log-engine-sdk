@@ -1,10 +1,15 @@
 package protocol
 
+/*
+用于 elk 日志格式
+*/
+
 // ElkLogData 存入到elk的数据日志
 type ElkLogData struct {
 	UUID      string    // uuid
-	Host      string    // 来源主机
-	Ip        string    // 来源ip
+	Timestamp string    // 日志生成时间 "2024-10-01 12:01:00"
+	HostName  string    // 来源主机
+	IP        string    // 来源ip
 	LogLevel  LogLevel  // 日志级别
 	LogType   LogType   // 日志类型
 	EventId   EventID   // 事件id
