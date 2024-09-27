@@ -1,4 +1,4 @@
-module github.com/stones-hub/log-engine-sdk
+module og-engine-sdk
 
 go 1.22.4
 
