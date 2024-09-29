@@ -1,4 +1,4 @@
-module og-engine-sdk
+module log-engine-sdk
 
 go 1.22.4
 
