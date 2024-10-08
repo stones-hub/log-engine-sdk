@@ -46,6 +46,8 @@ const (
 type ElasticSearchData struct {
 	UUID      string                 // 日志唯一ID， elk document id
 	Timestamp string                 // 日志产生时间 "2024-10-01 12:00:00 "
+	Protocol  string                 // 协议"HTTP/1.1"
+	Domain    string                 // 域名
 	LogIp     string                 // 日志来源IP
 	HostIp    string                 // 日志落盘IP
 	HostName  string                 // 日志落盘主机名
@@ -56,3 +58,23 @@ type ElasticSearchData struct {
 	LogName   LogName                // 日志名称
 	Data      map[string]interface{} // 扩展字段
 }
+
+type EventId int
+
+const (
+	UserLoginID EventId = 1 << iota
+	UserRegisterID
+	RoleLoginID
+	RoleRegisterID
+	PaymentID
+)
+
+type EventName string
+
+const (
+	UserLogin    EventName = "user_login"
+	UserRegister EventName = "user_register"
+	RoleLogin    EventName = "role_login"
+	RoleRegister EventName = "role_register"
+	Payment      EventName = "payment"
+)
