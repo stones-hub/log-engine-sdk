@@ -12,8 +12,8 @@ const (
 type LogType string
 
 const (
-	NetWork    LogType = "network"
-	System     LogType = "system"
+	NetWork    LogType = "network" // 网络日志
+	System     LogType = "system"  // 系统日志
 	Business   LogType = "business"
 	Components LogType = "components"
 )
@@ -21,26 +21,26 @@ const (
 type LogName string
 
 const (
-	Nginx         LogName = "nginx"
-	ALB           LogName = "alb"
-	Application   LogName = "application"
-	Mysql         LogName = "mysql"
-	Redis         LogName = "redis"
-	VM            LogName = "vm"
-	MTR           LogName = "mtr"
-	AlertWebhook  LogName = "alert_webhook"
-	Telegram      LogName = "telegram"
-	VMAgent       LogName = "vm_agent"
-	VMAlert       LogName = "vm_alert"
-	VMStorage     LogName = "vm_storage"
-	HostKernel    LogName = "host_kernel"
-	HostCron      LogName = "host_cron"
-	HostAuth      LogName = "host_auth"
-	HostMaillog   LogName = "host_maillog"
-	HostDmessage  LogName = "host_dmessage"
-	HostMessage   LogName = "host_message"
-	HostSecurelog LogName = "host_securelog"
-	K8SLog        LogName = "k8s_log"
+	Nginx        LogName = "nginx"
+	ALB          LogName = "alb"
+	Application  LogName = "application" // 应用系统日志
+	Mysql        LogName = "mysql"
+	Redis        LogName = "redis"
+	VM           LogName = "vm"
+	MTR          LogName = "mtr"
+	AlertWebhook LogName = "alert_webhook"
+	Telegram     LogName = "telegram"
+	VMAgent      LogName = "vm_agent"
+	VMAlert      LogName = "vm_alert"
+	VMStorage    LogName = "vm_storage"
+	HostKernel   LogName = "host_kernel"
+	HostCron     LogName = "host_cron"
+	HostAuth     LogName = "host_auth"
+	HostMail     LogName = "host_mail"
+	HostDmessage LogName = "host_dmessage"
+	HostMessage  LogName = "host_message"
+	HostSecure   LogName = "host_secure"
+	K8SLog       LogName = "k8s_log"
 )
 
 type ElasticSearchData struct {
