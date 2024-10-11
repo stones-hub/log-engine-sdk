@@ -10,6 +10,7 @@ import (
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -110,11 +111,13 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 	for {
 
 		var (
-			b   []byte
-			err error
-			req esapi.IndexRequest
-			res *esapi.Response
-			e   map[string]interface{}
+			b                 []byte
+			err               error
+			req               esapi.IndexRequest
+			res               *esapi.Response
+			e                 map[string]interface{}
+			elasticSearchData protocol.ElasticSearchData
+			_index            = config.GlobalConfig.Watch.DefaultIndex
 		)
 
 		select {
@@ -124,8 +127,15 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				return
 			}
 
-			// 封装elk_data
-			var elasticSearchData protocol.ElasticSearchData
+			for index := range config.GlobalConfig.Watch.ReadPath {
+				if strings.HasSuffix(data.EventName, index) {
+					_index = index
+				}
+			}
+
+			if config.GlobalConfig.Watch.IsUseSuffixDate {
+				_index = _index + "-" + data.Timestamp.Format("20060102")
+			}
 
 			// 如果解析失败，则直接赋值给text字段
 			if err = json.Unmarshal([]byte(data.Properties["_data"].(string)), &elasticSearchData); err != nil {
@@ -141,7 +151,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				elasticSearchData.UUID = data.UUID
 			}
 			if elasticSearchData.HostName == "" {
-
+				elasticSearchData.HostName, _ = os.Hostname()
 			}
 			if elasticSearchData.HostIp == "" {
 				elasticSearchData.HostIp = data.Ip
@@ -149,8 +159,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			elasticSearchData.Timestamp = data.Timestamp
 
 			req = esapi.IndexRequest{
-				// TODO eventName是当前日志来源那个文件, 所以要从config中匹配下拿到最终的index
-				Index:      data.EventName,
+				Index:      _index,
 				DocumentID: fmt.Sprintf("%s", elasticSearchData.UUID),
 				Body:       strings.NewReader(string(b)),
 				Pretty:     true,

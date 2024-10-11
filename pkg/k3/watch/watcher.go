@@ -330,7 +330,6 @@ func doRemoveAndRenameEvent(name string, stateFile string) {
 
 }
 
-// TODO 考虑文件名路径 是不是有可能跟Key有贪婪匹配的问题
 // ReadFileByOffset 读取文件内容， 从offset开始，直到遇到\n, 返回读取后，最后的偏移量, eventName 当前文件地址
 func readFileByOffset(eventName string, fd *os.File, offset int64) (int64, error) {
 	var (

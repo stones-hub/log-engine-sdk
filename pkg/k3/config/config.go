@@ -31,6 +31,7 @@ type Watch struct {
 	IsUseSuffixDate bool                `yaml:"is_use_suffix_date" json:"is_use_suffix_date" toml:"is_use_suffix_date"`
 	StateFilePath   string              `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
 	MaxReadCount    int                 `yaml:"max_read_count" json:"max_read_count"` // max_read_count
+	DefaultIndex    string              `yaml:"default_index" json:"default_index"`
 }
 
 type System struct {
