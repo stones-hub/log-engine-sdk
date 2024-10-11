@@ -407,7 +407,7 @@ func sendDataToConsumer(content string) {
 
 		var (
 			err                                  error
-			jsonMap                              map[string]interface{}
+			properties                           map[string]interface{}
 			accountId, appId, eventId, eventName string
 		)
 
@@ -417,40 +417,35 @@ func sendDataToConsumer(content string) {
 			continue
 		}
 
-		if err = json.Unmarshal([]byte(data), &jsonMap); err != nil {
-			jsonMap[content] = data
+		if err = json.Unmarshal([]byte(data), &properties); err != nil {
+			properties[content] = data
 		}
 
-		if _, exists := jsonMap["account_id"]; !exists {
+		if _, exists := properties["account_id"]; !exists {
 			accountId = config.GlobalConfig.Account.AccountId
 		} else {
-			accountId = jsonMap["account_id"].(string)
+			accountId = properties["account_id"].(string)
 		}
 
-		if _, exists := jsonMap["app_id"]; !exists {
+		if _, exists := properties["app_id"]; !exists {
 			appId = config.GlobalConfig.Account.AccountId
 		} else {
-			appId = jsonMap["app_id"].(string)
+			appId = properties["app_id"].(string)
 		}
 
-		if _, exists := jsonMap["event_id"]; !exists {
+		if _, exists := properties["event_id"]; !exists {
 			eventId = config.GlobalConfig.Account.AccountId
 		} else {
-			eventId = jsonMap["event_id"].(string)
+			eventId = properties["event_id"].(string)
 		}
 
-		if _, exists := jsonMap["event_name"]; !exists {
+		if _, exists := properties["event_name"]; !exists {
 			eventName = config.GlobalConfig.Account.AccountId
 		} else {
-			eventName = jsonMap["event_name"].(string)
+			eventName = properties["event_name"].(string)
 		}
 
-		if err = dataAnalytics.Track(
-			accountId, appId, eventName, eventId,
-			ip, map[string]interface{}{
-				"data":      data,
-				"Timestamp": time.Now(),
-			}); err != nil {
+		if err = dataAnalytics.Track(accountId, appId, eventName, eventId, ip, properties); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)
 		}
 	}
