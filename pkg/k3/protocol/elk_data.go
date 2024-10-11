@@ -1,10 +1,5 @@
 package protocol
 
-// text => linux, vm,
-// json => nginx, alb, mysql, redis
-
-// _index =>
-
 type ElasticSearchData struct {
 	UUID       string     `json:"_id,omitempty"`        // 日志唯一ID， elk document id  √
 	LogLevel   string     `json:"log_level,omitempty"`  // 日志级别 warn, error, debug, info

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"log-engine-sdk/pkg/k3/protocol"
+	"github.com/koding/multiconfig"
+	"strings"
 )
 
 var jsonString = `{
@@ -50,19 +50,76 @@ var jsonString = `{
 }`
 
 func main() {
-	var (
-		log protocol.ElasticSearchData
-		err error
-		b   []byte
-	)
-	if err = json.Unmarshal([]byte(jsonString), &log); err != nil {
-		fmt.Println(err.Error())
-		return
-	} else {
-		if b, err = json.Marshal(log); err != nil {
+	/*
+		var (
+			log protocol.ElasticSearchData
+			err error
+			b   []byte
+		)
+		if err = json.Unmarshal([]byte(jsonString), &log); err != nil {
 			fmt.Println(err.Error())
 			return
+		} else {
+			if b, err = json.Marshal(log); err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			fmt.Println(string(b))
 		}
-		fmt.Println(string(b))
+	*/
+	var (
+		file = "/Users/yelei/data/code/go-projects/log-engine-sdk/configs/watch.yaml"
+	)
+
+	mustLoad(file)
+
+	fmt.Println(cfg)
+}
+
+var (
+	cfg = new(Config)
+)
+
+type Config struct {
+	Watch Watch `yaml:"watch" json:"watch" toml:"watch"`
+}
+
+type Watch struct {
+	ReadPath      map[string][]string `yaml:"read_path"`
+	Prefix        bool                `yaml:"prefix"`
+	MaxReadCount  int                 `yaml:"max_read_count"`
+	StateFilePath string              `yaml:"state_file_path"`
+}
+
+func mustLoad(fpaths ...string) {
+	var (
+		loaders []multiconfig.Loader
+		m       multiconfig.DefaultLoader
+	)
+
+	loaders = []multiconfig.Loader{
+		&multiconfig.TagLoader{},
+		&multiconfig.EnvironmentLoader{},
 	}
+
+	for _, fpath := range fpaths {
+		if strings.HasSuffix(fpath, ".yaml") {
+			loaders = append(loaders, &multiconfig.YAMLLoader{Path: fpath})
+		}
+
+		if strings.HasSuffix(fpath, ".json") {
+			loaders = append(loaders, &multiconfig.JSONLoader{Path: fpath})
+		}
+
+		if strings.HasSuffix(fpath, ".toml") {
+			loaders = append(loaders, &multiconfig.TOMLLoader{Path: fpath})
+		}
+	}
+
+	m = multiconfig.DefaultLoader{
+		Loader:    multiconfig.MultiLoader(loaders...),
+		Validator: multiconfig.MultiValidator(&multiconfig.RequiredValidator{}),
+	}
+
+	m.MustLoad(cfg)
 }

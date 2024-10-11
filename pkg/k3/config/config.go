@@ -26,9 +26,10 @@ type ELK struct {
 }
 
 type Watch struct {
-	ReadPath      []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
-	StateFilePath string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
-	MaxReadCount  int      `yaml:"max_read_count"` // max_read_count
+	ReadPath        map[string][]string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
+	IsUseSuffixDate bool                `yaml:"is_use_suffix_date" json:"is_use_suffix_date" toml:"is_use_suffix_date"`
+	StateFilePath   string              `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
+	MaxReadCount    int                 `yaml:"max_read_count" json:"max_read_count"` // max_read_count
 }
 
 type System struct {
