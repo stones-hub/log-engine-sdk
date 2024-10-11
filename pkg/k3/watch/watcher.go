@@ -330,8 +330,8 @@ func doRemoveAndRenameEvent(name string, stateFile string) {
 
 }
 
-// ReadFileByOffset 读取文件内容， 从offset开始，直到遇到\n, 返回读取后，最后的偏移量
-func readFileByOffset(fd *os.File, offset int64) (int64, error) {
+// ReadFileByOffset 读取文件内容， 从offset开始，直到遇到\n, 返回读取后，最后的偏移量, eventName 当前文件地址
+func readFileByOffset(eventName string, fd *os.File, offset int64) (int64, error) {
 	var (
 		err              error
 		reader           *bufio.Reader
@@ -405,36 +405,17 @@ func sendDataToConsumer(content string) {
 	datas = strings.Split(content, "\n")
 	for _, data := range datas {
 
-		var (
-			err              error
-			properties       map[string]interface{}
-			accountId, appId string
-		)
-
 		data = strings.TrimSpace(data)
 		data = strings.Trim(data, "\n")
 		if len(data) == 0 {
 			continue
 		}
 
-		if err = json.Unmarshal([]byte(data), &properties); err != nil {
-			properties[content] = data
-		}
-
-		// description 暂时 accountId, appId, eventName, eventId 用处不大
-		if _, exists := properties["account_id"]; !exists {
-			accountId = config.GlobalConfig.Account.AccountId
-		} else {
-			accountId = properties["account_id"].(string)
-		}
-
-		if _, exists := properties["app_id"]; !exists {
-			appId = config.GlobalConfig.Account.AccountId
-		} else {
-			appId = properties["app_id"].(string)
-		}
-
-		if err = dataAnalytics.Track(accountId, appId, ip, properties); err != nil {
+		if err := dataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId,
+			ip, map[string]interface{}{
+				"_data":  data,
+				"_index": "",
+			}); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)
 		}
 	}

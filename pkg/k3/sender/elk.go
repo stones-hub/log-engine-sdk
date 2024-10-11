@@ -123,15 +123,34 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				k3.K3LogError("WriteDataToElasticSearch Data channel closed !")
 				return
 			}
-			// 解析数据
-			if b, err = json.Marshal(data); err != nil {
-				k3.K3LogError("Failed to marshal data: %v", err)
+
+			// 封装elk_data
+			var elasticSearchData protocol.ElasticSearchData
+
+			// 如果解析失败，则直接赋值给text字段
+			if err = json.Unmarshal([]byte(data.Properties["_data"].(string)), &elasticSearchData); err != nil {
+				elasticSearchData.ExtendData.Content["text"] = data.Properties["_data"]
+			}
+
+			if b, err = json.Marshal(elasticSearchData); err != nil {
+				k3.K3LogError("WriteDataToElasticSearch Failed to marshal data: %v", err)
 				continue
 			}
 
+			if elasticSearchData.UUID == "" {
+				elasticSearchData.UUID = data.UUID
+			}
+			if elasticSearchData.HostName == "" {
+
+			}
+			if elasticSearchData.HostIp == "" {
+				elasticSearchData.HostIp = data.Ip
+			}
+			elasticSearchData.Timestamp = data.Timestamp
+
 			req = esapi.IndexRequest{
-				Index:      "",
-				DocumentID: fmt.Sprintf("%s", data.UUID),
+				Index:      ,
+				DocumentID: fmt.Sprintf("%s", elasticSearchData.UUID),
 				Body:       strings.NewReader(string(b)),
 				Pretty:     true,
 			}

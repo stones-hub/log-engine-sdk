@@ -1,5 +1,7 @@
 package protocol
 
+import "time"
+
 type ElasticSearchData struct {
 	UUID       string     `json:"_id,omitempty"`        // 日志唯一ID， elk document id  √
 	LogLevel   string     `json:"log_level,omitempty"`  // 日志级别 warn, error, debug, info
@@ -16,7 +18,7 @@ type ElasticSearchData struct {
 	LogSrc     string     `json:"log_src,omitempty"`    // 日志源(内部调用default/sms/phone等)
 	EventId    int        `json:"event_id,omitempty"`   // 日志事件ID
 	EventName  string     `json:"event_name,omitempty"` // 日志事件名称(每种日志唯一)
-	Timestamp  string     `json:"timestamp,omitempty"`  // 日志产生时间 "2024-10-01 12:00:00 " √
+	Timestamp  time.Time  `json:"timestamp,omitempty"`  // 日志产生时间 "2024-10-01 12:00:00 " √
 	ExtendData ExtendData `json:"extend_data"`          // 扩展字段
 }
 

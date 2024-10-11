@@ -79,18 +79,16 @@ func (i *DataAnalytics) track(accountId, appId, ip string, properties map[string
 
 func (i *DataAnalytics) add(accountId, appId, ip string, properties map[string]interface{}) error {
 	var (
-		now  string
 		uuid string
 		data protocol.Data
 	)
 
-	now = time.Now().Format("2006-01-02 15:04:05")
 	uuid = GenerateUUID()
 	data = protocol.Data{
 		AccountId:  accountId,
 		AppId:      appId,
 		Ip:         ip,
-		Time:       now,
+		Timestamp:  time.Now(),
 		UUID:       uuid,
 		Properties: properties,
 	}
