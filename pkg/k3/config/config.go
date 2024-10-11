@@ -12,7 +12,6 @@ type Config struct {
 	System   System   `yaml:"system" json:"system" toml:"system"`
 	Http     Http     `yaml:"http" json:"http" toml:"http"`
 	Consumer Consumer `yaml:"consumer" json:"consumer" toml:"consumer"`
-	Account  Account  `yaml:"account" json:"account"`
 	Watch    Watch    `yaml:"watch" json:"watch" toml:"watch"`
 }
 
@@ -30,13 +29,6 @@ type Watch struct {
 	ReadPath      []string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
 	StateFilePath string   `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
 	MaxReadCount  int      `yaml:"max_read_count"` // max_read_count
-}
-
-type Account struct {
-	AccountId string `yaml:"account_id"`
-	AppId     string `yaml:"app_id"`
-	EventName string `yaml:"event_name"`
-	EventId   string `yaml:"event_id"`
 }
 
 type System struct {

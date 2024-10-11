@@ -1,6 +1,0 @@
-account:
-  account_id: "1001"
-  app_id: "1001-001"
-  event_name: "admin_center_trace"
-  event_id: "1"
-

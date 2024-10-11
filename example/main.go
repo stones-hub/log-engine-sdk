@@ -59,13 +59,10 @@ func main() {
 		fmt.Println(err.Error())
 		return
 	} else {
-		fmt.Println(log)
-		fmt.Println("---->")
 		if b, err = json.Marshal(log); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 		fmt.Println(string(b))
-
 	}
 }
