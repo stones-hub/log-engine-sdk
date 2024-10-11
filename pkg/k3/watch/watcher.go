@@ -406,9 +406,9 @@ func sendDataToConsumer(content string) {
 	for _, data := range datas {
 
 		var (
-			err                                  error
-			properties                           map[string]interface{}
-			accountId, appId, eventId, eventName string
+			err              error
+			properties       map[string]interface{}
+			accountId, appId string
 		)
 
 		data = strings.TrimSpace(data)
@@ -421,6 +421,7 @@ func sendDataToConsumer(content string) {
 			properties[content] = data
 		}
 
+		// description 暂时 accountId, appId, eventName, eventId 用处不大
 		if _, exists := properties["account_id"]; !exists {
 			accountId = config.GlobalConfig.Account.AccountId
 		} else {
@@ -433,19 +434,7 @@ func sendDataToConsumer(content string) {
 			appId = properties["app_id"].(string)
 		}
 
-		if _, exists := properties["event_id"]; !exists {
-			eventId = config.GlobalConfig.Account.AccountId
-		} else {
-			eventId = properties["event_id"].(string)
-		}
-
-		if _, exists := properties["event_name"]; !exists {
-			eventName = config.GlobalConfig.Account.AccountId
-		} else {
-			eventName = properties["event_name"].(string)
-		}
-
-		if err = dataAnalytics.Track(accountId, appId, eventName, eventId, ip, properties); err != nil {
+		if err = dataAnalytics.Track(accountId, appId, ip, properties); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)
 		}
 	}

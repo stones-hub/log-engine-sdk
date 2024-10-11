@@ -43,11 +43,11 @@ func (i *DataAnalytics) CleanSuperProperties() {
 	i.superProperties = make(map[string]interface{})
 }
 
-func (i *DataAnalytics) Track(accountId, appId, eventName, eventId, ip string, properties map[string]interface{}) error {
-	return i.track(accountId, appId, eventName, eventId, ip, properties)
+func (i *DataAnalytics) Track(accountId, appId, ip string, properties map[string]interface{}) error {
+	return i.track(accountId, appId, ip, properties)
 }
 
-func (i *DataAnalytics) track(accountId, appId, eventName, eventId, ip string, properties map[string]interface{}) error {
+func (i *DataAnalytics) track(accountId, appId, ip string, properties map[string]interface{}) error {
 	var (
 		msg string
 		p   map[string]interface{}
@@ -72,18 +72,12 @@ func (i *DataAnalytics) track(accountId, appId, eventName, eventId, ip string, p
 		return errors.New(msg)
 	}
 
-	if len(eventId) == 0 {
-		msg = "the event id must be provided"
-		K3LogError(msg)
-		return errors.New(msg)
-	}
-
 	p = i.GetSuperProperties()
 	MergeProperties(p, properties)
-	return i.add(accountId, appId, eventName, eventId, ip, p)
+	return i.add(accountId, appId, ip, p)
 }
 
-func (i *DataAnalytics) add(accountId, appId, eventName, eventId, ip string, properties map[string]interface{}) error {
+func (i *DataAnalytics) add(accountId, appId, ip string, properties map[string]interface{}) error {
 	var (
 		now  string
 		uuid string
@@ -95,8 +89,6 @@ func (i *DataAnalytics) add(accountId, appId, eventName, eventId, ip string, pro
 	data = protocol.Data{
 		AccountId:  accountId,
 		AppId:      appId,
-		EventId:    eventId,
-		EventName:  eventName,
 		Ip:         ip,
 		Time:       now,
 		UUID:       uuid,

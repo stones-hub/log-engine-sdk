@@ -130,7 +130,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			}
 
 			req = esapi.IndexRequest{
-				Index:      data.EventName,
+				Index:      "",
 				DocumentID: fmt.Sprintf("%s", data.UUID),
 				Body:       strings.NewReader(string(b)),
 				Pretty:     true,
@@ -151,7 +151,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				}
 			}
 			res.Body.Close()
-			k3.K3LogDebug("Send data (event_name : %v, document_id: %v) to Elasticsearch successfully.", data.EventName, data.UUID)
+			k3.K3LogDebug("Send data (document_id: %v) to Elasticsearch successfully.", data.UUID)
 		}
 	}
 }

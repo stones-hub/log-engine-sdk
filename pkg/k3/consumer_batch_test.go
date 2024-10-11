@@ -35,8 +35,6 @@ func TestBatchConsumer(t *testing.T) {
 		AccountId: "1001",
 		AppId:     "appid-1001",
 		Time:      time.Now().Format("2006-01-02 15:04:05"),
-		EventName: "batch_test",
-		EventId:   "batch_test_id",
 		Ip:        ips[0],
 		UUID:      GenerateUUID(),
 		Properties: map[string]interface{}{
@@ -49,8 +47,6 @@ func TestBatchConsumer(t *testing.T) {
 		AccountId: "1002",
 		AppId:     "appid-1001",
 		Time:      time.Now().Format("2006-01-02 15:04:05"),
-		EventName: "batch_test",
-		EventId:   "batch_test_id",
 		Ip:        ips[0],
 		UUID:      GenerateUUID(),
 		Properties: map[string]interface{}{
@@ -63,8 +59,6 @@ func TestBatchConsumer(t *testing.T) {
 		AccountId: "1003",
 		AppId:     "appid-1001",
 		Time:      time.Now().Format("2006-01-02 15:04:05"),
-		EventName: "batch_test",
-		EventId:   "batch_test_id",
 		Ip:        ips[0],
 		UUID:      GenerateUUID(),
 		Properties: map[string]interface{}{

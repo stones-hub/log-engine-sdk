@@ -41,8 +41,6 @@ func TestConsumerLog(t *testing.T) {
 					AccountId: "1001",
 					AppId:     "app_id_1001",
 					Time:      time.Now().Format("2006-01-02 15:04:05"),
-					EventName: "user",
-					EventId:   "user_event_id_001",
 					Ip:        ips[0],
 					UUID:      GenerateUUID(),
 					Properties: map[string]interface{}{
