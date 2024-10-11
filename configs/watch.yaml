@@ -1,4 +1,16 @@
 watch:
-  read_path: ["/Users/yelei/data/code/go-projects/logs"] # watch监控目录列表
+  read_path : [
+      "_index_nginx" : [
+      "/data/logs/yw/nginx",
+      ],
+      "_index_ucenter_admin": [
+        "/data/logs/ucenter_admin",
+      ],
+    "_index_ucenter_api": [
+      "/data/logs/ucenter_api/",
+    ],
+  ]
+  prefix : true # 当前日期
+  # watch监控目录列表
   max_read_count: 100 # 监控到文件变化时，读取文件最大次数
   state_file_path: "/state/core.json" # 记录监控文件的offset
