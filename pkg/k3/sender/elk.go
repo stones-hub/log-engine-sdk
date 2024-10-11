@@ -149,7 +149,8 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			elasticSearchData.Timestamp = data.Timestamp
 
 			req = esapi.IndexRequest{
-				Index:      ,
+				// TODO eventName是当前日志来源那个文件, 所以要从config中匹配下拿到最终的index
+				Index:      data.EventName,
 				DocumentID: fmt.Sprintf("%s", elasticSearchData.UUID),
 				Body:       strings.NewReader(string(b)),
 				Pretty:     true,

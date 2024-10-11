@@ -255,7 +255,7 @@ func handleEvent(event fsnotify.Event, stateFile string) {
 			k3.K3LogError("handleEvent write error : %s", event.Name)
 			return
 		}
-		offset, err := readFileByOffset(GlobalFileStatesFd[event.Name].Fd, GlobalFileStates[event.Name].Offset)
+		offset, err := readFileByOffset(event.Name, GlobalFileStatesFd[event.Name].Fd, GlobalFileStates[event.Name].Offset)
 		if err != nil {
 			k3.K3LogError("ReadFileByOffset error: %s", err)
 		}
@@ -330,6 +330,7 @@ func doRemoveAndRenameEvent(name string, stateFile string) {
 
 }
 
+// TODO 考虑文件名路径 是不是有可能跟Key有贪婪匹配的问题
 // ReadFileByOffset 读取文件内容， 从offset开始，直到遇到\n, 返回读取后，最后的偏移量, eventName 当前文件地址
 func readFileByOffset(eventName string, fd *os.File, offset int64) (int64, error) {
 	var (
@@ -380,12 +381,12 @@ func readFileByOffset(eventName string, fd *os.File, offset int64) (int64, error
 
 EXIT:
 	// 将读取的数据发送给consumer
-	sendDataToConsumer(content)
+	sendDataToConsumer(eventName, content)
 	return newOffset, nil
 }
 
 // sendDataToConsumer 将数据发送到数据收集器
-func sendDataToConsumer(content string) {
+func sendDataToConsumer(eventName string, content string) {
 	var (
 		ip    string
 		datas []string
@@ -412,9 +413,8 @@ func sendDataToConsumer(content string) {
 		}
 
 		if err := dataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId,
-			ip, map[string]interface{}{
-				"_data":  data,
-				"_index": "",
+			eventName, ip, map[string]interface{}{
+				"_data": data,
 			}); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)
 		}
