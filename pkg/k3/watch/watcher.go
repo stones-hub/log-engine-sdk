@@ -404,21 +404,55 @@ func sendDataToConsumer(content string) {
 	// 发送的数据有可能是多条，因此做拆分, 循环提交
 	datas = strings.Split(content, "\n")
 	for _, data := range datas {
+
+		var (
+			err                                  error
+			jsonMap                              map[string]interface{}
+			accountId, appId, eventId, eventName string
+		)
+
 		data = strings.TrimSpace(data)
 		data = strings.Trim(data, "\n")
 		if len(data) == 0 {
 			continue
 		}
 
-		/* TODO*/
-		if err := dataAnalytics.Track("1001", "1001", "1001", "1001",
+		if err = json.Unmarshal([]byte(data), &jsonMap); err != nil {
+			jsonMap[content] = data
+		}
+
+		if _, exists := jsonMap["account_id"]; !exists {
+			accountId = config.GlobalConfig.Account.AccountId
+		} else {
+			accountId = jsonMap["account_id"].(string)
+		}
+
+		if _, exists := jsonMap["app_id"]; !exists {
+			appId = config.GlobalConfig.Account.AccountId
+		} else {
+			appId = jsonMap["app_id"].(string)
+		}
+
+		if _, exists := jsonMap["event_id"]; !exists {
+			eventId = config.GlobalConfig.Account.AccountId
+		} else {
+			eventId = jsonMap["event_id"].(string)
+		}
+
+		if _, exists := jsonMap["event_name"]; !exists {
+			eventName = config.GlobalConfig.Account.AccountId
+		} else {
+			eventName = jsonMap["event_name"].(string)
+		}
+
+		if err = dataAnalytics.Track(
+			accountId, appId, eventName, eventId,
 			ip, map[string]interface{}{
 				"data":      data,
 				"Timestamp": time.Now(),
 			}); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)
 		}
-
 	}
 }
 

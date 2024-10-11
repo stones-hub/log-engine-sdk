@@ -13,6 +13,7 @@ type Config struct {
 	Http     Http     `yaml:"http" json:"http" toml:"http"`
 	Consumer Consumer `yaml:"consumer" json:"consumer" toml:"consumer"`
 	Watch    Watch    `yaml:"watch" json:"watch" toml:"watch"`
+	Account  Account  `yaml:"account" json:"account"`
 }
 
 type ELK struct {
@@ -37,6 +38,13 @@ type System struct {
 	UseELK       bool   `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
 	RootPath     string `yaml:"root_path" json:"root_path" toml:"root_path"`
 	LogLevel     int    `yaml:"log_level"`
+}
+
+type Account struct {
+	AccountId string `yaml:"account_id"`
+	AppId     string `yaml:"app_id"`
+	EventName string `yaml:"event_name"`
+	EventId   string `yaml:"event_id"`
 }
 
 type Consumer struct {
