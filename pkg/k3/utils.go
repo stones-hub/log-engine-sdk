@@ -166,3 +166,20 @@ func InterfaceToJSONString(val interface{}) (string, error) {
 	b, err := json.Marshal(val)
 	return string(b), err
 }
+
+// RemoveDuplicateElement 移除重复元素
+func RemoveDuplicateElement(src []string) []string {
+	var (
+		seen = make(map[string]bool)
+		res  []string
+	)
+
+	for _, s := range src {
+		if _, exists := seen[s]; !exists {
+			seen[s] = true
+			res = append(res, s)
+		}
+	}
+
+	return res
+}

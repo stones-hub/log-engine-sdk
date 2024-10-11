@@ -394,7 +394,7 @@ func sendDataToConsumer(content string) {
 	// 获取本地IP
 	if ips, err := k3.GetLocalIPs(); err != nil {
 		k3.K3LogError("GetLocalIPs error: %s", err)
-		ip = "10.10.10.1"
+		ip = "127.0.0.1"
 	} else {
 		if len(ips) >= 1 {
 			ip = ips[0]
@@ -410,15 +410,15 @@ func sendDataToConsumer(content string) {
 			continue
 		}
 
-		if err := dataAnalytics.Track(config.GlobalConfig.Account.AccountId,
-			config.GlobalConfig.Account.AppId,
-			config.GlobalConfig.Account.EventName,
-			config.GlobalConfig.Account.EventId, ip, map[string]interface{}{
+		/* TODO*/
+		if err := dataAnalytics.Track("1001", "1001", "1001", "1001",
+			ip, map[string]interface{}{
 				"data":      data,
 				"Timestamp": time.Now(),
 			}); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)
 		}
+
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"log-engine-sdk/pkg/k3/watch"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -64,9 +65,18 @@ func main() {
 		httpClean     func()
 	)
 
-	for _, readDir := range config.GlobalConfig.Watch.ReadPath {
-		ReadDirectory = append(ReadDirectory, readDir)
+	// 遍历需要监控的目录
+	for _, readDirs := range config.GlobalConfig.Watch.ReadPath {
+		for _, readDir := range readDirs {
+			if !strings.HasSuffix(readDir, "/") {
+				readDir = readDir + "/"
+			}
+			ReadDirectory = append(ReadDirectory, readDir)
+		}
 	}
+
+	// 剔除ReadDirectory中的重复目录
+	ReadDirectory = k3.RemoveDuplicateElement(ReadDirectory)
 
 	err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
 
