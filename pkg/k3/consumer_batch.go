@@ -121,11 +121,11 @@ func (k *K3BatchConsumer) Close() error {
 }
 
 type K3BatchConsumerConfig struct {
-	Sender        protocol.Sender
-	BatchSize     int
-	AutoFlush     bool
-	Interval      int
-	CacheCapacity int
+	Sender        protocol.Sender // 日志提交到那个sender
+	BatchSize     int             // 批量提交大小， 单次, []protocol.Data
+	AutoFlush     bool            // 是否自动提交，配合interval使用
+	Interval      int             // 检查提交的时间间隔
+	CacheCapacity int             // 批量日志缓存容量 [][]protocol.Data
 }
 
 // NewBatchConsumer creates a new K3BatchConsumer with default batch size.

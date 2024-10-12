@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/koding/multiconfig"
-	"strings"
+	"log-engine-sdk/pkg/k3"
+	"log-engine-sdk/pkg/k3/protocol"
+	"log-engine-sdk/pkg/k3/sender"
+	"time"
 )
 
-var jsonString = `{
+var jString = `{
     "_id": "8816c977-854e-11ef-917e-00163e346885",
     "timestamp" : "2024-10-09T17:41:30.703011223+08:00",
     "log_level": "INFO", 
@@ -49,77 +51,72 @@ var jsonString = `{
     }
 }`
 
+func TestK3Log() {
+	k3.K3LogError("test: %s", "err")
+	k3.K3LogInfo("test: %s", "info")
+	k3.K3LogWarn("test: %s", "warn")
+	k3.K3LogDebug("test: %s", "debug")
+}
+
+func TestConsumerLog() {
+	consumerLog, err := k3.NewLogConsumerWithConfig(k3.K3LogConsumerConfig{
+		Directory:      "log/",
+		RoteMode:       k3.ROTATE_DAILY,
+		FileSize:       1024,
+		FileNamePrefix: "test",
+		ChannelSize:    1024,
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	consumerLog.Add(protocol.Data{
+		UUID:      k3.GenerateUUID(),
+		AccountId: "1001",
+		AppId:     "1001-01",
+		Ip:        "127.0.0.1",
+		Timestamp: time.Now(),
+		EventName: "event_name",
+		Properties: map[string]interface{}{
+			"property": "test",
+		},
+	})
+
+	consumerLog.Close()
+}
+
+func TestConsumerBatchLog() {
+
+	batchConsumer, err := k3.NewBatchConsumerWithConfig(k3.K3BatchConsumerConfig{
+		Sender:        new(sender.Default),
+		BatchSize:     10,    // 批量日志单次批量提交最大值
+		AutoFlush:     false, // 是否自动刷新
+		Interval:      5,     // 批量日志检查缓存列表时间间隔
+		CacheCapacity: 100,   // 批量日志缓存容量
+	})
+
+	if err != nil {
+		return
+	}
+
+	batchConsumer.Add(protocol.Data{
+		UUID:      k3.GenerateUUID(),
+		AccountId: "1001",
+		AppId:     "1001-01",
+		Ip:        "127.0.0.1",
+		Timestamp: time.Now(),
+		EventName: "event_name",
+		Properties: map[string]interface{}{
+			"property": "batch test",
+		},
+	})
+	batchConsumer.Close()
+}
+
 func main() {
-	/*
-		var (
-			log protocol.ElasticSearchData
-			err error
-			b   []byte
-		)
-		if err = json.Unmarshal([]byte(jsonString), &log); err != nil {
-			fmt.Println(err.Error())
-			return
-		} else {
-			if b, err = json.Marshal(log); err != nil {
-				fmt.Println(err.Error())
-				return
-			}
-			fmt.Println(string(b))
-		}
-	*/
-	var (
-		file = "/Users/yelei/data/code/go-projects/log-engine-sdk/configs/watch.yaml"
-	)
-
-	mustLoad(file)
-
-	fmt.Println(cfg)
-}
-
-var (
-	cfg = new(Config)
-)
-
-type Config struct {
-	Watch Watch `yaml:"watch" json:"watch" toml:"watch"`
-}
-
-type Watch struct {
-	ReadPath      map[string][]string `yaml:"read_path"`
-	Prefix        bool                `yaml:"prefix"`
-	MaxReadCount  int                 `yaml:"max_read_count"`
-	StateFilePath string              `yaml:"state_file_path"`
-}
-
-func mustLoad(fpaths ...string) {
-	var (
-		loaders []multiconfig.Loader
-		m       multiconfig.DefaultLoader
-	)
-
-	loaders = []multiconfig.Loader{
-		&multiconfig.TagLoader{},
-		&multiconfig.EnvironmentLoader{},
-	}
-
-	for _, fpath := range fpaths {
-		if strings.HasSuffix(fpath, ".yaml") {
-			loaders = append(loaders, &multiconfig.YAMLLoader{Path: fpath})
-		}
-
-		if strings.HasSuffix(fpath, ".json") {
-			loaders = append(loaders, &multiconfig.JSONLoader{Path: fpath})
-		}
-
-		if strings.HasSuffix(fpath, ".toml") {
-			loaders = append(loaders, &multiconfig.TOMLLoader{Path: fpath})
-		}
-	}
-
-	m = multiconfig.DefaultLoader{
-		Loader:    multiconfig.MultiLoader(loaders...),
-		Validator: multiconfig.MultiValidator(&multiconfig.RequiredValidator{}),
-	}
-
-	m.MustLoad(cfg)
+	TestK3Log()
+	TestConsumerLog()
+	TestConsumerBatchLog()
 }
