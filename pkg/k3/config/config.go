@@ -17,21 +17,21 @@ type Config struct {
 }
 
 type ELK struct {
-	Address        []string `yaml:"address" json:"addresses,omitempty" toml:"addresses"` // A list of Elasticsearch nodes to use.
-	Username       string   `yaml:"username" json:"username,omitempty" toml:"username"`  // Username for HTTP Basic Authentication.
-	Password       string   `yaml:"password" json:"password,omitempty" toml:"password"`  // Password for HTTP Basic Authentication.
-	MaxChannelSize int      `yaml:"max_channel_size"`                                    // 最大管道
-	MaxRetry       int      `yaml:"max_retry"`
-	RetryInterval  int      `yaml:"retry_interval"`
-	Timeout        int      `yaml:"timeout"`
+	Address          []string `yaml:"address" json:"addresses,omitempty" toml:"addresses"` // A list of Elasticsearch nodes to use.
+	Username         string   `yaml:"username" json:"username,omitempty" toml:"username"`  // Username for HTTP Basic Authentication.
+	Password         string   `yaml:"password" json:"password,omitempty" toml:"password"`  // Password for HTTP Basic Authentication.
+	MaxChannelSize   int      `yaml:"max_channel_size"`                                    // 最大管道
+	MaxRetry         int      `yaml:"max_retry"`
+	RetryInterval    int      `yaml:"retry_interval"`
+	Timeout          int      `yaml:"timeout"`
+	DefaultIndexName string   `yaml:"default_index_name"`                                                     // 默认ELK索引名
+	IsUseSuffixDate  bool     `yaml:"is_use_suffix_date" json:"is_use_suffix_date" toml:"is_use_suffix_date"` // 是否使用时间戳后缀给索引
 }
 
 type Watch struct {
-	ReadPath        map[string][]string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
-	IsUseSuffixDate bool                `yaml:"is_use_suffix_date" json:"is_use_suffix_date" toml:"is_use_suffix_date"`
-	StateFilePath   string              `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
-	MaxReadCount    int                 `yaml:"max_read_count" json:"max_read_count"` // max_read_count
-	DefaultIndex    string              `yaml:"default_index" json:"default_index"`
+	ReadPath      map[string][]string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
+	StateFilePath string              `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
+	MaxReadCount  int                 `yaml:"max_read_count" json:"max_read_count"` // max_read_count
 }
 
 type System struct {

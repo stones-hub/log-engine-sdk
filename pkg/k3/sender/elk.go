@@ -117,7 +117,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			res               *esapi.Response
 			e                 map[string]interface{}
 			elasticSearchData protocol.ElasticSearchData
-			_index            = config.GlobalConfig.Watch.DefaultIndex
+			_index            = config.GlobalConfig.ELK.DefaultIndexName
 		)
 
 		select {
@@ -133,8 +133,8 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				}
 			}
 
-			if config.GlobalConfig.Watch.IsUseSuffixDate {
-				_index = _index + "-" + data.Timestamp.Format("20060102")
+			if config.GlobalConfig.ELK.IsUseSuffixDate {
+				_index = _index + "_" + data.Timestamp.Format("20060102")
 			}
 
 			// 如果解析失败，则直接赋值给text字段
