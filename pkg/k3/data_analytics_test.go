@@ -27,13 +27,10 @@ func TestDataAnalytics(t *testing.T) {
 	})
 
 	dataAnalytics = NewDataAnalytics(consumer)
-
 	dataAnalytics.SetSuperProperties(map[string]interface{}{"user": "yelei", "age": 12})
-
-	dataAnalytics.Track("account_id", "app_id", "ip", map[string]interface{}{"name": "stones", "age": 111})
-	dataAnalytics.Track("account_id", "app_id", "ip", map[string]interface{}{"name": "stones", "age": 112})
-	dataAnalytics.Track("account_id", "app_id", "ip", map[string]interface{}{"name": "stones", "age": 113})
-	dataAnalytics.Track("account_id", "app_id", "ip", map[string]interface{}{"name": "stones", "age": 114})
-
+	dataAnalytics.Track("account_id", "app_id", "ip", "", map[string]interface{}{"name": "stones", "age": 111})
+	dataAnalytics.Track("account_id", "app_id", "ip", "", map[string]interface{}{"name": "stones", "age": 112})
+	dataAnalytics.Track("account_id", "app_id", "ip", "", map[string]interface{}{"name": "stones", "age": 113})
+	dataAnalytics.Track("account_id", "app_id", "ip", "", map[string]interface{}{"name": "stones", "age": 114})
 	dataAnalytics.Close()
 }

@@ -32,11 +32,12 @@ func TestBatchConsumer(t *testing.T) {
 	}
 
 	consumer.Add(protocol.Data{
+		UUID:      GenerateUUID(),
 		AccountId: "1001",
 		AppId:     "appid-1001",
-		Time:      time.Now().Format("2006-01-02 15:04:05"),
 		Ip:        ips[0],
-		UUID:      GenerateUUID(),
+		Timestamp: time.Now(),
+		EventName: "",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,
@@ -44,11 +45,12 @@ func TestBatchConsumer(t *testing.T) {
 	})
 
 	consumer.Add(protocol.Data{
+		UUID:      GenerateUUID(),
 		AccountId: "1002",
 		AppId:     "appid-1001",
-		Time:      time.Now().Format("2006-01-02 15:04:05"),
 		Ip:        ips[0],
-		UUID:      GenerateUUID(),
+		Timestamp: time.Now(),
+		EventName: "",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,
@@ -56,16 +58,16 @@ func TestBatchConsumer(t *testing.T) {
 	})
 
 	consumer.Add(protocol.Data{
+		UUID:      GenerateUUID(),
 		AccountId: "1003",
 		AppId:     "appid-1001",
-		Time:      time.Now().Format("2006-01-02 15:04:05"),
 		Ip:        ips[0],
-		UUID:      GenerateUUID(),
+		Timestamp: time.Now(),
+		EventName: "",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,
 		},
 	})
-
 	consumer.Close()
 }

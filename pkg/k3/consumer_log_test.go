@@ -38,11 +38,12 @@ func TestConsumerLog(t *testing.T) {
 			select {
 			case <-t.C:
 				err = consumerLog.Add(protocol.Data{
+					UUID:      GenerateUUID(),
 					AccountId: "1001",
 					AppId:     "app_id_1001",
-					Time:      time.Now().Format("2006-01-02 15:04:05"),
 					Ip:        ips[0],
-					UUID:      GenerateUUID(),
+					Timestamp: time.Now(),
+					EventName: "",
 					Properties: map[string]interface{}{
 						"user_name": "stones",
 						"age":       18,
