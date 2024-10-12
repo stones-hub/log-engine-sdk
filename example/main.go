@@ -115,8 +115,39 @@ func TestConsumerBatchLog() {
 	batchConsumer.Close()
 }
 
-func main() {
+func TestDataAnalytics() {
+
+	var (
+		dataAnalytics k3.DataAnalytics
+		err           error
+		consumer      protocol.K3Consumer
+	)
+
+	if consumer, err = k3.NewBatchConsumerWithConfig(k3.K3BatchConsumerConfig{
+		Sender:    new(sender.Default),
+		AutoFlush: true,
+	}); err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	dataAnalytics = k3.NewDataAnalytics(consumer)
+	dataAnalytics.SetSuperProperties(map[string]interface{}{"user": "yelei", "age": 12})
+	dataAnalytics.Track("account_id", "app_id", "ip", "1001", map[string]interface{}{"name": "stones", "age": 111})
+	dataAnalytics.Track("account_id", "app_id", "ip", "1002", map[string]interface{}{"name": "stones", "age": 112})
+	dataAnalytics.Track("account_id", "app_id", "ip", "1003", map[string]interface{}{"name": "stones", "age": 113})
+	dataAnalytics.Track("account_id", "app_id", "ip", "1004", map[string]interface{}{"name": "stones", "age": 114})
+	dataAnalytics.Close()
+}
+
+// TotalTestLog 测试日志
+func TotalTestLog() {
 	TestK3Log()
 	TestConsumerLog()
 	TestConsumerBatchLog()
+	TestDataAnalytics()
+}
+
+func main() {
+
 }

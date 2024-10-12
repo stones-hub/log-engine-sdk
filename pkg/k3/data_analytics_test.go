@@ -1,36 +1,54 @@
 package k3
 
 import (
+	"encoding/json"
 	"fmt"
 	"log-engine-sdk/pkg/k3/protocol"
-	"log-engine-sdk/pkg/k3/sender"
 	"testing"
 )
+
+type Default struct {
+}
+
+func (d *Default) Send(data []protocol.Data) error {
+	var (
+		b   []byte
+		err error
+	)
+	if b, err = json.Marshal(data); err != nil {
+		return err
+	}
+	fmt.Println(string(b))
+	return nil
+}
+
+func (d *Default) Close() error {
+	fmt.Println("close default sender")
+	return nil
+}
 
 func TestDataAnalytics(t *testing.T) {
 
 	var (
 		dataAnalytics DataAnalytics
-		elk           *sender.ElasticSearchClient
 		err           error
 		consumer      protocol.K3Consumer
 	)
 
-	if elk, err = sender.NewElasticsearch([]string{"http://127.0.0.1:9200"}, "admin", "admin"); err != nil {
-		fmt.Println(err)
+	if consumer, err = NewBatchConsumerWithConfig(K3BatchConsumerConfig{
+		Sender:    new(Default),
+		AutoFlush: true,
+	}); err != nil {
+		t.Error(err)
 		return
 	}
 
-	consumer, err = NewBatchConsumerWithConfig(K3BatchConsumerConfig{
-		Sender:    elk,
-		AutoFlush: true,
-	})
-
 	dataAnalytics = NewDataAnalytics(consumer)
 	dataAnalytics.SetSuperProperties(map[string]interface{}{"user": "yelei", "age": 12})
-	dataAnalytics.Track("account_id", "app_id", "ip", "", map[string]interface{}{"name": "stones", "age": 111})
-	dataAnalytics.Track("account_id", "app_id", "ip", "", map[string]interface{}{"name": "stones", "age": 112})
-	dataAnalytics.Track("account_id", "app_id", "ip", "", map[string]interface{}{"name": "stones", "age": 113})
-	dataAnalytics.Track("account_id", "app_id", "ip", "", map[string]interface{}{"name": "stones", "age": 114})
+	dataAnalytics.Track("account_id", "app_id", "ip", "1001", map[string]interface{}{"name": "stones", "age": 111})
+	dataAnalytics.Track("account_id", "app_id", "ip", "1001", map[string]interface{}{"name": "stones", "age": 112})
+	dataAnalytics.Track("account_id", "app_id", "ip", "1001", map[string]interface{}{"name": "stones", "age": 113})
+	dataAnalytics.Track("account_id", "app_id", "ip", "1001", map[string]interface{}{"name": "stones", "age": 114})
 	dataAnalytics.Close()
+
 }

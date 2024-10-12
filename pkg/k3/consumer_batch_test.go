@@ -3,7 +3,6 @@ package k3
 import (
 	"fmt"
 	"log-engine-sdk/pkg/k3/protocol"
-	"log-engine-sdk/pkg/k3/sender"
 	"testing"
 	"time"
 )
@@ -11,18 +10,12 @@ import (
 func TestBatchConsumer(t *testing.T) {
 	var (
 		ips      []string
-		elk      *sender.ElasticSearchClient
 		err      error
 		consumer protocol.K3Consumer
 	)
 
-	if elk, err = sender.NewElasticsearch([]string{"http://127.0.0.1:8080"}, "", ""); err != nil {
-		fmt.Println(err)
-		return
-	}
-
 	consumer, err = NewBatchConsumerWithConfig(K3BatchConsumerConfig{
-		Sender:    elk,
+		Sender:    new(Default),
 		AutoFlush: true,
 	})
 
@@ -37,7 +30,7 @@ func TestBatchConsumer(t *testing.T) {
 		AppId:     "appid-1001",
 		Ip:        ips[0],
 		Timestamp: time.Now(),
-		EventName: "",
+		EventName: "1001",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,
@@ -50,7 +43,7 @@ func TestBatchConsumer(t *testing.T) {
 		AppId:     "appid-1001",
 		Ip:        ips[0],
 		Timestamp: time.Now(),
-		EventName: "",
+		EventName: "1001",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,
@@ -63,11 +56,12 @@ func TestBatchConsumer(t *testing.T) {
 		AppId:     "appid-1001",
 		Ip:        ips[0],
 		Timestamp: time.Now(),
-		EventName: "",
+		EventName: "1001",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,
 		},
 	})
 	consumer.Close()
+
 }

@@ -30,7 +30,7 @@ DIRS = log scripts
 all: pack
 
 test:
-	@go test -v ./...
+	@go test -v ./pkg/...
 
 build:
 	@mkdir -p log
