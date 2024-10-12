@@ -46,7 +46,8 @@ func HttpServer(ctx context.Context) (func(), error) {
 	}, nil
 }
 
-// TODO 获取Reqeust URI 的信息, 来决定业务逻辑
+// FindStatusRouter
+// TODO  获取Reqeust URI 的信息, 来决定业务逻辑
 func FindStatusRouter(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("hello world"))
 }

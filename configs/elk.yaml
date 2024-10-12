@@ -8,3 +8,5 @@ elk:
   max_retries: 5 # 最大重试次数
   retry_interval: 1 # 重试等待时间
   timeout: 5 # 超时时间
+  default_index_name: "logstash" # 默认elk index name
+  is_use_suffix_date: true # 是否使用日期作为后缀的index
