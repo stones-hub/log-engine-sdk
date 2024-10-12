@@ -163,9 +163,6 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				continue
 			}
 
-			fmt.Printf("写入到elk的数据: _index(%s), body(%v), elk_data(%v)\n", _index, string(b), elasticSearchData)
-
-			continue
 			req = esapi.IndexRequest{
 				Index:      _index,
 				DocumentID: fmt.Sprintf("%s", elasticSearchData.UUID),

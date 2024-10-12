@@ -1,56 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
-	"strings"
+	"os"
 	"time"
 )
 
-var jString = `{
-    "_id": "8816c977-854e-11ef-917e-00163e346885",
-    "timestamp" : "2024-10-09T17:41:30.703011223+08:00",
-    "log_level": "INFO", 
-    "host_ip" : "192.168.3.130",
-    "host_name" : "ali-gnfx-api-sdk4-01",
-    "domain" : "gnuser.3k.com",
-	"protocol":"HTTP/1.1",
-    "http_code" : 200,
-    "log_src": "default",
-    "client_ip": "34.12.10.1",
-    "trace_id": "f0713b0d0ea4b3b5a068a808e2f38aa",
-    "org": "gnfx",
-    "project" : "ywzx",
-    "code_name": "api_sdk4",
-    "event_id" : 1001,
-    "event_name" : "user_login",
-    "extend_data": {
-        "uid": "2029753648",
-        "game_name" : "坦克前线",
-        "amount" : 30,
-        "currency" : "RMB",
-        "language" : "Android",
-        "version" : "10.7.2",
-        "code" : 1001,
-        "content" : {
-            "time_local": "2024-10-09 15:40:03",
-            "channel": "trace",
-            "content": "[trace.server]接收请求POST http://gnuser.3k.com/v5/user/login",
-            "context": {
-                "log_type": "trace.server",
-                "url": "http://gnuser.3k.com/v5/user/login",
-                "method": "POST",
-                "input": "p=nh2%252FcdpyD",
-                "output": {"msg": "Success"},
-                "cost_ms": 49,
-                "start_time": "2024-10-09 15:39:23.644",
-                "end_time": "2024-10-09 15:39:23.693"
-            }
-        }
-    }
-}`
+var jString = `{"timestamp":"2024-10-09T17:41:30.703011223+08:00","log_level":"INFO","domain":"gnuser.3k.com","protocol":"HTTP/1.1","http_code":200,"log_src":"default","client_ip":"34.12.10.1","trace_id":"f0713b0d0ea4b3b5a068a808e2f38aa","org":"gnfx","project":"ywzx","code_name":"api_sdk4","event_id":1001,"event_name":"user_login","extend_data":{"uid":"2029753648","game_name":"坦克前线","amount":30,"currency":"RMB","language":"Android","version":"10.7.2","code":1001,"content":{"time_local":"2024-10-09 15:40:03","channel":"trace","content":"[trace.server]接收请求POST http://gnuser.3k.com/v5/user/login","context":{"log_type":"trace.server","url":"http://gnuser.3k.com/v5/user/login","method":"POST","input":"p=nh2%252FcdpyD","output":{"msg":"Success"},"cost_ms":49,"start_time":"2024-10-09 15:39:23.644","end_time":"2024-10-09 15:39:23.693"}}}}`
 
 func TestK3Log() {
 	k3.K3LogError("test: %s", "err")
@@ -150,10 +110,50 @@ func TotalTestLog() {
 }
 
 func main() {
+	var (
+		count         = 10
+		nginxFile     = "/Users/yelei/data/code/go-projects/logs/nginx/nginx.log"
+		adminFile     = "/Users/yelei/data/code/go-projects/logs/admin/admin.log"
+		apiFile       = "/Users/yelei/data/code/go-projects/logs/api/api.log"
+		fd1, fd2, fd3 *os.File
+		err           error
+	)
 
-	pix := "/Users/yelei/data/code/go-projects/log-engine-sdk/log"
-	s := "/Users/yelei/data/code/go-projects/log-engine-sdk/log/disk.log.2024-10-12_0 "
+	for count > 0 {
+		if fd1, err = os.OpenFile(nginxFile, os.O_RDWR|os.O_APPEND, 0666); err != nil {
+			fmt.Println(err)
+			return
+		} else {
+			writer1 := bufio.NewWriter(fd1)
+			writer1.WriteString(jString + "\n")
+			writer1.Flush()
+		}
 
-	fmt.Println(strings.HasPrefix(s, pix))
+		fd1.Close()
 
+		if fd2, err = os.OpenFile(adminFile, os.O_RDWR|os.O_APPEND, 0666); err != nil {
+			fmt.Println(err)
+			return
+		} else {
+			writer2 := bufio.NewWriter(fd2)
+			writer2.WriteString(jString + "\n")
+			writer2.Flush()
+		}
+
+		fd2.Close()
+
+		if fd3, err = os.OpenFile(apiFile, os.O_RDWR|os.O_APPEND, 0666); err != nil {
+			fmt.Println(err)
+			return
+		} else {
+			writer3 := bufio.NewWriter(fd3)
+			writer3.WriteString(jString + "\n")
+			writer3.Flush()
+		}
+
+		fd3.Close()
+
+		count--
+		time.Sleep(1 * time.Second)
+	}
 }
