@@ -142,7 +142,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			}
 
 			// 如果解析失败，则直接赋值给text字段
-			if err = json.Unmarshal([]byte(data.Properties["_data"].(string)), &elasticSearchData); err != nil {
+			if err = json.Unmarshal([]byte(data.Properties["_data"].(string)), &elasticSearchData); err != nil || elasticSearchData.Flag == false {
 				elasticSearchData.ExtendData.Content = make(map[string]interface{})
 				elasticSearchData.ExtendData.Content["text"] = data.Properties["_data"]
 			}
@@ -162,6 +162,8 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				k3.K3LogError("WriteDataToElasticSearch Failed to marshal data: %v", err)
 				continue
 			}
+
+			// fmt.Printf("document_id(%s), _index(%s), body(%s)\n", elasticSearchData.UUID, _index, string(b))
 
 			req = esapi.IndexRequest{
 				Index:      _index,

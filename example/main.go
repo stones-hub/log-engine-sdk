@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var jString = `{"timestamp":"2024-10-09T17:41:30.703011223+08:00","log_level":"INFO","domain":"gnuser.3k.com","protocol":"HTTP/1.1","http_code":200,"log_src":"default","client_ip":"34.12.10.1","trace_id":"f0713b0d0ea4b3b5a068a808e2f38aa","org":"gnfx","project":"ywzx","code_name":"api_sdk4","event_id":1001,"event_name":"user_login","extend_data":{"uid":"2029753648","game_name":"坦克前线","amount":30,"currency":"RMB","language":"Android","version":"10.7.2","code":1001,"content":{"time_local":"2024-10-09 15:40:03","channel":"trace","content":"[trace.server]接收请求POST http://gnuser.3k.com/v5/user/login","context":{"log_type":"trace.server","url":"http://gnuser.3k.com/v5/user/login","method":"POST","input":"p=nh2%252FcdpyD","output":{"msg":"Success"},"cost_ms":49,"start_time":"2024-10-09 15:39:23.644","end_time":"2024-10-09 15:39:23.693"}}}}`
+var jString = `{"time_local":"2024-10-12 16:43:47","trace_id":"ecab3e28ac94df49caf298d2204a242f","hostname":"ali-gnfx-admin-center-02","channel":"trace","log_level":"INFO","context":"{\"源数据\":\"app_id=2fa4cd360802b096&appid=mp_api&ip=14.18.194.140&passport_token=ee94e0af5993e9dbcfaf0b09a0a94702&timestamp=1728722627&secret=0b746e4165cba2e8758d2594cf91f006\",\"签名\":\"7B153732E4C5D8F8865901DD75100778\"}","content":"签名信息"}`
 
 func TestK3Log() {
 	k3.K3LogError("test: %s", "err")
@@ -109,7 +109,16 @@ func TotalTestLog() {
 	TestDataAnalytics()
 }
 
+type TestData struct {
+	Flag bool
+}
+
 func main() {
+	TestAddData()
+}
+
+func TestAddData() {
+
 	var (
 		count         = 10
 		nginxFile     = "/Users/yelei/data/code/go-projects/logs/nginx/nginx.log"

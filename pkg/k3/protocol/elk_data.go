@@ -3,23 +3,24 @@ package protocol
 import "time"
 
 type ElasticSearchData struct {
-	UUID       string     `json:"_id,omitempty"`        // 日志唯一ID， elk document id  √
-	LogLevel   string     `json:"log_level,omitempty"`  // 日志级别 warn, error, debug, info
-	HostName   string     `json:"host_name,omitempty"`  // 日志落盘主机名 √
-	HostIp     string     `json:"host_ip,omitempty"`    // 日志落盘IP √
-	TraceId    string     `json:"trace_id,omitempty"`   // 追踪ID
-	Domain     string     `json:"domain,omitempty"`     // 域名
-	Protocol   string     `json:"protocol,omitempty"`   // 协议"HTTP/1.1"
-	HttpCode   int        `json:"http_code,omitempty"`  // http状态码
-	ClientIp   string     `json:"client_ip,omitempty"`  // 日志来源IP
-	Org        string     `json:"org,omitempty"`        // 事业部, gnfx, tapplus, zganme等
-	Project    string     `json:"project,omitempty"`    // 业务线 ywzx， company, tf, sdk4,等
-	CodeName   string     `json:"code_name,omitempty"`  // 代码仓库标识, user_service, nginx, mysql, redis等
-	LogSrc     string     `json:"log_src,omitempty"`    // 日志源(内部调用default/sms/phone等)
-	EventId    int        `json:"event_id,omitempty"`   // 日志事件ID
-	EventName  string     `json:"event_name,omitempty"` // 日志事件名称(每种日志唯一)
-	Timestamp  time.Time  `json:"Timestamp,omitempty"`  // 日志产生时间 "2024-10-01 12:00:00 " √
-	ExtendData ExtendData `json:"extend_data"`          // 扩展字段
+	Flag       bool       `json:"flag"`        // 兼容老版本
+	UUID       string     `json:"uuid"`        // 日志唯一ID， elk document id  √
+	LogLevel   string     `json:"log_level"`   // 日志级别 warn, error, debug, info
+	HostName   string     `json:"host_name"`   // 日志落盘主机名 √
+	HostIp     string     `json:"host_ip"`     // 日志落盘IP √
+	TraceId    string     `json:"trace_id"`    // 追踪ID
+	Domain     string     `json:"domain"`      // 域名
+	Protocol   string     `json:"protocol"`    // 协议"HTTP/1.1"
+	HttpCode   int        `json:"http_code"`   // http状态码
+	ClientIp   string     `json:"client_ip"`   // 日志来源IP
+	Org        string     `json:"org"`         // 事业部, gnfx, tapplus, zganme等
+	Project    string     `json:"project"`     // 业务线 ywzx， company, tf, sdk4,等
+	CodeName   string     `json:"code_name"`   // 代码仓库标识, user_service, nginx, mysql, redis等
+	LogSrc     string     `json:"log_src"`     // 日志源(内部调用default/sms/phone等)
+	EventId    int        `json:"event_id"`    // 日志事件ID
+	EventName  string     `json:"event_name"`  // 日志事件名称(每种日志唯一)
+	Timestamp  time.Time  `json:"Timestamp"`   // 日志产生时间 "2024-10-01 12:00:00 " √
+	ExtendData ExtendData `json:"extend_data"` // 扩展字段
 }
 
 type ExtendData struct {
