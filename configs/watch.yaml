@@ -4,7 +4,5 @@ watch :
     index_nginx: ["/data/logs/yw/nginx/", "/data/logs/ucenter_api"] # 必须是目录
     index_ucenter_admin : [ "/data/logs/ucenter_admin/", "/data/logs/ucenter_admin/"]
     index_ucenter_api : [ "/data/logs/ucenter_api/", "/data/logs/ucenter_api/"]
-  is_use_suffix_date: true # 是否用日期作为后缀
-  default_index : "default" # 默认索引名
   max_read_count : 100 # 监控到文件变化时，读取文件最大次数
   state_file_path : "/state/core.json" # 记录监控文件的offset
