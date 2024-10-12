@@ -65,8 +65,9 @@ type Http struct {
 }
 
 var (
-	once           sync.Once
-	GlobalConfig   = new(Config)
+	once         sync.Once
+	GlobalConfig = new(Config)
+	// GlobalConsumer 日志处理模块
 	GlobalConsumer protocol.K3Consumer
 )
 

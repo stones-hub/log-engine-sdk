@@ -19,7 +19,7 @@ type RotateMode int
 
 const (
 	DefaultChannelSize            = 1000 // 默认队列大小
-	ROTATE_DAILY       RotateMode = 0    //  时间格式
+	ROTATE_DAILY       RotateMode = 0    // 时间格式
 	ROTATE_HOURLY      RotateMode = 1    // 时间格式
 )
 
