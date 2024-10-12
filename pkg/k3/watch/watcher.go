@@ -168,7 +168,7 @@ func Run(directory []string, stateFile string) error {
 		return err
 	}
 
-	// 3. 遍历WatchDirectory下的所有文件
+	// 3. 遍历directory下的所有文件
 	for _, dir := range directory {
 		if names, err := k3.FetchDirectory(dir, -1); err != nil {
 			return err
@@ -411,8 +411,8 @@ func sendDataToConsumer(eventName string, content string) {
 			continue
 		}
 
-		if err := dataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId,
-			eventName, ip, map[string]interface{}{
+		if err := dataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, eventName,
+			map[string]interface{}{
 				"_data": data,
 			}); err != nil {
 			k3.K3LogError("sendDataToConsumer error: %s", err)

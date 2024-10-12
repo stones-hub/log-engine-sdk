@@ -1,4 +1,4 @@
-.PHONY: clean reload
+.PHONY: clean reload run
 
 # 当前时间
 NOW = $(shell date -u '+%Y%m%d%I%M%S')

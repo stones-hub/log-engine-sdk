@@ -5,6 +5,7 @@ import (
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
+	"strings"
 	"time"
 )
 
@@ -149,5 +150,10 @@ func TotalTestLog() {
 }
 
 func main() {
+
+	pix := "/Users/yelei/data/code/go-projects/log-engine-sdk/log"
+	s := "/Users/yelei/data/code/go-projects/log-engine-sdk/log/disk.log.2024-10-12_0 "
+
+	fmt.Println(strings.HasPrefix(s, pix))
 
 }

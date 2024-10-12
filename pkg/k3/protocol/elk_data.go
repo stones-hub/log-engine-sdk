@@ -18,7 +18,7 @@ type ElasticSearchData struct {
 	LogSrc     string     `json:"log_src,omitempty"`    // 日志源(内部调用default/sms/phone等)
 	EventId    int        `json:"event_id,omitempty"`   // 日志事件ID
 	EventName  string     `json:"event_name,omitempty"` // 日志事件名称(每种日志唯一)
-	Timestamp  time.Time  `json:"timestamp,omitempty"`  // 日志产生时间 "2024-10-01 12:00:00 " √
+	Timestamp  time.Time  `json:"Timestamp,omitempty"`  // 日志产生时间 "2024-10-01 12:00:00 " √
 	ExtendData ExtendData `json:"extend_data"`          // 扩展字段
 }
 

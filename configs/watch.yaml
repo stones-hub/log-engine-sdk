@@ -1,8 +1,8 @@
 # watch监控目录列表
 watch :
   read_path :
-    index_nginx: ["/data/logs/yw/nginx/", "/data/logs/ucenter_api"] # 必须是目录
-    index_ucenter_admin : [ "/data/logs/ucenter_admin/", "/data/logs/ucenter_admin/"]
-    index_ucenter_api : [ "/data/logs/ucenter_api/", "/data/logs/ucenter_api/"]
+    index_nginx: ["/Users/yelei/data/code/go-projects/log-engine-sdk/log/nginx"] # 必须是目录
+    index_ucenter_admin : [ "/Users/yelei/data/code/go-projects/log-engine-sdk/log/admin"]
+    index_ucenter_api : [ "/Users/yelei/data/code/go-projects/log-engine-sdk/log/api"]
   max_read_count : 100 # 监控到文件变化时，读取文件最大次数
   state_file_path : "/state/core.json" # 记录监控文件的offset

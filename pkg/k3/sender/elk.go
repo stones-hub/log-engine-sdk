@@ -109,7 +109,6 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 	}()
 
 	for {
-
 		var (
 			b                 []byte
 			err               error
@@ -127,9 +126,14 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				return
 			}
 
-			for index := range config.GlobalConfig.Watch.ReadPath {
-				if strings.HasSuffix(data.EventName, index) {
-					_index = index
+		outerLoop:
+			// 获取索引名称
+			for index, filepaths := range config.GlobalConfig.Watch.ReadPath {
+				for _, filepath := range filepaths {
+					if strings.HasPrefix(data.EventName, filepath) {
+						_index = index
+						break outerLoop
+					}
 				}
 			}
 
@@ -139,12 +143,8 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 
 			// 如果解析失败，则直接赋值给text字段
 			if err = json.Unmarshal([]byte(data.Properties["_data"].(string)), &elasticSearchData); err != nil {
+				elasticSearchData.ExtendData.Content = make(map[string]interface{})
 				elasticSearchData.ExtendData.Content["text"] = data.Properties["_data"]
-			}
-
-			if b, err = json.Marshal(elasticSearchData); err != nil {
-				k3.K3LogError("WriteDataToElasticSearch Failed to marshal data: %v", err)
-				continue
 			}
 
 			if elasticSearchData.UUID == "" {
@@ -158,6 +158,14 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			}
 			elasticSearchData.Timestamp = data.Timestamp
 
+			if b, err = json.Marshal(elasticSearchData); err != nil {
+				k3.K3LogError("WriteDataToElasticSearch Failed to marshal data: %v", err)
+				continue
+			}
+
+			fmt.Printf("写入到elk的数据: _index(%s), body(%v), elk_data(%v)\n", _index, string(b), elasticSearchData)
+
+			continue
 			req = esapi.IndexRequest{
 				Index:      _index,
 				DocumentID: fmt.Sprintf("%s", elasticSearchData.UUID),
