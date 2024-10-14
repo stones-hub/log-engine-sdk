@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+// TODO 需要思考将watcher修改成全局管控模式， 避免监控的日志在转点的时候数据不在发送的问题
+
 var (
 	GlobalWatchSg                = &sync.WaitGroup{}
 	GlobalWatchClose             = make(chan struct{})
