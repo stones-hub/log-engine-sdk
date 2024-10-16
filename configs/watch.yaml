@@ -5,4 +5,8 @@ watch :
     index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
     index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
   max_read_count : 100 # 监控到文件变化时，读取文件最大次数
+  start_date : "2020-01-01 00:00:00"
   state_file_path : "/state/core.json" # 记录监控文件的offset
+
+
+  # 每个索引开一个线程，控制开始时间，日志多久不操作算结束，是不是考虑已结束的文件，用另外的文件或者map记录
