@@ -118,7 +118,7 @@ func GenerateUUID() string {
 	return newUUID.String()
 }
 
-// FetchDirectory 递归遍历目录, maxDepth -1 全部遍历
+// FetchDirectory 递归遍历目录, maxDepth -1 全部遍历, 返回所有的文件
 func FetchDirectory(dir string, maxDepth int) ([]string, error) {
 
 	var (
