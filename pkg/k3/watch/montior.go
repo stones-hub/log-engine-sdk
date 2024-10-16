@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"io"
 	"log-engine-sdk/pkg/k3"
+	"log-engine-sdk/pkg/k3/config"
 	"os"
 	"path/filepath"
 	"time"
 )
 
 type SateFile struct {
-	OnLine   map[string]FileSate `json:"on_line"`
+	OnLine   map[string]FileSate `json:"on_line"`  // key : 一批文件的索引名称, value : 文件信息
 	Obsolete []string            `json:"obsolete"` // 被删除的文件
 }
 
@@ -24,6 +25,44 @@ type FileSate struct {
 }
 
 func WatchRun() {
+	var (
+		watchConfig = config.GlobalConfig.Watch
+		stateFile   *SateFile
+		watchPaths  = make(map[string][]string)
+		err         error
+	)
+
+	// 加载state文件到内存
+	if stateFile, err = CreateAndLoadFileState(watchConfig.StateFilePath); err != nil {
+		k3.K3LogError("WatchRun CreateAndLoadFileState error: %s", err.Error())
+		return
+	}
+
+	// 遍历配置文件所有目录, 求并集
+	/*
+	  read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
+	    index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
+	    index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
+	    index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
+	  max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数
+	  start_date : "2020-01-01 00:00:00" # 监控什么时间起创建的文件
+	  obsolete_date_interval : 1 # 单位小时hour, 默认1小时, 超过多少时间文件未变化, 认为文件应该删除
+	  state_file_path : "/state/core
+	*/
+
+	// 遍历所有的目录,找到所有需要监控的目录(包含子目录)
+	for indexName, paths := range watchConfig.ReadPath {
+		for _, path := range paths {
+			subPaths, err := FetchWatchPath(path)
+			if err != nil {
+				k3.K3LogError("FetchWatchPath error: %s", err.Error())
+				return
+			}
+			watchPaths[indexName] = subPaths
+		}
+	}
+
+	// 完善StateFile 中的文件信息
 
 }
 
