@@ -21,9 +21,12 @@ type FileSate struct {
 	Offset        int64     `json:"offset"`          // 当前文件读取的偏移量
 	StartReadTime time.Time `json:"start_read_time"` // 开始读取时间
 	LastReadTime  time.Time `json:"last_read_time"`  // 最后一次读取文件的时间
-	Fd            *os.File  `json:"fd"`              // 文件描述符
 	IndexName     string    `json:"index_name"`
 }
+
+var (
+	FileFds = make(map[string]*os.File)
+)
 
 func WatchRun() {
 	var (
@@ -97,13 +100,35 @@ func WatchRun() {
 		index_admin:[/Users/yelei/data/code/go-projects/logs/admin /Users/yelei/data/code/go-projects/logs/admin/err]
 		index_api:[/Users/yelei/data/code/go-projects/logs/api /Users/yelei/data/code/go-projects/logs/api/err]
 		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx /Users/yelei/data/code/go-projects/logs/nginx/err]]
-		watchFilePaths map[
+		watchFilePaths : map[
 		index_admin:[/Users/yelei/data/code/go-projects/logs/admin/admin.log /Users/yelei/data/code/go-projects/logs/admin/err/err.log]
 		index_api:[/Users/yelei/data/code/go-projects/logs/api/api.log /Users/yelei/data/code/go-projects/logs/api/err/err.log]
 		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx/err/err.log /Users/yelei/data/code/go-projects/logs/nginx/nginx.log]]
 	*/
 
 	// 完善StateFile 中的文件信息
+
+}
+
+// PackStateFile 解析配置文件, 生成SateFile
+// watchFilePaths : 配置文件中的监控文件路径,  key : index_name, value : 文件路径slice
+func PackStateFile(watchFilePaths map[string][]string, stateFile *SateFile) {
+	for indexName, filePaths := range watchFilePaths {
+		for _, filePath := range filePaths {
+			if exists := CheckFilePathIsExist(filePath, stateFile); !exists {
+				stateFile.OnLine[filePath] = FileSate{
+					Path:      filePath,
+					Offset:    0,
+					IndexName: indexName,
+				}
+			}
+		}
+	}
+}
+
+// CheckFilePathIsExist 判断当前目录中的文件, 判断是否在stateFile的online中, 且会否在obsolete中
+func CheckFilePathIsExist(filePath string, stateFile *SateFile) bool {
+	return true
 }
 
 /*
@@ -145,27 +170,6 @@ func WatchRun() {
 	  ]
 	}
 */
-
-// PackStateFile 解析配置文件, 生成SateFile
-// watchFilePaths : 配置文件中的监控文件路径,  key : index_name, value : 文件路径slice
-func PackStateFile(stateFile *SateFile, watchFilePaths map[string][]string) {
-
-}
-
-// CheckFilePathIsExist 判断当前目录中的文件, 判断是否在stateFile的online中
-func CheckFilePathIsExist(indexName, filePath string, onLine map[string]*FileSate) bool {
-	var (
-		exist bool = false // 文件是否在onLine中
-	)
-
-	for fPath, fileState := range onLine {
-		if fPath == filePath {
-			return true
-		}
-	}
-
-	return true
-}
 
 // CreateAndLoadFileState 创建并加载状态文件
 func CreateAndLoadFileState(fileSatePath string) (*SateFile, error) {
