@@ -2,12 +2,10 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
-	"log-engine-sdk/pkg/k3/watch"
 	"os"
 	"time"
 )
@@ -116,48 +114,6 @@ type TestData struct {
 }
 
 func main() {
-	var (
-		core = new(watch.SateFile)
-	)
-
-	core.Watch.FileInfoList = make([]map[string]map[string]watch.FileInfo, 2, 2)
-	core.Obsolete = []string{}
-
-	core.Watch.FileInfoList[0] = map[string]map[string]watch.FileInfo{
-		"nginx": {
-			"nginx/nginx.log": {
-				Path:         "/Users/yelei/data/code/go-projects/logs/nginx/nginx.log",
-				Offset:       0,
-				LastReadTime: time.Now(),
-			},
-
-			"nginx/nginx01.log": {
-				Path:         "/Users/yelei/data/code/go-projects/logs/nginx/nginx01.log",
-				Offset:       0,
-				LastReadTime: time.Now(),
-			},
-		},
-	}
-
-	core.Watch.FileInfoList[1] = map[string]map[string]watch.FileInfo{
-		"linux": {
-			"linux/linux.log": {
-				Path:         "/Users/yelei/data/code/go-projects/logs/linux/linux.log",
-				Offset:       0,
-				LastReadTime: time.Now(),
-			},
-
-			"linux/linux01.log": {
-				Path:         "/Users/yelei/data/code/go-projects/logs/linux/linux01.log",
-				Offset:       0,
-				LastReadTime: time.Now(),
-			},
-		},
-	}
-
-	coreJson, _ := json.Marshal(core)
-
-	fmt.Println(string(coreJson))
 
 }
 
