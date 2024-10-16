@@ -26,11 +26,31 @@ type FileSate struct {
 
 func WatchRun() {
 	var (
-		watchConfig = config.GlobalConfig.Watch
-		stateFile   *SateFile
-		watchPaths  = make(map[string][]string)
-		err         error
+		watchConfig    = config.GlobalConfig.Watch
+		stateFile      *SateFile
+		watchPaths     = make(map[string][]string)
+		watchFilePaths = make(map[string][]string)
+		err            error
 	)
+
+	// 用于测试用
+	watchConfig = config.Watch{
+		ReadPath: map[string][]string{
+			"index_nginx": []string{
+				"/Users/yelei/data/code/go-projects/logs/nginx",
+			},
+			"index_admin": []string{
+				"/Users/yelei/data/code/go-projects/logs/admin",
+			},
+			"index_api": []string{
+				"/Users/yelei/data/code/go-projects/logs/api",
+			},
+		},
+		StateFilePath:        "state/core.json",
+		MaxReadCount:         1000,
+		StartDate:            time.Now(),
+		ObsoleteDateInterval: 1,
+	}
 
 	// 加载state文件到内存
 	if stateFile, err = CreateAndLoadFileState(watchConfig.StateFilePath); err != nil {
@@ -50,7 +70,7 @@ func WatchRun() {
 	  state_file_path : "/state/core
 	*/
 
-	// 遍历所有的目录,找到所有需要监控的目录(包含子目录)
+	// 遍历所有的目录,找到所有需要监控的目录(包含子目录) 和 所有文件
 	for indexName, paths := range watchConfig.ReadPath {
 		for _, path := range paths {
 			subPaths, err := FetchWatchPath(path)
@@ -59,6 +79,13 @@ func WatchRun() {
 				return
 			}
 			watchPaths[indexName] = subPaths
+
+			filePaths, err := FetchWatchPathFile(path)
+			if err != nil {
+				k3.K3LogError("FetchWatchPathFile error: %s", err.Error())
+				return
+			}
+			watchFilePaths[indexName] = filePaths
 		}
 	}
 
@@ -120,6 +147,6 @@ func FetchWatchPath(watchPath string) ([]string, error) {
 }
 
 // FetchWatchPathFile 获取监控目录中的所有文件
-func FetchWatchPathFile(subPath string) ([]string, error) {
-	return k3.FetchDirectory(subPath, -1)
+func FetchWatchPathFile(watchPath string) ([]string, error) {
+	return k3.FetchDirectory(watchPath, -1)
 }
