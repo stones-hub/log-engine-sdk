@@ -155,7 +155,7 @@ func PackStateFile(stateFile *SateFile, watchFilePaths map[string][]string) {
 // CheckFilePathIsExist 判断当前目录中的文件, 判断是否在stateFile的online中
 func CheckFilePathIsExist(indexName, filePath string, onLine map[string]*FileSate) bool {
 	var (
-		exist bool = false
+		exist bool = false // 文件是否在onLine中
 	)
 
 	for fPath, fileState := range onLine {
