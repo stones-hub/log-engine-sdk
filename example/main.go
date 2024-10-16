@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
@@ -114,7 +115,10 @@ type TestData struct {
 }
 
 func main() {
-	TestAddData()
+	slice := []string{"nginx", "admin", "api"}
+	ad, _ := json.Marshal(slice)
+	fmt.Println(string(ad))
+
 }
 
 func TestAddData() {
