@@ -2,6 +2,7 @@ package watch
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
@@ -89,8 +90,9 @@ func WatchRun() {
 		}
 	}
 
-	// 完善StateFile 中的文件信息
+	fmt.Println(watchPaths, watchFilePaths, stateFile)
 
+	// 完善StateFile 中的文件信息
 }
 
 // ParserConfig 解析配置文件, 生成SateFile

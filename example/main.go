@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
@@ -116,28 +115,9 @@ type TestData struct {
 }
 
 func main() {
-	var (
-		filePath  = "state/core.json"
-		err       error
-		fd        *os.File
-		decoder   *json.Decoder
-		fileState = make(map[string]*watch.FileState)
-	)
 
-	fd, err = os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		fmt.Println("aaaaaa")
-		return
-	}
+	watch.WatchRun()
 
-	decoder = json.NewDecoder(fd)
-
-	if err = decoder.Decode(&fileState); err != nil {
-		fmt.Println(err, "bbbb")
-		return
-	}
-
-	fmt.Println(fileState)
 }
 
 func TestAddData() {
