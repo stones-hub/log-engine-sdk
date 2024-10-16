@@ -25,6 +25,7 @@ type FileSate struct {
 }
 
 var (
+	// FileFds 用于存储所有被监听的文件的FD
 	FileFds = make(map[string]*os.File)
 )
 
