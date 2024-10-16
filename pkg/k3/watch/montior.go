@@ -12,7 +12,7 @@ import (
 )
 
 type SateFile struct {
-	OnLine   map[string]FileSate `json:"on_line"`  // key : 一批文件的索引名称, value : 文件信息
+	OnLine   map[string]FileSate `json:"online"`   // key : 一批文件的索引名称, value : 文件信息
 	Obsolete []string            `json:"obsolete"` // 被删除的文件
 }
 
@@ -92,12 +92,79 @@ func WatchRun() {
 
 	fmt.Println(watchPaths, watchFilePaths, stateFile)
 
+	/*
+		map[
+		index_admin:[/Users/yelei/data/code/go-projects/logs/admin /Users/yelei/data/code/go-projects/logs/admin/err]
+		index_api:[/Users/yelei/data/code/go-projects/logs/api /Users/yelei/data/code/go-projects/logs/api/err]
+		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx /Users/yelei/data/code/go-projects/logs/nginx/err]]
+		map[
+		index_admin:[/Users/yelei/data/code/go-projects/logs/admin/admin.log /Users/yelei/data/code/go-projects/logs/admin/err/err.log]
+		index_api:[/Users/yelei/data/code/go-projects/logs/api/api.log /Users/yelei/data/code/go-projects/logs/api/err/err.log]
+		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx/err/err.log /Users/yelei/data/code/go-projects/logs/nginx/nginx.log]]
+	*/
+
 	// 完善StateFile 中的文件信息
 }
 
-// ParserConfig 解析配置文件, 生成SateFile
-func ParserConfig() {
+/*
+	{
+	  "online": {
+	    "file_path_01": {
+	      "path": "file_path_01",
+	      "offset": 0,
+	      "start_read_time": "0001-01-01T00:00:00Z",
+	      "last_read_time": "2024-10-16T14:43:41.218263+08:00",
+	      "index_name": "file_index_01"
+	    },
+	    "file_path_02": {
+	      "path": "file_path_02",
+	      "offset": 0,
+	      "start_read_time": "0001-01-01T00:00:00Z",
+	      "last_read_time": "2024-10-16T14:43:41.218264+08:00",
+	      "index_name": "file_index_03"
+	    },
+	    "file_path_03": {
+	      "path": "file_path_03",
+	      "offset": 0,
+	      "start_read_time": "0001-01-01T00:00:00Z",
+	      "last_read_time": "2024-10-16T14:43:41.218264+08:00",
+	      "index_name": "file_index_02"
+	    },
+	    "file_path_04": {
+	      "path": "file_path_04",
+	      "offset": 0,
+	      "start_read_time": "0001-01-01T00:00:00Z",
+	      "last_read_time": "2024-10-16T14:43:41.218264+08:00",
+	      "index_name": "file_index_01"
+	    }
+	  },
+	  "obsolete": [
+	    "aaa",
+	    "bbb",
+	    "cccc"
+	  ]
+	}
+*/
 
+// PackStateFile 解析配置文件, 生成SateFile
+// watchFilePaths : 配置文件中的监控文件路径,  key : index_name, value : 文件路径slice
+func PackStateFile(stateFile *SateFile, watchFilePaths map[string][]string) {
+
+}
+
+// CheckFilePathIsExist 判断当前目录中的文件, 判断是否在stateFile的online中
+func CheckFilePathIsExist(indexName, filePath string, onLine map[string]*FileSate) bool {
+	var (
+		exist bool = false
+	)
+
+	for fPath, fileState := range onLine {
+		if fPath == filePath {
+			return true
+		}
+	}
+
+	return true
 }
 
 // CreateAndLoadFileState 创建并加载状态文件
