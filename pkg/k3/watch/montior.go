@@ -93,11 +93,11 @@ func WatchRun() {
 	fmt.Println(watchPaths, watchFilePaths, stateFile)
 
 	/*
-		map[
+		watchPaths : map[
 		index_admin:[/Users/yelei/data/code/go-projects/logs/admin /Users/yelei/data/code/go-projects/logs/admin/err]
 		index_api:[/Users/yelei/data/code/go-projects/logs/api /Users/yelei/data/code/go-projects/logs/api/err]
 		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx /Users/yelei/data/code/go-projects/logs/nginx/err]]
-		map[
+		watchFilePaths map[
 		index_admin:[/Users/yelei/data/code/go-projects/logs/admin/admin.log /Users/yelei/data/code/go-projects/logs/admin/err/err.log]
 		index_api:[/Users/yelei/data/code/go-projects/logs/api/api.log /Users/yelei/data/code/go-projects/logs/api/err/err.log]
 		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx/err/err.log /Users/yelei/data/code/go-projects/logs/nginx/nginx.log]]
