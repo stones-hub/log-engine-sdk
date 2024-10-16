@@ -1,6 +1,8 @@
 package watch
 
 import (
+	"encoding/json"
+	"io"
 	"log-engine-sdk/pkg/k3"
 	"os"
 	"path/filepath"
@@ -28,6 +30,29 @@ func WatchRun() {
 // ParserConfig 解析配置文件, 生成SateFile
 func ParserConfig() {
 
+}
+
+// CreateAndLoadFileState 创建并加载状态文件
+func CreateAndLoadFileState(fileSatePath string) (*SateFile, error) {
+	var (
+		fd        *os.File
+		err       error
+		decoder   *json.Decoder
+		stateFile SateFile
+	)
+	// 判断文件是否存在, 不存在就创建, 存在就将文本内容加载出来,映射到SateFile中
+	if fd, err = os.OpenFile(fileSatePath, os.O_CREATE|os.O_RDWR, 0666); err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+
+	decoder = json.NewDecoder(fd)
+
+	if err = decoder.Decode(&stateFile); err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	return &stateFile, nil
 }
 
 // FetchWatchPath 获取需要监控的目录中的所有子目录
