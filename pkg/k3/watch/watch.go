@@ -27,10 +27,10 @@ var (
 func Run() {
 
 	var (
-		watchConfig    = config.GlobalConfig.Watch
-		watchPaths     = make(map[string][]string)
-		watchFilePaths = make(map[string][]string)
-		err            error
+		watchConfig   = config.GlobalConfig.Watch
+		diskPaths     = make(map[string][]string)
+		diskFilePaths = make(map[string][]string)
+		err           error
 	)
 
 	// 用于测试用
@@ -48,7 +48,6 @@ func Run() {
 		},
 		StateFilePath:        "state/core.json",
 		MaxReadCount:         1000,
-		StartDate:            time.Now(),
 		ObsoleteDateInterval: 1,
 	}
 
@@ -66,18 +65,18 @@ func Run() {
 				k3.K3LogError("FetchWatchPath error: %s", err.Error())
 				return
 			}
-			watchPaths[indexName] = subPaths
+			diskPaths[indexName] = subPaths
 
 			filePaths, err := FetchWatchPathFile(path)
 			if err != nil {
 				k3.K3LogError("FetchWatchPathFile error: %s", err.Error())
 				return
 			}
-			watchFilePaths[indexName] = filePaths
+			diskFilePaths[indexName] = filePaths
 		}
 	}
 
-	fmt.Println(watchPaths, watchFilePaths, GlobalFileStates)
+	fmt.Println(diskPaths, diskFilePaths, GlobalFileStates)
 
 	/*
 		watch.yaml 配置文件信息
@@ -89,24 +88,32 @@ func Run() {
 		start_date : "2020-01-01 00:00:00" # 监控什么时间起创建的文件
 		obsolete_date_interval : 1 # 单位小时hour, 默认1小时, 超过多少时间文件未变化, 认为文件应该删除
 		state_file_path : "/state/core
-
-		watchPaths : map[
-		index_admin:[/Users/yelei/data/code/go-projects/logs/admin /Users/yelei/data/code/go-projects/logs/admin/err]
-		index_api:[/Users/yelei/data/code/go-projects/logs/api /Users/yelei/data/code/go-projects/logs/api/err]
-		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx /Users/yelei/data/code/go-projects/logs/nginx/err]]
-
-		watchFilePaths : map[
-		index_admin:[/Users/yelei/data/code/go-projects/logs/admin/admin.log /Users/yelei/data/code/go-projects/logs/admin/err/err.log]
-		index_api:[/Users/yelei/data/code/go-projects/logs/api/api.log /Users/yelei/data/code/go-projects/logs/api/err/err.log]
-		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx/err/err.log /Users/yelei/data/code/go-projects/logs/nginx/nginx.log]]
 	*/
+	SyncFileStates2Disk(diskFilePaths)
 }
 
-// SyncWatchFiles2FileStates
-// 初始化时
+// SyncFileStates2Disk 将FileState数据写入到磁盘, 先删除在覆盖
+func SyncFileStates2Disk(diskFilePaths map[string][]string) {
+	SyncWatchFiles2FileStates(diskFilePaths)
+	SyncFileStates2WatchFiles(diskFilePaths)
+
+	// 将数据写入到 state_file_path
+}
+
+// SyncWatchFiles2FileStates 初始化时
 // 遍历硬盘上被监控目录的所有文件, 判断文件是否在FileState中，如果不在，证明是新增的文件, 则添加到FileState中
 func SyncWatchFiles2FileStates(watchFiles map[string][]string) {
-
+	for index, files := range watchFiles {
+		for _, diskFilePath := range files {
+			if !CheckDiskFileIsExistInFileStates(diskFilePath) {
+				GlobalFileStates[diskFilePath] = &FileState{
+					Path:      diskFilePath,
+					Offset:    0,
+					IndexName: index,
+				}
+			}
+		}
+	}
 }
 
 // CheckDiskFileIsExistInFileStates 判断文件是否在FileState中
@@ -119,13 +126,27 @@ func CheckDiskFileIsExistInFileStates(diskFilePath string) bool {
 	return false
 }
 
-// CheckFileStateIsExistInDiskFiles 判断FileState是否在硬盘中
-func CheckFileStateIsExistInDiskFiles(fileState *FileState) bool {
-	return false
+// SyncFileStates2WatchFiles 初始化时
+// 遍历FileState中记录的所有文件，如果文件不存在于本地硬盘中，证明已经被删除了，对应在FileState中删除
+func SyncFileStates2WatchFiles(watchFiles map[string][]string) {
+	for fileStatePath := range GlobalFileStates {
+		if !CheckFileStateIsExistInDiskFiles(fileStatePath, watchFiles) {
+			delete(GlobalFileStates, fileStatePath)
+		}
+	}
 }
 
-// SyncFileStates2WatchFiles 初始化时
-// 遍历FileState中记录的所有文件，如果文件不存在于本地硬盘中，证明已经被删除了，对应在FileState中删除 func SyncFileStates2WatchFiles() {
+// CheckFileStateIsExistInDiskFiles 判断FileState是否在硬盘中
+func CheckFileStateIsExistInDiskFiles(fileStatePath string, watchFiles map[string][]string) bool {
+	for _, files := range watchFiles {
+		for _, diskFilePath := range files {
+			if diskFilePath == fileStatePath {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
 
