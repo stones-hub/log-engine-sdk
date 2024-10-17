@@ -102,22 +102,45 @@ func Run() {
 	*/
 }
 
-// completeFileState 补全状态文件
+func GetFilePathsFromFileStates() []string {
+	return nil
+}
+
+func GetFilePathsFromWatchFilePaths() []string {
+	return nil
+}
+
+// SyncWatchFiles2FileStates
 // 初始化时
-// 遍历硬盘上被监控目录的所有文件, 判断文件是否满足被监控的条件 => 文件要满足某个生成日期之后的才能添加到FileState
-func completeFileState() {
+// 遍历硬盘上被监控目录的所有文件, 判断文件是否在FileState中，如果不在，证明是新增的文件, 则添加到FileState中
+func SyncWatchFiles2FileStates(watchFiles map[string][]string) {
+
+	var (
+		files = GetFilePathsFromFileStates()
+		isExist bool = false
+	)
+
+
+	for indexName, filePaths := range watchFiles {
+		for _, filePath := range filePaths {
+			for _, fileName := range files {
+				if filePath == fileName {
+					isExist = true
+				}
+			}
+		}
+	}
 
 }
 
-// 初始化时
-// 遍历FileState中记录的所有文件，如果文件不存在于监控目录中，证明已经被删除了，对应在FileState中删除
+// SyncFileStates2WatchFiles 初始化时
+// 遍历FileState中记录的所有文件，如果文件不存在于本地硬盘中，证明已经被删除了，对应在FileState中删除 func SyncFileStates2WatchFiles() {
 
-// 启动后，定时检查FileState中的记录文件，是否达到被删除的条件，如果达到则更新FileState ， 但在删除之前需要考虑文件是否读取完
-
-// IsOK 判断文件是否符合被加入到FileState中的标准, 主要是时间控制
-func IsOK(filePath string) bool {
-	return true
 }
+
+// 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
+
+// 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
 
 // CreateORLoadFileState 创建并加载状态文件
 func CreateORLoadFileState(fileSatePath string) (map[string]*FileState, error) {
