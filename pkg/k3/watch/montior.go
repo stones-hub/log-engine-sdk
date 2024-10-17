@@ -64,7 +64,7 @@ func WatchRun() {
 	}
 
 	// 如果state file文件没有就创建，如果有就load文件内容到stateFile
-	if stateFile, err = CreateAndLoadFileState(watchConfig.StateFilePath); err != nil {
+	if stateFile, err = CreateORLoadFileState(watchConfig.StateFilePath); err != nil {
 		k3.K3LogError("WatchRun CreateAndLoadFileState error: %s", err.Error())
 		return
 	}
@@ -192,8 +192,8 @@ func (s *SateFile) checkObsoleteFiles(filePath string) bool {
 	return false
 }
 
-// PackStateFile 补全StateFile
-func (s *SateFile) PackStateFile(indexName, filePath string) {
+// InitPackStateFile 补全StateFile
+func (s *SateFile) InitPackStateFile(indexName, filePath string) {
 	// 目录中遍历出来的文件， 既不在在线文件列表中， 也不在已删除文件列表中， 就新增
 	if !s.checkObsoleteFiles(filePath) && !s.checkOnLineFiles(filePath) {
 		s.OnLine[filePath] = FileSate{
@@ -204,8 +204,13 @@ func (s *SateFile) PackStateFile(indexName, filePath string) {
 	}
 }
 
-// CreateAndLoadFileState 创建并加载状态文件
-func CreateAndLoadFileState(fileSatePath string) (*SateFile, error) {
+// FetchStateFileSyncToFile 遍历StateFile 中的文件， 如果文件名在真实目录中不存在，就删除StateFile, 最后同步到配置文件中
+func (s *SateFile) FetchStateFileSyncToFile(watchFilePaths map[string][]string) {
+
+}
+
+// CreateORLoadFileState 创建并加载状态文件
+func CreateORLoadFileState(fileSatePath string) (*SateFile, error) {
 	var (
 		fd        *os.File
 		err       error
