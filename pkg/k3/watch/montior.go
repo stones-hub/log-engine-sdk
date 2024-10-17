@@ -17,11 +17,6 @@ TODO :
 2. 要定时将online中过期的文件，移除到obsoleteFiles中, 并关闭online 中的fd
 */
 
-type SateFile struct {
-	OnLine   map[string]FileSate `json:"online"`   // key : 一批文件的索引名称, value : 文件信息
-	Obsolete []string            `json:"obsolete"` // 被删除的文件
-}
-
 type FileSate struct {
 	Path          string    `json:"path"`            // 文件地址
 	Offset        int64     `json:"offset"`          // 当前文件读取的偏移量
@@ -32,7 +27,8 @@ type FileSate struct {
 
 var (
 	// FileFds 用于存储所有被监听的文件的FD
-	FileFds = make(map[string]*os.File)
+	FileFds    = make(map[string]*os.File)
+	FileStates = make(map[string]FileSate)
 )
 
 func WatchRun() {
@@ -156,27 +152,39 @@ func WatchRun() {
 	}
 */
 
+/*
 // completeStateFile 完善stateFile
 // 初始化的时候，遍历要监控的所有的目录，找出所有的文件，如果文件不在stateFile中，就新增
 func (s *SateFile) completeStateFile(indexName, filePath string) {
 	// 目录中遍历出来的文件， 既不在在线文件列表中， 也不在已删除文件列表中， 就新增
-	if !s.checkObsoleteFiles(filePath) && !s.checkOnLineFiles(filePath) {
-		s.OnLine[filePath] = FileSate{
-			Path:      filePath,
-			Offset:    0,
-			IndexName: indexName,
+	if !s.checkObsoleteFile(filePath) && !s.checkOnLineFile(filePath) {
+		if s.isObsoleteFile(filePath) {
+			s.Obsolete = append(s.Obsolete, filePath)
+		} else {
+			s.OnLine[filePath] = FileSate{
+				Path:      filePath,
+				Offset:    0,
+				IndexName: indexName,
+			}
 		}
 	}
 }
 
 // fetchStateFileSyncToFile
-// 初始化的时候，要考虑statefile中的文件实际上已经在硬盘上被删除了，所以要遍历stateFile跟硬盘比对，来删除已不存在的文件, 并最终同步最新的数据到状态文件
+// 1. 初始化的时候，要考虑state file中的文件实际上已经在硬盘上被删除了，所以要遍历stateFile跟硬盘比对，来删除已不存在的文件, 并最终同步最新的数据到状态文件
+// 2. 硬盘上的文件，如果出现
 func (s *SateFile) fetchStateFileSyncToFile(watchFilePaths map[string][]string) {
 
 }
 
-// GetOnlineFiles 获取当前所有的在线文件
-func (s *SateFile) checkOnLineFiles(filePath string) bool {
+// isObsoleteFile  判断是否应该是被删除的文件
+func (s *SateFile) isObsoleteFile(filePath string) bool {
+
+	return false
+}
+
+// GetOnlineFiles 判断是否在state file 中的在线文件列表
+func (s *SateFile) checkOnLineFile(filePath string) bool {
 	for f := range s.OnLine {
 		if f == filePath {
 			return true
@@ -185,8 +193,8 @@ func (s *SateFile) checkOnLineFiles(filePath string) bool {
 	return false
 }
 
-// GetObsolete 获取已删除的文件
-func (s *SateFile) checkObsoleteFiles(filePath string) bool {
+// GetObsolete 判断是否在 state file 中已删除的文件,列表
+func (s *SateFile) checkObsoleteFile(filePath string) bool {
 	for _, f := range s.Obsolete {
 		if f == filePath {
 			return true
@@ -194,6 +202,7 @@ func (s *SateFile) checkObsoleteFiles(filePath string) bool {
 	}
 	return false
 }
+*/
 
 // CreateORLoadFileState 创建并加载状态文件
 func CreateORLoadFileState(fileSatePath string) (*SateFile, error) {
