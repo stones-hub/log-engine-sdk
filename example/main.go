@@ -116,7 +116,7 @@ type TestData struct {
 
 func main() {
 
-	watch.WatchRun()
+	watch.Run()
 
 }
 
