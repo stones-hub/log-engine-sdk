@@ -57,7 +57,7 @@ func WatchRun() {
 		ObsoleteDateInterval: 1,
 	}
 
-	// 加载state文件到内存
+	// 如果state file文件没有就创建，如果有就load文件内容到stateFile
 	if stateFile, err = CreateAndLoadFileState(watchConfig.StateFilePath); err != nil {
 		k3.K3LogError("WatchRun CreateAndLoadFileState error: %s", err.Error())
 		return
