@@ -178,9 +178,9 @@ func CheckFileStateIsExistInDiskFiles(fileStatePath string, watchFiles map[strin
 	return false
 }
 
-// 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
+// TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
 
-// 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
+// TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
 
 // CreateORLoadFileState 创建并加载状态文件
 func CreateORLoadFileState(fileSatePath string) (map[string]*FileState, error) {
