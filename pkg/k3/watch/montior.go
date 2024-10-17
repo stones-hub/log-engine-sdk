@@ -84,21 +84,22 @@ func WatchRun() {
 
 	fmt.Println(watchPaths, watchFilePaths, stateFile)
 
-	/* 配置文件信息:
-	read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
-	  index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
-	  index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
-	  index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
-	max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数
-	start_date : "2020-01-01 00:00:00" # 监控什么时间起创建的文件
-	obsolete_date_interval : 1 # 单位小时hour, 默认1小时, 超过多少时间文件未变化, 认为文件应该删除
-	state_file_path : "/state/core
-	*/
 	/*
+		watch.yaml 配置文件信息
+		read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
+		  index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
+		  index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
+		  index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
+		max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数
+		start_date : "2020-01-01 00:00:00" # 监控什么时间起创建的文件
+		obsolete_date_interval : 1 # 单位小时hour, 默认1小时, 超过多少时间文件未变化, 认为文件应该删除
+		state_file_path : "/state/core
+
 		watchPaths : map[
 		index_admin:[/Users/yelei/data/code/go-projects/logs/admin /Users/yelei/data/code/go-projects/logs/admin/err]
 		index_api:[/Users/yelei/data/code/go-projects/logs/api /Users/yelei/data/code/go-projects/logs/api/err]
 		index_nginx:[/Users/yelei/data/code/go-projects/logs/nginx /Users/yelei/data/code/go-projects/logs/nginx/err]]
+
 		watchFilePaths : map[
 		index_admin:[/Users/yelei/data/code/go-projects/logs/admin/admin.log /Users/yelei/data/code/go-projects/logs/admin/err/err.log]
 		index_api:[/Users/yelei/data/code/go-projects/logs/api/api.log /Users/yelei/data/code/go-projects/logs/api/err/err.log]
