@@ -8,6 +8,7 @@ import (
 	"log-engine-sdk/pkg/k3/config"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type FileState struct {
 var (
 	GlobalFileFds    = make(map[string]*os.File)
 	GlobalFileStates = make(map[string]*FileState)
+	FileStateLock    sync.Mutex
 )
 
 func Run() {
@@ -89,15 +91,37 @@ func Run() {
 		obsolete_date_interval : 1 # 单位小时hour, 默认1小时, 超过多少时间文件未变化, 认为文件应该删除
 		state_file_path : "/state/core
 	*/
-	SyncFileStates2Disk(diskFilePaths)
+	SyncFileStates2Disk(diskFilePaths, watchConfig.StateFilePath)
 }
 
 // SyncFileStates2Disk 将FileState数据写入到磁盘, 先删除在覆盖
-func SyncFileStates2Disk(diskFilePaths map[string][]string) {
+func SyncFileStates2Disk(diskFilePaths map[string][]string, filePath string) error {
+	var (
+		fd      *os.File
+		err     error
+		encoder *json.Encoder
+	)
+
 	SyncWatchFiles2FileStates(diskFilePaths)
 	SyncFileStates2WatchFiles(diskFilePaths)
 
+	FileStateLock.Lock()
+	defer FileStateLock.Unlock()
+
 	// 将数据写入到 state_file_path
+	if fd, err = os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666); err != nil {
+		return fmt.Errorf("open state file error: %s", err.Error())
+	}
+
+	defer fd.Close()
+
+	encoder = json.NewEncoder(fd)
+
+	if err = encoder.Encode(GlobalFileStates); err != nil {
+		return fmt.Errorf("encode state file error: %s", err.Error())
+	}
+
+	return nil
 }
 
 // SyncWatchFiles2FileStates 初始化时
