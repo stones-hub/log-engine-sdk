@@ -103,14 +103,14 @@ func Run() {
 }
 
 // completeFileState 补全状态文件
-// 初始化时，遍历硬盘上被监控目录的所有文件， 如果文件不存在于FileState中就添加进去
+// 初始化时，遍历硬盘上被监控目录的所有文件， 如果文件满足被监控的条件（时间）, 且不存在于FileState中就添加进去
 func completeFileState() {
 
 }
 
 // 初始化时，遍历FileState中记录的所有文件，如果文件不存在于监控目录中，证明已经被删除了，对应在FileState中删除
 
-// 初始化时，检查文件最后读取时间是否超时，如果超时需要考虑文件是否已经读完，读完以后就提出FileState中
+// 启动后，定时检查FileState中的记录文件，是否达到被删除的条件，如果达到则更新FileState ， 但在删除之前需要考虑文件是否读取完
 
 // CreateORLoadFileState 创建并加载状态文件
 func CreateORLoadFileState(fileSatePath string) (map[string]*FileState, error) {
