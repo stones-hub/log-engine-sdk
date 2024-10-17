@@ -26,7 +26,7 @@ var (
 	FileStateLock    sync.Mutex
 )
 
-func Run() {
+func Run() error {
 
 	var (
 		watchConfig   = config.GlobalConfig.Watch
@@ -56,7 +56,7 @@ func Run() {
 	// 如果state file文件没有就创建，如果有就load文件内容到stateFile
 	if GlobalFileStates, err = CreateORLoadFileState(watchConfig.StateFilePath); err != nil {
 		k3.K3LogError("WatchRun CreateAndLoadFileState error: %s", err.Error())
-		return
+		return err
 	}
 
 	// 遍历所有的目录,找到所有需要监控的目录(包含子目录) 和 所有文件
@@ -65,14 +65,14 @@ func Run() {
 			subPaths, err := FetchWatchPath(path)
 			if err != nil {
 				k3.K3LogError("FetchWatchPath error: %s", err.Error())
-				return
+				return err
 			}
 			diskPaths[indexName] = subPaths
 
 			filePaths, err := FetchWatchPathFile(path)
 			if err != nil {
 				k3.K3LogError("FetchWatchPathFile error: %s", err.Error())
-				return
+				return err
 			}
 			diskFilePaths[indexName] = filePaths
 		}
@@ -91,7 +91,11 @@ func Run() {
 		obsolete_date_interval : 1 # 单位小时hour, 默认1小时, 超过多少时间文件未变化, 认为文件应该删除
 		state_file_path : "/state/core
 	*/
-	SyncFileStates2Disk(diskFilePaths, watchConfig.StateFilePath)
+	if err = SyncFileStates2Disk(diskFilePaths, watchConfig.StateFilePath); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SyncFileStates2Disk 将FileState数据写入到磁盘, 先删除在覆盖
