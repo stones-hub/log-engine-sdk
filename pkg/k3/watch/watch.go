@@ -95,6 +95,8 @@ func Run() error {
 		return err
 	}
 
+	// 开始监控, 注意多协程处理，每个index name一个线程
+
 	return nil
 }
 
