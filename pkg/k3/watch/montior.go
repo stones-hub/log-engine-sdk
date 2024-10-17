@@ -116,22 +116,6 @@ func WatchRun() {
 
 }
 
-// PackStateFile 解析配置文件, 生成SateFile
-// watchFilePaths : 配置文件中的监控文件路径,  key : index_name, value : 文件路径slice
-func PackStateFile(watchFilePaths map[string][]string, stateFile *SateFile) {
-	for indexName, filePaths := range watchFilePaths {
-		for _, filePath := range filePaths {
-			if exists := stateFile.CheckFilePathIsExist(filePath); !exists {
-				stateFile.OnLine[filePath] = FileSate{
-					Path:      filePath,
-					Offset:    0,
-					IndexName: indexName,
-				}
-			}
-		}
-	}
-}
-
 /*
 	{
 	  "online": {
@@ -172,6 +156,25 @@ func PackStateFile(watchFilePaths map[string][]string, stateFile *SateFile) {
 	}
 */
 
+// completeStateFile 完善stateFile
+// 初始化的时候，遍历要监控的所有的目录，找出所有的文件，如果文件不在stateFile中，就新增
+func (s *SateFile) completeStateFile(indexName, filePath string) {
+	// 目录中遍历出来的文件， 既不在在线文件列表中， 也不在已删除文件列表中， 就新增
+	if !s.checkObsoleteFiles(filePath) && !s.checkOnLineFiles(filePath) {
+		s.OnLine[filePath] = FileSate{
+			Path:      filePath,
+			Offset:    0,
+			IndexName: indexName,
+		}
+	}
+}
+
+// fetchStateFileSyncToFile
+// 初始化的时候，要考虑statefile中的文件实际上已经在硬盘上被删除了，所以要遍历stateFile跟硬盘比对，来删除已不存在的文件, 并最终同步最新的数据到状态文件
+func (s *SateFile) fetchStateFileSyncToFile(watchFilePaths map[string][]string) {
+
+}
+
 // GetOnlineFiles 获取当前所有的在线文件
 func (s *SateFile) checkOnLineFiles(filePath string) bool {
 	for f := range s.OnLine {
@@ -190,23 +193,6 @@ func (s *SateFile) checkObsoleteFiles(filePath string) bool {
 		}
 	}
 	return false
-}
-
-// InitPackStateFile 补全StateFile
-func (s *SateFile) InitPackStateFile(indexName, filePath string) {
-	// 目录中遍历出来的文件， 既不在在线文件列表中， 也不在已删除文件列表中， 就新增
-	if !s.checkObsoleteFiles(filePath) && !s.checkOnLineFiles(filePath) {
-		s.OnLine[filePath] = FileSate{
-			Path:      filePath,
-			Offset:    0,
-			IndexName: indexName,
-		}
-	}
-}
-
-// FetchStateFileSyncToFile 遍历StateFile 中的文件， 如果文件名在真实目录中不存在，就删除StateFile, 最后同步到配置文件中
-func (s *SateFile) FetchStateFileSyncToFile(watchFilePaths map[string][]string) {
-
 }
 
 // CreateORLoadFileState 创建并加载状态文件
