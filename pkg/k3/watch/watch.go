@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
@@ -108,30 +109,83 @@ func Run() error {
 }
 
 func InitWatcher(diskPaths map[string][]string) {
+	var (
+		parentWG    = &sync.WaitGroup{}
+		ctx, cancel = context.WithCancel(context.Background())
+	)
+	defer cancel()
 
 	for index, paths := range diskPaths {
-		go doWatch(index, paths)
+		parentWG.Add(1)
+
+		go doWatch(ctx, index, paths, parentWG)
 	}
 }
 
-func doWatch(index string, paths []string) error {
+func doWatch(ctx context.Context, index string, paths []string, parentWG *sync.WaitGroup) {
 	var (
+		childWG = &sync.WaitGroup{}
 		err     error
 		watcher *fsnotify.Watcher
 	)
-	if watcher, err = fsnotify.NewWatcher(); err != nil {
-		return err
-	}
 
-	for {
-		select {
-		case event, ok := <-watcher.Events:
-		case err := <-watcher.Errors:
-		case <-watcher.Closed:
+	// 协程退出
+	defer parentWG.Done()
+
+	// 初始化协程watcher
+	if watcher, err = fsnotify.NewWatcher(); err != nil {
+		k3.K3LogError("Failed to create watcher for %s: %v\n", index, err)
+		return
+	}
+	defer watcher.Close()
+
+	// 开始监听目录, 如果错误就退出
+	for _, path := range paths {
+		if err = watcher.Add(path); err != nil {
+			k3.K3LogError("Failed to add %s to watcher for %s: %v\n", path, index, err)
+			// TODO 因为是循环多个目录，有可能某些目录出现问题，那么需要给外部发一个chan， 这样方便解决程序整体退出的问题
+			return
 		}
 	}
 
-	return nil
+	childWG.Add(1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				k3.K3LogError("doWatch panic: %s\n", r)
+			}
+		}()
+
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok { // 退出子协程
+					return
+				}
+
+				// TODO 这里可以处理监控到文件的变化，比如文件大小变化，文件内容变化，文件删除等
+				handlerEvent(event)
+
+			case err, ok := <-watcher.Errors:
+				if !ok { // 退出子协程
+					return
+				}
+				k3.K3LogError("Child Goroutine Error reading %s: %v\n", index, err)
+
+			case <-ctx.Done():
+				k3.K3LogInfo("Received exit signal, child goroutine stopping....\n")
+				return
+			}
+		}
+	}()
+
+	// 等待子协程退出
+	childWG.Wait()
+}
+
+// handlerEvent 处理监控到文件的变化
+func handlerEvent(event fsnotify.Event) {
+
 }
 
 func InitFileStateFds() error {
