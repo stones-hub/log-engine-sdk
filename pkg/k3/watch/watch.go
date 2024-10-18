@@ -114,6 +114,9 @@ func Run() error {
 	GlobalWatchWG = &sync.WaitGroup{}
 	InitWatcher(diskPaths)
 
+	ClockSyncFileState()
+	ClockCheckFileState()
+
 	return nil
 }
 
@@ -381,7 +384,7 @@ func ForceSyncFileState() error {
 	return nil
 }
 
-// ClockSyncFileState 定时检查FileState
+// ClockSyncFileState 定时将内存中的file state 写入硬盘
 func ClockSyncFileState() {
 	var (
 		syncInterval int
@@ -416,8 +419,26 @@ func ClockSyncFileState() {
 	}()
 }
 
+// ClockCheckFileState 定时检查FileState, 并写入硬盘
 // TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
 // TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
-func Clock() {
+func ClockCheckFileState() error {
+	var (
+		diskFiles = make([]string, 1, 1)
+	)
+	// 遍历出所有的文件
+	for _, paths := range config.GlobalConfig.Watch.ReadPath {
+		for _, path := range paths {
+			if tempFiles, err := k3.FetchDirectory(path, -1); err != nil {
+				k3.K3LogError("FetchDirectory: %s\n", err)
+				return err
+			} else {
+				diskFiles = append(diskFiles, tempFiles...)
+			}
+		}
+	}
 
+	// 遍历FileState， 如果比对后，硬盘文件不存在，就更新FileState
+
+	// 遍历FileState， 如果文件的最后读取时间超过一定时间，就强制将文件读完，并更新FileState
 }
