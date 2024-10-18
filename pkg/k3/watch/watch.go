@@ -3,6 +3,7 @@ package watch
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"io"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
@@ -101,18 +102,36 @@ func Run() error {
 	}
 
 	// 开始监控, 注意多协程处理，每个index name一个线程
-	InitWatcher()
+	InitWatcher(diskPaths)
 
 	return nil
 }
 
-func InitWatcher() {
+func InitWatcher(diskPaths map[string][]string) {
 
-	go doWatch(indexName)
+	for index, paths := range diskPaths {
+		go doWatch(index, paths)
+	}
 }
 
-func doWatch(indexName string) {
+func doWatch(index string, paths []string) error {
+	var (
+		err     error
+		watcher *fsnotify.Watcher
+	)
+	if watcher, err = fsnotify.NewWatcher(); err != nil {
+		return err
+	}
 
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+		case err := <-watcher.Errors:
+		case <-watcher.Closed:
+		}
+	}
+
+	return nil
 }
 
 func InitFileStateFds() error {
