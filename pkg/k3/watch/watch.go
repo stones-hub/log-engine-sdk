@@ -23,9 +23,11 @@ type FileState struct {
 }
 
 var (
-	GlobalFileStateFds = make(map[string]*os.File)
-	GlobalFileStates   = make(map[string]*FileState)
-	FileStateLock      sync.Mutex
+	GlobalFileStateFds                           = make(map[string]*os.File)
+	GlobalFileStates                             = make(map[string]*FileState)
+	GlobalWatchContext, GlobalWatchContextCancel = context.WithCancel(context.Background())
+	GlobalWatchWG                                = &sync.WaitGroup{}
+	FileStateLock                                sync.Mutex
 )
 
 func Run() error {
@@ -109,20 +111,14 @@ func Run() error {
 }
 
 func InitWatcher(diskPaths map[string][]string) {
-	var (
-		parentWG    = &sync.WaitGroup{}
-		ctx, cancel = context.WithCancel(context.Background())
-	)
-	defer cancel()
-
 	for index, paths := range diskPaths {
-		parentWG.Add(1)
-
-		go doWatch(ctx, index, paths, parentWG)
+		GlobalWatchWG.Add(1)
+		go doWatch(index, paths)
 	}
+
 }
 
-func doWatch(ctx context.Context, index string, paths []string, parentWG *sync.WaitGroup) {
+func doWatch(index string, paths []string) {
 	var (
 		childWG = &sync.WaitGroup{}
 		err     error
@@ -130,7 +126,7 @@ func doWatch(ctx context.Context, index string, paths []string, parentWG *sync.W
 	)
 
 	// 协程退出
-	defer parentWG.Done()
+	defer GlobalWatchWG.Done()
 
 	// 初始化协程watcher
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
@@ -172,7 +168,7 @@ func doWatch(ctx context.Context, index string, paths []string, parentWG *sync.W
 				}
 				k3.K3LogError("Child Goroutine Error reading %s: %v\n", index, err)
 
-			case <-ctx.Done():
+			case <-GlobalWatchContext.Done():
 				k3.K3LogInfo("Received exit signal, child goroutine stopping....\n")
 				return
 			}
@@ -186,6 +182,15 @@ func doWatch(ctx context.Context, index string, paths []string, parentWG *sync.W
 // handlerEvent 处理监控到文件的变化
 func handlerEvent(event fsnotify.Event) {
 
+}
+
+func Close() {
+	// 关闭所有打开的文件
+	for _, fd := range GlobalFileStateFds {
+		fd.Close()
+	}
+	GlobalWatchContextCancel()
+	GlobalWatchWG.Wait()
 }
 
 func InitFileStateFds() error {
@@ -204,13 +209,6 @@ func InitFileStateFds() error {
 	}
 
 	return nil
-}
-
-func Close() {
-	// 关闭所有打开的文件
-	for _, fd := range GlobalFileStateFds {
-		fd.Close()
-	}
 }
 
 // SyncFileStates2Disk 将FileState数据写入到磁盘, 先删除在覆盖
