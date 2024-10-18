@@ -423,9 +423,16 @@ func ClockSyncFileState() {
 // TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
 // TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
 func ClockCheckFileState() error {
+
 	var (
-		diskFiles = make([]string, 1, 1)
+		diskFiles = make([]string, 1, 10) // 所有的硬盘文件
+		interval  int
 	)
+
+	if interval = config.GlobalConfig.Watch.ObsoleteInterval; interval <= 0 || interval > DefaultObsoleteInterval {
+		interval = DefaultSyncInterval
+	}
+
 	// 遍历出所有的文件
 	for _, paths := range config.GlobalConfig.Watch.ReadPath {
 		for _, path := range paths {
@@ -439,6 +446,14 @@ func ClockCheckFileState() error {
 	}
 
 	// 遍历FileState， 如果比对后，硬盘文件不存在，就更新FileState
+	for filePath, fileState := range GlobalFileStates {
+		if k3.InSlice(fileState.Path, diskFiles) == false {
+			delete(GlobalFileStates, filePath)
+		}
 
-	// 遍历FileState， 如果文件的最后读取时间超过一定时间，就强制将文件读完，并更新FileState
+		// 如果文件的最后读取时间超过一定时间，就强制将文件读完，并更新FileState
+
+	}
+
+	return nil
 }

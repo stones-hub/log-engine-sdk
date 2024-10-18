@@ -183,3 +183,12 @@ func RemoveDuplicateElement(src []string) []string {
 
 	return res
 }
+
+func InSlice(s string, slice []string) bool {
+	for _, d := range slice {
+		if s == d && len(s) == len(d) {
+			return true
+		}
+	}
+	return false
+}
