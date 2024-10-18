@@ -23,8 +23,10 @@ type FileState struct {
 }
 
 var (
-	DefaultReadCount         = 200
-	DefaultObsoleteInterval  = 60
+	DefaultMaxReadCount     = 200
+	DefaultObsoleteInterval = 1  // 单位天，用于解决文件已经长时间没写了，或者删除了， 但file state未处理
+	DefaultSyncInterval     = 60 // 单位秒, 用于解决运行时，不断落盘
+
 	GlobalFileStateFds       = make(map[string]*os.File)   // 对应所有要监控的文件fd
 	GlobalFileStates         = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
 	GlobalWatchContextCancel context.CancelFunc
@@ -379,33 +381,43 @@ func ForceSyncFileState() error {
 	return nil
 }
 
-// ClockCheckAndSyncFileState 定时检查FileState
-// TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
-// TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
-func ClockCheckAndSyncFileState() {
+// ClockSyncFileState 定时检查FileState
+func ClockSyncFileState() {
 	var (
-		obsoleteInterval int
-		t                *time.Ticker
+		syncInterval int
+		t            *time.Ticker
 	)
 
 	// 获取监控时间间隔
-	if obsoleteInterval = config.GlobalConfig.Watch.ObsoleteInterval; obsoleteInterval <= 0 || obsoleteInterval > DefaultObsoleteInterval {
-		obsoleteInterval = DefaultObsoleteInterval
+	if syncInterval = config.GlobalConfig.Watch.ObsoleteInterval; syncInterval <= 0 || syncInterval > DefaultSyncInterval {
+		syncInterval = DefaultSyncInterval
 	}
-
 	// 创建定时器
-	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Second)
+	t = time.NewTicker(time.Duration(syncInterval) * time.Second)
 
+	GlobalWatchWG.Add(1)
 	go func() {
-
+		defer GlobalWatchWG.Done()
 		defer func() {
 			t.Stop()
 		}()
-
-		for true {
-			// 获取到定时时间
-			<-t.C
-			// 执行同步逻辑任务
+		for {
+			select {
+			case <-GlobalWatchContext.Done():
+				return
+				// 获取到定时时间
+			case <-t.C:
+				// 执行同步逻辑任务
+				if err := ForceSyncFileState(); err != nil {
+					k3.K3LogError("ForceSyncFileState: %s\n", err)
+				}
+			}
 		}
 	}()
+}
+
+// TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
+// TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
+func Clock() {
+
 }
