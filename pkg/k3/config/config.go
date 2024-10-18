@@ -29,10 +29,10 @@ type ELK struct {
 }
 
 type Watch struct {
-	ReadPath             map[string][]string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
-	StateFilePath        string              `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
-	MaxReadCount         int                 `yaml:"max_read_count" json:"max_read_count"` // max_read_count
-	ObsoleteDateInterval int                 `yaml:"obsolete_date_interval" json:"obsolete_date_interval"`
+	ReadPath         map[string][]string `yaml:"read_path" json:"read_path,omitempty" toml:"read_path"` // 要读取的日志文件路径
+	StateFilePath    string              `yaml:"state_file_path" json:"state_file_path,omitempty" toml:"state_file_path"`
+	MaxReadCount     int                 `yaml:"max_read_count" json:"max_read_count"` // max_read_count
+	ObsoleteInterval int                 `yaml:"obsolete_interval" json:"obsolete_interval"`
 }
 
 type System struct {

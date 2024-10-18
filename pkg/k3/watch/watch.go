@@ -21,9 +21,9 @@ type FileState struct {
 }
 
 var (
-	GlobalFileFds    = make(map[string]*os.File)
-	GlobalFileStates = make(map[string]*FileState)
-	FileStateLock    sync.Mutex
+	GlobalFileStateFds = make(map[string]*os.File)
+	GlobalFileStates   = make(map[string]*FileState)
+	FileStateLock      sync.Mutex
 )
 
 func Run() error {
@@ -48,9 +48,9 @@ func Run() error {
 				"/Users/yelei/data/code/go-projects/logs/api",
 			},
 		},
-		StateFilePath:        "state/core.json",
-		MaxReadCount:         1000,
-		ObsoleteDateInterval: 1,
+		StateFilePath:    "state/core.json",
+		MaxReadCount:     1000,
+		ObsoleteInterval: 1,
 	}
 
 	// 如果state file文件没有就创建，如果有就load文件内容到stateFile
@@ -95,9 +95,49 @@ func Run() error {
 		return err
 	}
 
+	// 初始化带监控的所有文件的FD
+	if err = InitFileStateFds(); err != nil {
+		return err
+	}
+
 	// 开始监控, 注意多协程处理，每个index name一个线程
+	InitWatcher()
 
 	return nil
+}
+
+func InitWatcher() {
+
+	go doWatch(indexName)
+}
+
+func doWatch(indexName string) {
+
+}
+
+func InitFileStateFds() error {
+	var (
+		err error
+	)
+
+	for filePath, _ := range GlobalFileStates {
+		if GlobalFileStateFds[filePath], err = os.OpenFile(filePath, os.O_RDONLY, 0666); err != nil {
+			return fmt.Errorf("InitFileStateFds open file error: %s", err.Error())
+		}
+
+		if GlobalFileStates[filePath].StartReadTime.IsZero() {
+			GlobalFileStates[filePath].StartReadTime = time.Now()
+		}
+	}
+
+	return nil
+}
+
+func Close() {
+	// 关闭所有打开的文件
+	for _, fd := range GlobalFileStateFds {
+		fd.Close()
+	}
 }
 
 // SyncFileStates2Disk 将FileState数据写入到磁盘, 先删除在覆盖
