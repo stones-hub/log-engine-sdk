@@ -427,6 +427,7 @@ func ClockCheckFileState() error {
 	var (
 		diskFiles = make([]string, 1, 10) // 所有的硬盘文件
 		interval  int
+		fd        *os.File
 	)
 
 	if interval = config.GlobalConfig.Watch.ObsoleteInterval; interval <= 0 || interval > DefaultObsoleteInterval {
@@ -449,9 +450,13 @@ func ClockCheckFileState() error {
 	for filePath, fileState := range GlobalFileStates {
 		if k3.InSlice(fileState.Path, diskFiles) == false {
 			delete(GlobalFileStates, filePath)
+			GlobalFileStateFds[filePath].Close()
+			delete(GlobalFileStateFds, filePath)
 		}
 
 		// 如果文件的最后读取时间超过一定时间，就强制将文件读完，并更新FileState
+		if fd = GlobalFileStateFds[filePath]; fd != nil && fileState.LastReadTime.Add(time.Duration(interval)*time.Second).Before(time.Now()) {
+		}
 
 	}
 
