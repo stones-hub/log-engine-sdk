@@ -23,11 +23,13 @@ type FileState struct {
 }
 
 var (
-	GlobalFileStateFds                           = make(map[string]*os.File)
-	GlobalFileStates                             = make(map[string]*FileState)
-	GlobalWatchContext, GlobalWatchContextCancel = context.WithCancel(context.Background())
-	GlobalWatchWG                                = &sync.WaitGroup{}
-	FileStateLock                                sync.Mutex
+	GlobalFileStateFds       = make(map[string]*os.File)   // 对应所有要监控的文件fd
+	GlobalFileStates         = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
+	GlobalWatchContextCancel context.CancelFunc
+	GlobalWatchContext       context.Context // 控制协程主动退出
+	GlobalWatchWG            *sync.WaitGroup
+	GlobalWatchMutex         sync.Mutex // 控制全局变量的并发
+	FileStateLock            sync.Mutex
 )
 
 func Run() error {
@@ -105,12 +107,15 @@ func Run() error {
 	}
 
 	// 开始监控, 注意多协程处理，每个index name一个线程
+	GlobalWatchContext, GlobalWatchContextCancel = context.WithCancel(context.Background())
+	GlobalWatchWG = &sync.WaitGroup{}
 	InitWatcher(diskPaths)
 
 	return nil
 }
 
 func InitWatcher(diskPaths map[string][]string) {
+
 	for index, paths := range diskPaths {
 		GlobalWatchWG.Add(1)
 		go doWatch(index, paths)
@@ -130,6 +135,9 @@ func doWatch(index string, paths []string) {
 
 	// 初始化协程watcher
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
+		GlobalWatchMutex.Lock()
+		GlobalWatchContextCancel()
+		GlobalWatchMutex.Unlock()
 		k3.K3LogError("Failed to create watcher for %s: %v\n", index, err)
 		return
 	}
@@ -138,8 +146,10 @@ func doWatch(index string, paths []string) {
 	// 开始监听目录, 如果错误就退出
 	for _, path := range paths {
 		if err = watcher.Add(path); err != nil {
+			GlobalWatchMutex.Lock()
+			GlobalWatchContextCancel()
+			GlobalWatchMutex.Unlock()
 			k3.K3LogError("Failed to add %s to watcher for %s: %v\n", path, index, err)
-			// TODO 因为是循环多个目录，有可能某些目录出现问题，那么需要给外部发一个chan， 这样方便解决程序整体退出的问题
 			return
 		}
 	}
@@ -148,6 +158,9 @@ func doWatch(index string, paths []string) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
+				GlobalWatchMutex.Lock()
+				GlobalWatchContextCancel()
+				GlobalWatchMutex.Unlock()
 				k3.K3LogError("doWatch child goroutine panic: %s\n", r)
 			}
 		}()
