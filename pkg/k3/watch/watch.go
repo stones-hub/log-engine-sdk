@@ -23,6 +23,8 @@ type FileState struct {
 }
 
 var (
+	DefaultReadCount         = 200
+	DefaultObsoleteInterval  = 60
 	GlobalFileStateFds       = make(map[string]*os.File)   // 对应所有要监控的文件fd
 	GlobalFileStates         = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
 	GlobalWatchContextCancel context.CancelFunc
@@ -35,14 +37,13 @@ var (
 func Run() error {
 
 	var (
-		watchConfig   = config.GlobalConfig.Watch
 		diskPaths     = make(map[string][]string)
 		diskFilePaths = make(map[string][]string)
 		err           error
 	)
 
 	// 用于测试用
-	watchConfig = config.Watch{
+	config.GlobalConfig.Watch = config.Watch{
 		ReadPath: map[string][]string{
 			"index_nginx": []string{
 				"/Users/yelei/data/code/go-projects/logs/nginx",
@@ -60,13 +61,13 @@ func Run() error {
 	}
 
 	// 如果state file文件没有就创建，如果有就load文件内容到stateFile
-	if GlobalFileStates, err = CreateORLoadFileState(watchConfig.StateFilePath); err != nil {
+	if GlobalFileStates, err = CreateORLoadFileState(config.GlobalConfig.Watch.StateFilePath); err != nil {
 		k3.K3LogError("WatchRun CreateAndLoadFileState error: %s", err.Error())
 		return err
 	}
 
 	// 遍历所有的目录,找到所有需要监控的目录(包含子目录) 和 所有文件
-	for indexName, paths := range watchConfig.ReadPath {
+	for indexName, paths := range config.GlobalConfig.Watch.ReadPath {
 		for _, path := range paths {
 			subPaths, err := FetchWatchPath(path)
 			if err != nil {
@@ -97,7 +98,7 @@ func Run() error {
 		obsolete_date_interval : 1 # 单位小时hour, 默认1小时, 超过多少时间文件未变化, 认为文件应该删除
 		state_file_path : "/state/core
 	*/
-	if err = SyncFileStates2Disk(diskFilePaths, watchConfig.StateFilePath); err != nil {
+	if err = SyncFileStates2Disk(diskFilePaths, config.GlobalConfig.Watch.StateFilePath); err != nil {
 		return err
 	}
 
@@ -116,6 +117,7 @@ func Run() error {
 
 func InitWatcher(diskPaths map[string][]string) {
 
+	// 循环开协程，每个index name 一个协程
 	for index, paths := range diskPaths {
 		GlobalWatchWG.Add(1)
 		go doWatch(index, paths)
@@ -156,6 +158,7 @@ func doWatch(index string, paths []string) {
 
 	childWG.Add(1)
 	go func() {
+		defer childWG.Done()
 		defer func() {
 			if r := recover(); r != nil {
 				GlobalWatchMutex.Lock()
@@ -181,20 +184,19 @@ func doWatch(index string, paths []string) {
 				}
 				k3.K3LogError("Child Goroutine Error reading %s: %v\n", index, err)
 
-			case <-GlobalWatchContext.Done():
+			case <-GlobalWatchContext.Done(): // 退出子协程
 				k3.K3LogInfo("Received exit signal, child goroutine stopping....\n")
 				return
 			}
 		}
 	}()
-
 	// 等待子协程退出
 	childWG.Wait()
 }
 
 // handlerEvent 处理监控到文件的变化
 func handlerEvent(event fsnotify.Event) {
-
+	k3.K3LogInfo("handlerEvent: %v, %v, %v \n", event, event.Name, event.Op)
 }
 
 func Close() {
@@ -302,10 +304,6 @@ func CheckFileStateIsExistInDiskFiles(fileStatePath string, watchFiles map[strin
 	return false
 }
 
-// TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
-
-// TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
-
 // CreateORLoadFileState 创建并加载状态文件
 func CreateORLoadFileState(fileSatePath string) (map[string]*FileState, error) {
 	var (
@@ -357,4 +355,57 @@ func FetchWatchPath(watchPath string) ([]string, error) {
 // FetchWatchPathFile 获取监控目录中的所有文件
 func FetchWatchPathFile(watchPath string) ([]string, error) {
 	return k3.FetchDirectory(watchPath, -1)
+}
+
+// ForceSyncFileState 强制同步FileState, 先清空，在同步
+func ForceSyncFileState() error {
+	var (
+		fd      *os.File
+		err     error
+		encoder *json.Encoder
+	)
+	FileStateLock.Lock()
+	defer FileStateLock.Unlock()
+	if fd, err = os.OpenFile(config.GlobalConfig.Watch.StateFilePath, os.O_RDWR|os.O_TRUNC, 0666); err != nil {
+		return fmt.Errorf("open state file error: %s", err.Error())
+	}
+
+	defer fd.Close()
+	encoder = json.NewEncoder(fd)
+
+	if err = encoder.Encode(&GlobalFileStates); err != nil {
+		return fmt.Errorf("encode state file error: %s", err.Error())
+	}
+	return nil
+}
+
+// ClockCheckAndSyncFileState 定时检查FileState
+// TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
+// TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
+func ClockCheckAndSyncFileState() {
+	var (
+		obsoleteInterval int
+		t                *time.Ticker
+	)
+
+	// 获取监控时间间隔
+	if obsoleteInterval = config.GlobalConfig.Watch.ObsoleteInterval; obsoleteInterval <= 0 || obsoleteInterval > DefaultObsoleteInterval {
+		obsoleteInterval = DefaultObsoleteInterval
+	}
+
+	// 创建定时器
+	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Second)
+
+	go func() {
+
+		defer func() {
+			t.Stop()
+		}()
+
+		for true {
+			// 获取到定时时间
+			<-t.C
+			// 执行同步逻辑任务
+		}
+	}()
 }
