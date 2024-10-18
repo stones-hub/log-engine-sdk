@@ -99,7 +99,7 @@ func Run() error {
 		return err
 	}
 
-	// 初始化带监控的所有文件的FD
+	// 初始化待监控的所有文件的FD
 	if err = InitFileStateFds(); err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func doWatch(index string, paths []string) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				k3.K3LogError("doWatch panic: %s\n", r)
+				k3.K3LogError("doWatch child goroutine panic: %s\n", r)
 			}
 		}()
 
