@@ -472,16 +472,17 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 		currentReadIndex int // 当前读取次数
 		reader           *bufio.Reader
 		content          string
-		lastOffset       int64
+		lastOffset       int64 // 最后读取到的索引
 	)
 
 	if fd != nil {
-		return -1, fmt.Errorf("file descriptor is nil")
+		return offset, fmt.Errorf("file descriptor is nil")
 	}
 
 	currentReadIndex = 0
 	lastOffset = offset
 
+	//
 	if _, err = fd.Seek(offset, io.SeekStart); err != nil {
 		return -1, fmt.Errorf("seek file error: %s", err.Error())
 	}
@@ -522,6 +523,7 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 // TODO 是否考虑在读取长时间没有读写的问题，每个文件开一个协程处理.
 // TODO 读完的文件，是否考虑不用从state file中删除，如果硬盘上被删除了，再次删除即可
 
+// 将数据发送给consumer
 func sendData2Consumer(content string) error {
 	return nil
 }
