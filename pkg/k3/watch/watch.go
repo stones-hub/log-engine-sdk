@@ -423,44 +423,8 @@ func ClockSyncFileState() {
 
 // ---------------------------------
 
-// ClockCheckFileState 定时检查FileState, 并写入硬盘
-func ClockCheckFileState() error {
-
-	var (
-		diskFiles = make([]string, 1, 10) // 所有的硬盘文件
-		interval  int
-		fd        *os.File
-	)
-
-	if interval = config.GlobalConfig.Watch.ObsoleteInterval; interval <= 0 || interval > DefaultObsoleteInterval {
-		interval = DefaultSyncInterval
-	}
-
-	// 遍历出所有的文件
-	for _, paths := range config.GlobalConfig.Watch.ReadPath {
-		for _, path := range paths {
-			if tempFiles, err := k3.FetchDirectory(path, -1); err != nil {
-				k3.K3LogError("FetchDirectory: %s\n", err)
-				return err
-			} else {
-				diskFiles = append(diskFiles, tempFiles...)
-			}
-		}
-	}
-
-	// 遍历FileState， 如果比对后，硬盘文件不存在，就更新FileState
-	for filePath, fileState := range GlobalFileStates {
-		if k3.InSlice(fileState.Path, diskFiles) == false {
-			delete(GlobalFileStates, filePath)
-			GlobalFileStateFds[filePath].Close()
-			delete(GlobalFileStateFds, filePath)
-		}
-
-		// 如果文件的最后读取时间超过一定时间，就强制将文件读完，并更新FileState
-		if fd = GlobalFileStateFds[filePath]; fd != nil && fileState.LastReadTime.Add(time.Duration(interval)*time.Second).Before(time.Now()) {
-		}
-
-	}
+// ClockCheckFileStateAndReadFile
+func ClockCheckFileStateAndReadFile() error {
 
 	return nil
 }
@@ -471,10 +435,15 @@ func ReadFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 		currentReadIndex int // 当前读取次数
 		reader           *bufio.Reader
 		content          string
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
 	)
 
 	if fd != nil {
 		return offset, fmt.Errorf("file descriptor is nil")
+	}
+
+	if maxReadCount < 0 || config.GlobalConfig.Watch.MaxReadCount > DefaultMaxReadCount {
+		maxReadCount = DefaultMaxReadCount
 	}
 
 	currentReadIndex = 0
@@ -489,7 +458,7 @@ func ReadFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 	reader = bufio.NewReader(fd)
 
 	// 循环读取文件
-	for currentReadIndex < config.GlobalConfig.Watch.MaxReadCount {
+	for currentReadIndex < maxReadCount {
 
 		// 控制文件读取次数
 		currentReadIndex++
