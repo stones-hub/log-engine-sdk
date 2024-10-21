@@ -520,8 +520,3 @@ func ReadFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 func sendData2Consumer(content string) error {
 	return nil
 }
-
-// TODO 是否考虑在读取长时间没有读写的问题，每个文件开一个协程处理.
-// TODO 读完的文件，是否考虑不用从state file中删除，如果硬盘上被删除了，再次删除即可
-// TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
-// TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
