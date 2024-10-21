@@ -11,6 +11,7 @@ import (
 	"log-engine-sdk/pkg/k3/config"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -470,11 +471,16 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 		err              error
 		currentReadIndex int // 当前读取次数
 		reader           *bufio.Reader
+		content          string
+		lastOffset       int64
 	)
 
 	if fd != nil {
 		return -1, fmt.Errorf("file descriptor is nil")
 	}
+
+	currentReadIndex = 0
+	lastOffset = offset
 
 	if _, err = fd.Seek(offset, io.SeekStart); err != nil {
 		return -1, fmt.Errorf("seek file error: %s", err.Error())
@@ -484,10 +490,30 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 
 	for i := 0; i < config.GlobalConfig.Watch.MaxReadCount; i++ {
 		currentReadIndex++
+
 		line, err := reader.ReadString('\n')
+
 		if err != nil && err != io.EOF {
 			k3.K3LogError("read file error: %s", err)
+			break
 		}
+
+		if err == io.EOF && len(line) > 0 && strings.HasSuffix(line, "\n") {
+			content += line
+			lastOffset += int64(len(line))
+			break
+		}
+
+		if len(line) > 0 && strings.HasSuffix(line, "\n") {
+			content += line
+			lastOffset += int64(len(line))
+			continue
+		}
+	}
+
+	// 将数据写入consumer
+	if err = sendData2Consumer(content); err != nil {
+		return -1, err
 	}
 
 	return 0, nil
@@ -495,3 +521,7 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 
 // TODO 是否考虑在读取长时间没有读写的问题，每个文件开一个协程处理.
 // TODO 读完的文件，是否考虑不用从state file中删除，如果硬盘上被删除了，再次删除即可
+
+func sendData2Consumer(content string) error {
+	return nil
+}
