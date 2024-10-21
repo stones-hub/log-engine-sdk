@@ -464,7 +464,7 @@ func ClockCheckFileState() error {
 	return nil
 }
 
-// ReadFileByOffset 从文件偏移量开始读取文件
+// ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
 func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 	var (
 		err              error
@@ -492,3 +492,6 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 
 	return 0, nil
 }
+
+// TODO 是否考虑在读取长时间没有读写的问题，每个文件开一个协程处理.
+// TODO 读完的文件，是否考虑不用从state file中删除，如果硬盘上被删除了，再次删除即可
