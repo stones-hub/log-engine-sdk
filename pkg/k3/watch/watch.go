@@ -11,7 +11,6 @@ import (
 	"log-engine-sdk/pkg/k3/config"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
@@ -422,8 +421,6 @@ func ClockSyncFileState() {
 }
 
 // ClockCheckFileState 定时检查FileState, 并写入硬盘
-// TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
-// TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
 func ClockCheckFileState() error {
 
 	var (
@@ -466,13 +463,11 @@ func ClockCheckFileState() error {
 }
 
 // ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
-func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
+func ReadFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 	var (
-		err              error
 		currentReadIndex int // 当前读取次数
 		reader           *bufio.Reader
 		content          string
-		lastOffset       int64 // 最后读取到的索引
 	)
 
 	if fd != nil {
@@ -482,48 +477,51 @@ func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
 	currentReadIndex = 0
 	lastOffset = offset
 
-	//
+	// 将文件偏移量偏移至指定位置
 	if _, err = fd.Seek(offset, io.SeekStart); err != nil {
-		return -1, fmt.Errorf("seek file error: %s", err.Error())
+		return offset, fmt.Errorf("seek file error: %s", err.Error())
 	}
 
+	// 封装读取器
 	reader = bufio.NewReader(fd)
 
-	for i := 0; i < config.GlobalConfig.Watch.MaxReadCount; i++ {
+	// 循环读取文件
+	for currentReadIndex < config.GlobalConfig.Watch.MaxReadCount {
+
+		// 控制文件读取次数
 		currentReadIndex++
 
+		// 读取文件
 		line, err := reader.ReadString('\n')
 
-		if err != nil && err != io.EOF {
-			k3.K3LogError("read file error: %s", err)
+		// 读取文件错误, 有可能读完了
+		if err != nil {
+			k3.K3LogError("read file error: %s\n", err)
 			break
 		}
 
-		if err == io.EOF && len(line) > 0 && strings.HasSuffix(line, "\n") {
+		if len(line) > 0 {
 			content += line
 			lastOffset += int64(len(line))
-			break
-		}
-
-		if len(line) > 0 && strings.HasSuffix(line, "\n") {
-			content += line
-			lastOffset += int64(len(line))
-			continue
 		}
 	}
 
-	// 将数据写入consumer
-	if err = sendData2Consumer(content); err != nil {
-		return -1, err
+	if len(content) > 0 {
+		if err = sendData2Consumer(content); err != nil {
+			// TODO 数据读出来了，但是发送失败，需要将失败的数据存储起来, 方便后续处理
+			return lastOffset, err
+		}
 	}
 
-	return 0, nil
+	return lastOffset, nil
 }
-
-// TODO 是否考虑在读取长时间没有读写的问题，每个文件开一个协程处理.
-// TODO 读完的文件，是否考虑不用从state file中删除，如果硬盘上被删除了，再次删除即可
 
 // 将数据发送给consumer
 func sendData2Consumer(content string) error {
 	return nil
 }
+
+// TODO 是否考虑在读取长时间没有读写的问题，每个文件开一个协程处理.
+// TODO 读完的文件，是否考虑不用从state file中删除，如果硬盘上被删除了，再次删除即可
+// TODO 启动后，定时检查FileState中的记录文件，是否还存在在硬盘中，如果不存在就更新FileState
+// TODO 启动后，定时检查FileState中的记录文件，如果一段时间都没有变化，证明文件不会再写入了， 就检查是否已经读完, 没读完就一次性读完它
