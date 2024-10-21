@@ -117,7 +117,10 @@ func Run() error {
 	InitWatcher(diskPaths)
 
 	ClockSyncFileState()
-	ClockCheckFileState()
+
+	if err = ClockCheckFileStateAndReadFile(); err != nil {
+		return err
+	}
 
 	return nil
 }
