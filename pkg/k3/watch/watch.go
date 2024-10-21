@@ -424,7 +424,7 @@ func ClockSyncFileState() {
 	}()
 }
 
-// ClockCheckFileStateAndReadFile
+// ClockCheckFileStateAndReadFile 定时监控file states 中的文件状态，是不是长时间没有写入，如果没有就一次性读取完, 注意子协程的回收处理
 func ClockCheckFileStateAndReadFile() error {
 
 	var (
