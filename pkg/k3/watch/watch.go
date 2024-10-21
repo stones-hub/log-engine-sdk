@@ -389,12 +389,12 @@ func ForceSyncFileState() error {
 // ClockSyncFileState 定时将内存中的file state 写入硬盘
 func ClockSyncFileState() {
 	var (
-		syncInterval int
+		syncInterval = config.GlobalConfig.Watch.ObsoleteInterval
 		t            *time.Ticker
 	)
 
 	// 获取监控时间间隔
-	if syncInterval = config.GlobalConfig.Watch.ObsoleteInterval; syncInterval <= 0 || syncInterval > DefaultSyncInterval {
+	if syncInterval <= 0 || syncInterval > DefaultSyncInterval {
 		syncInterval = DefaultSyncInterval
 	}
 	// 创建定时器
@@ -421,11 +421,39 @@ func ClockSyncFileState() {
 	}()
 }
 
-// ---------------------------------
-
 // ClockCheckFileStateAndReadFile
 func ClockCheckFileStateAndReadFile() error {
 
+	var (
+		obInterval = config.GlobalConfig.Watch.ObsoleteInterval
+		t          *time.Ticker
+	)
+
+	if obInterval <= 0 || obInterval > DefaultObsoleteInterval {
+		obInterval = DefaultObsoleteInterval
+	}
+
+	// 创建定时器
+	t = time.NewTicker(time.Duration(obInterval) * time.Hour)
+
+	GlobalWatchWG.Add(1)
+
+	go func() {
+		defer GlobalWatchWG.Done()
+
+		defer func() {
+			t.Stop()
+		}()
+
+		for {
+			select {
+			case <-GlobalWatchContext.Done():
+				return
+			case <-t.C:
+				// TODO
+			}
+		}
+	}()
 	return nil
 }
 
@@ -442,7 +470,7 @@ func ReadFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 		return offset, fmt.Errorf("file descriptor is nil")
 	}
 
-	if maxReadCount < 0 || config.GlobalConfig.Watch.MaxReadCount > DefaultMaxReadCount {
+	if maxReadCount <= 0 || config.GlobalConfig.Watch.MaxReadCount > DefaultMaxReadCount {
 		maxReadCount = DefaultMaxReadCount
 	}
 
