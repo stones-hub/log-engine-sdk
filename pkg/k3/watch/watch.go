@@ -92,14 +92,15 @@ func Run() error {
 
 	/*
 		watch.yaml 配置文件信息
-		read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
-		  index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
-		  index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
-		  index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
-		max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数
-		start_date : "2020-01-01 00:00:00" # 监控什么时间起创建的文件
-		obsolete_date_interval : 1 # 单位小时hour, 默认1小时, 超过多少时间文件未变化, 认为文件应该删除
-		state_file_path : "/state/core
+			  read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
+			    index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
+			    index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
+			    index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
+			  max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数, 默认100次
+			  sync_interval : 60 # 单位秒，默认60, 程序运行过程中，要定时落盘
+			  state_file_path : "/state/core.json" # 记录监控文件的offset
+			  obsolete_interval : 1 # 单位小时, 默认1 表示定时多久时间检查文件是否已经读完了
+			  obsolete_date : 1 # 单位填， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
 	*/
 	if err = SyncFileStates2Disk(diskFilePaths, config.GlobalConfig.Watch.StateFilePath); err != nil {
 		return err
@@ -419,6 +420,8 @@ func ClockSyncFileState() {
 		}
 	}()
 }
+
+// ---------------------------------
 
 // ClockCheckFileState 定时检查FileState, 并写入硬盘
 func ClockCheckFileState() error {
