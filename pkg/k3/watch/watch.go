@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -461,4 +462,33 @@ func ClockCheckFileState() error {
 	}
 
 	return nil
+}
+
+// ReadFileByOffset 从文件偏移量开始读取文件
+func ReadFileByOffset(fd *os.File, offset int64) (int64, error) {
+	var (
+		err              error
+		currentReadIndex int // 当前读取次数
+		reader           *bufio.Reader
+	)
+
+	if fd != nil {
+		return -1, fmt.Errorf("file descriptor is nil")
+	}
+
+	if _, err = fd.Seek(offset, io.SeekStart); err != nil {
+		return -1, fmt.Errorf("seek file error: %s", err.Error())
+	}
+
+	reader = bufio.NewReader(fd)
+
+	for i := 0; i < config.GlobalConfig.Watch.MaxReadCount; i++ {
+		currentReadIndex++
+		line, err := reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			k3.K3LogError("read file error: %s", err)
+		}
+	}
+
+	return 0, nil
 }
