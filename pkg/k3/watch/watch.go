@@ -23,10 +23,22 @@ type FileState struct {
 	IndexName     string
 }
 
+/*
+  max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数, 默认100次
+  sync_interval : 60 # 单位秒，默认60, 程序运行过程中，要定时落盘
+  state_file_path : "/state/core.json" # 记录监控文件的offset
+  obsolete_interval : 1 # 单位小时, 默认1 表示定时多久时间检查文件是否已经读完了
+  obsolete_date : 1 # 单位填， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
+  obsolete_max_read_count : 1000 # 对于长时间没有读写的文件， 一次最大读取次数
+*/
+
 var (
-	DefaultMaxReadCount     = 200
-	DefaultObsoleteInterval = 1  // 单位天，用于解决文件已经长时间没写了，或者删除了， 但file state未处理
-	DefaultSyncInterval     = 60 // 单位秒, 用于解决运行时，不断落盘
+	DefaultMaxReadCount = 200
+	DefaultSyncInterval = 60 // 单位秒, 用于解决运行时，不断落盘
+
+	DefaultObsoleteInterval     = 1    // 单位小时, 默认1 表示定时多久时间检查文件是否已经读完了
+	DefaultObsoleteDate         = 1    // 单位填， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
+	DefaultObsoleteMaxReadCount = 5000 // 对于长时间没有读写的文件， 一次最大读取次数
 
 	GlobalFileStateFds       = make(map[string]*os.File)   // 对应所有要监控的文件fd
 	GlobalFileStates         = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
@@ -436,7 +448,7 @@ func ClockCheckFileStateAndReadFile() error {
 		obInterval = DefaultObsoleteInterval
 	}
 
-	// 创建定时器
+	// 创建定时器, 如果定时器间隔时间小于，逻辑处理时间，信号会丢弃，因为定时器的实现原理是chan size = 1
 	t = time.NewTicker(time.Duration(obInterval) * time.Hour)
 
 	GlobalWatchWG.Add(1)
@@ -464,14 +476,19 @@ func ClockCheckFileStateAndReadFile() error {
 // handleReadFileAndSendData 处理读取文件并发送数据
 func handleReadFileAndSendData() {
 	var (
-		wg = &sync.WaitGroup{}
+		wg           = &sync.WaitGroup{}
+		obsoleteDate = config.GlobalConfig.Watch.ObsoleteDate
 	)
+
+	if obsoleteDate < 0 || obsoleteDate > DefaultObsoleteDate {
+		obsoleteDate = DefaultObsoleteDate
+	}
 
 	for fileName, fileState := range GlobalFileStates {
 		now := time.Now()
 		lastReadTime := time.Unix(fileState.LastReadTime, 0)
 		// 判断当前时间点是否超过N天未读写
-		if now.Sub(lastReadTime) > 24*time.Hour*time.Duration(config.GlobalConfig.Watch.ObsoleteDate) {
+		if now.Sub(lastReadTime) > 24*time.Hour*time.Duration(obsoleteDate) {
 
 			// 判断文件是否读取完，如果没有，就一次性全部读取
 			if fd, ok := GlobalFileStateFds[fileName]; ok && fd != nil {
@@ -480,9 +497,9 @@ func handleReadFileAndSendData() {
 					continue
 				} else {
 					if fstat.Size() != fileState.Offset {
-						// 开协程，一次性读取所有内容
+						// 开协程，一次性读取所有内容, 但最好有个阀值， 避免内存过多
 						wg.Add(1)
-						go readFileFull(fd, wg)
+						go readFile(fd, wg)
 					}
 				}
 			}
@@ -492,12 +509,22 @@ func handleReadFileAndSendData() {
 	wg.Wait()
 }
 
-func readFileFull(fd *os.File, wg *sync.WaitGroup) {
+func readFile(fd *os.File, wg *sync.WaitGroup) {
+	var (
+		obsoleteMaxReadCount = config.GlobalConfig.Watch.ObsoleteMaxReadCount
+	)
+
+	if obsoleteMaxReadCount < 0 || obsoleteMaxReadCount > DefaultObsoleteMaxReadCount {
+		obsoleteMaxReadCount = DefaultObsoleteMaxReadCount
+	}
+
 	wg.Done()
+
+	// TODO 开始循环读取，并发送数据，读取完以后，需要考虑更新file state
 
 }
 
-// ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
+// 未使用 ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
 func readFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 	var (
 		currentReadIndex int // 当前读取次数
@@ -556,7 +583,7 @@ func readFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 	return lastOffset, nil
 }
 
-// 将数据发送给consumer
+// 未使用 将数据发送给consumer
 func sendData2Consumer(content string) error {
 	return nil
 }

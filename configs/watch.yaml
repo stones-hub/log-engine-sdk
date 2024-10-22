@@ -9,3 +9,4 @@ watch :
   state_file_path : "/state/core.json" # 记录监控文件的offset
   obsolete_interval : 1 # 单位小时, 默认1 表示定时多久时间检查文件是否已经读完了
   obsolete_date : 1 # 单位填， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
+  obsolete_max_read_count : 1000 # 对于长时间没有读写的文件， 一次最大读取次数
