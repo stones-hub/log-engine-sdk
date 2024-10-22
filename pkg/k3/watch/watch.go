@@ -18,8 +18,8 @@ import (
 type FileState struct {
 	Path          string
 	Offset        int64
-	StartReadTime time.Time
-	LastReadTime  time.Time
+	StartReadTime int64
+	LastReadTime  int64
 	IndexName     string
 }
 
@@ -228,8 +228,8 @@ func InitFileStateFds() error {
 			return fmt.Errorf("InitFileStateFds open file error: %s", err.Error())
 		}
 
-		if GlobalFileStates[filePath].StartReadTime.IsZero() {
-			GlobalFileStates[filePath].StartReadTime = time.Now()
+		if GlobalFileStates[filePath].StartReadTime == 0 {
+			GlobalFileStates[filePath].StartReadTime = time.Now().Unix()
 		}
 	}
 
@@ -453,7 +453,7 @@ func ClockCheckFileStateAndReadFile() error {
 			case <-GlobalWatchContext.Done():
 				return
 			case <-t.C:
-				// TODO
+				handleReadFileAndSendData()
 			}
 		}
 	}()
@@ -463,6 +463,30 @@ func ClockCheckFileStateAndReadFile() error {
 
 // handleReadFileAndSendData 处理读取文件并发送数据
 func handleReadFileAndSendData() {
+
+	for fileName, fileState := range GlobalFileStates {
+		now := time.Now()
+		lastReadTime := time.Unix(fileState.LastReadTime, 0)
+		// 判断当前时间点是否超过N天未读写
+		if now.Sub(lastReadTime) > 24*time.Hour*time.Duration(config.GlobalConfig.Watch.ObsoleteDate) {
+
+			// 判断文件是否读取完，如果没有，就一次性全部读取
+			if fd, ok := GlobalFileStateFds[fileName]; ok && fd != nil {
+				if fstat, err := fd.Stat(); err != nil {
+					k3.K3LogError("stat file error: %s", err)
+					continue
+				} else {
+					if fstat.Size() != fileState.Offset {
+						// 开协程，一次性读取所有内容
+						go readFileFull(fd)
+					}
+				}
+			}
+		}
+	}
+}
+
+func readFileFull(fd *os.File) {
 
 }
 
