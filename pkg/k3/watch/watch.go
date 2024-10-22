@@ -463,6 +463,9 @@ func ClockCheckFileStateAndReadFile() error {
 
 // handleReadFileAndSendData 处理读取文件并发送数据
 func handleReadFileAndSendData() {
+	var (
+		wg = &sync.WaitGroup{}
+	)
 
 	for fileName, fileState := range GlobalFileStates {
 		now := time.Now()
@@ -478,15 +481,19 @@ func handleReadFileAndSendData() {
 				} else {
 					if fstat.Size() != fileState.Offset {
 						// 开协程，一次性读取所有内容
-						go readFileFull(fd)
+						wg.Add(1)
+						go readFileFull(fd, wg)
 					}
 				}
 			}
 		}
 	}
+
+	wg.Wait()
 }
 
-func readFileFull(fd *os.File) {
+func readFileFull(fd *os.File, wg *sync.WaitGroup) {
+	wg.Done()
 
 }
 
