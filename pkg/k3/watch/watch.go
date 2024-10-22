@@ -457,11 +457,17 @@ func ClockCheckFileStateAndReadFile() error {
 			}
 		}
 	}()
+
 	return nil
 }
 
+// handleReadFileAndSendData 处理读取文件并发送数据
+func handleReadFileAndSendData() {
+
+}
+
 // ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
-func ReadFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
+func readFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 	var (
 		currentReadIndex int // 当前读取次数
 		reader           *bufio.Reader
