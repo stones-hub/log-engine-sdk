@@ -380,7 +380,7 @@ func FetchWatchPathFile(watchPath string) ([]string, error) {
 }
 
 // ForceSyncFileState 强制同步FileState, 先清空，在同步
-func ForceSyncFileState() error {
+func forceSyncFileState() error {
 	var (
 		fd      *os.File
 		err     error
@@ -428,7 +428,7 @@ func ClockSyncFileState() {
 				// 获取到定时时间
 			case <-t.C:
 				// 执行同步逻辑任务
-				if err := ForceSyncFileState(); err != nil {
+				if err := forceSyncFileState(); err != nil {
 					k3.K3LogError("ForceSyncFileState: %s\n", err)
 				}
 			}
@@ -556,7 +556,7 @@ func readFileAndUpdateFileState(fd *os.File, fileState *FileState, wg *sync.Wait
 	}
 
 	// TODO 更新file state
-	
+
 }
 
 // 未使用 ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
