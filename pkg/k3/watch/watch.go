@@ -499,7 +499,7 @@ func handleReadFileAndSendData() {
 					if fstat.Size() != fileState.Offset {
 						// 开协程，一次性读取所有内容, 但最好有个阀值， 避免内存过多
 						wg.Add(1)
-						go readFile(fd, wg)
+						go readFileAndUpdateFileState(fd, fileState, wg)
 					}
 				}
 			}
@@ -509,9 +509,14 @@ func handleReadFileAndSendData() {
 	wg.Wait()
 }
 
-func readFile(fd *os.File, wg *sync.WaitGroup) {
+func readFileAndUpdateFileState(fd *os.File, fileState *FileState, wg *sync.WaitGroup) {
 	var (
 		obsoleteMaxReadCount = config.GlobalConfig.Watch.ObsoleteMaxReadCount
+		reader               *bufio.Reader
+		lastOffset           int64
+		currentReadCount     int
+		err                  error
+		content              string
 	)
 
 	if obsoleteMaxReadCount < 0 || obsoleteMaxReadCount > DefaultObsoleteMaxReadCount {
@@ -521,7 +526,37 @@ func readFile(fd *os.File, wg *sync.WaitGroup) {
 	wg.Done()
 
 	// TODO 开始循环读取，并发送数据，读取完以后，需要考虑更新file state
+	if _, err = fd.Seek(fileState.Offset, io.SeekStart); err != nil {
+		k3.K3LogError("seek file error: %s", err)
+		return
+	}
 
+	lastOffset = fileState.Offset
+	currentReadCount = 0
+	reader = bufio.NewReader(fd)
+
+	for currentReadCount < obsoleteMaxReadCount {
+		currentReadCount++
+		line, err := reader.ReadString('\n')
+
+		// 读取文件错误, 有可能读完了
+		if err != nil {
+			if err == io.EOF {
+				k3.K3LogInfo("read file eof\n")
+			} else {
+				k3.K3LogError("read file error: %s\n", err)
+			}
+			break
+		}
+
+		if len(line) > 0 {
+			content += line
+			lastOffset += int64(len(line))
+		}
+	}
+
+	// TODO 更新file state
+	
 }
 
 // 未使用 ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
