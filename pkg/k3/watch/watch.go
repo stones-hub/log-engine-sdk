@@ -229,7 +229,7 @@ func doWatch(index string, paths []string) {
 				}
 
 				// TODO 这里可以处理监控到文件的变化，比如文件大小变化，文件内容变化，文件删除等
-				handlerEvent(event)
+				handlerEvent(watcher, event)
 
 			case err, ok := <-watcher.Errors:
 				if !ok { // 退出子协程
@@ -248,7 +248,7 @@ func doWatch(index string, paths []string) {
 }
 
 // handlerEvent 处理监控到文件的变化
-func handlerEvent(event fsnotify.Event) {
+func handlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
 	if event.Op&fsnotify.Write == fsnotify.Write { // 文件写入
 
 		// 判断map中是否存在，不存在就返回
