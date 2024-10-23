@@ -163,10 +163,7 @@ func Run() error {
 	InitWatcher(diskPaths)
 
 	ClockSyncFileState()
-
-	if err = ClockCheckFileStateAndReadFile(); err != nil {
-		return err
-	}
+	ClockCheckFileStateAndReadFile()
 
 	return nil
 }
@@ -252,7 +249,88 @@ func doWatch(index string, paths []string) {
 
 // handlerEvent 处理监控到文件的变化
 func handlerEvent(event fsnotify.Event) {
-	k3.K3LogInfo("handlerEvent: %v, %v, %v \n", event, event.Name, event.Op)
+	if event.Op&fsnotify.Write == fsnotify.Write { // 文件写入
+
+		// 判断map中是否存在，不存在就返回
+		if _, ok := GlobalFileStates[event.Name]; !ok {
+			k3.K3LogError("handlerEvent file not found: %s", event.Name)
+			return
+		}
+
+		if _, ok := GlobalFileStateFds[event.Name]; !ok {
+			k3.K3LogError("handlerEvent file fd not found: %s", event.Name)
+			return
+		}
+
+		ReadFileByOffset(GlobalFileStateFds[event.Name], GlobalFileStates[event.Name])
+
+	} else if event.Op&fsnotify.Create == fsnotify.Create { // 文件或目录创建
+
+		// TODO 判断是否是目录，如果是目录需要添加监控, 如果是文件，就需要将文件添加到FileState并新增FileState fds
+
+	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename { // 文件删除或改名
+
+	}
+}
+
+func DoRemoveAndRenameEvent() {
+	// TODO 关闭文件，删除文件，更新filestate
+
+}
+
+func ReadFileByOffset(fd *os.File, fileState *FileState) {
+	var (
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
+		currentReadCount int
+		currentOffset    int64
+		read             *bufio.Reader
+		content          string
+	)
+
+	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
+		maxReadCount = DefaultMaxReadCount
+	}
+
+	currentReadCount = 0
+	currentOffset = fileState.Offset
+
+	for currentReadCount < maxReadCount {
+		currentReadCount++
+
+		if _, err := fd.Seek(currentOffset, 0); err != nil {
+			k3.K3LogError("ReadFileByOffset Seek error: %s", err.Error())
+			return
+		}
+
+		read = bufio.NewReader(fd)
+		line, err := read.ReadString('\n')
+
+		if err != nil {
+			if err == io.EOF {
+				k3.K3LogInfo("ReadFileByOffset ReadString error: %s", err.Error())
+			} else {
+				k3.K3LogError("ReadFileByOffset ReadString error: %s", err.Error())
+			}
+			break
+		}
+
+		if len(line) > 0 {
+			content += line
+		}
+	}
+
+	if len(content) > 0 {
+		if err := SendData2Consumer(content, fileState); err != nil {
+			k3.K3LogError("SendData2Consumer error: %s", err.Error())
+		}
+
+		currentOffset += int64(len(content))
+	}
+
+	if err := SyncFileState(fileState.Path, currentOffset); err != nil {
+		k3.K3LogError("SyncFileState: %s\n", err)
+		return
+	}
 }
 
 func Close() {
@@ -472,7 +550,7 @@ func ClockSyncFileState() {
 }
 
 // ClockCheckFileStateAndReadFile 定时监控file states 中的文件状态，是不是长时间没有写入，如果没有就一次性读取完, 注意子协程的回收处理
-func ClockCheckFileStateAndReadFile() error {
+func ClockCheckFileStateAndReadFile() {
 
 	var (
 		obInterval = config.GlobalConfig.Watch.ObsoleteInterval
@@ -500,8 +578,6 @@ func ClockCheckFileStateAndReadFile() error {
 			}
 		}
 	}()
-
-	return nil
 }
 
 // HandleReadFileAndSendData 处理读取文件并发送数据
@@ -581,7 +657,6 @@ func ReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sync.WaitGr
 
 		if len(line) > 0 {
 			content += line
-			lastOffset += int64(len(line))
 		}
 	}
 
@@ -590,6 +665,9 @@ func ReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sync.WaitGr
 			k3.K3LogError("SendData2Consumer: %s\n", err)
 			return
 		}
+
+		// 发送成功以后，才可以改变偏移量
+		lastOffset += int64(len(content))
 	}
 
 	if err = SyncFileState(fileState.Path, lastOffset); err != nil {
@@ -644,6 +722,10 @@ func SyncFileState(filePath string, lastOffset int64) error {
 
 	FileStateLock.Lock()
 	defer FileStateLock.Unlock()
+
+	if GlobalFileStates[filePath].StartReadTime == 0 {
+		GlobalFileStates[filePath].StartReadTime = time.Now().Unix()
+	}
 	GlobalFileStates[filePath].Offset = lastOffset              // 更新最后偏移量
 	GlobalFileStates[filePath].LastReadTime = time.Now().Unix() // 更新最后读取时间
 
