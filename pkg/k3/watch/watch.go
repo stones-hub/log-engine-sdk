@@ -228,7 +228,8 @@ func doWatch(index string, paths []string) {
 					return
 				}
 
-				// TODO 这里可以处理监控到文件的变化，比如文件大小变化，文件内容变化，文件删除等
+				// TODO  检查是不是每个watcher是对应index_name创建的，如何解决每个watcher监控后文件的处理
+				// TODO 检查在创建watcher之前，filestates中是不是其实已经分好了index_name对应的文件，并检查下是什么时候初始化的
 				handlerEvent(watcher, event)
 
 			case err, ok := <-watcher.Errors:
