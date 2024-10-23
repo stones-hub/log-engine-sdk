@@ -490,7 +490,7 @@ func handleReadFileAndSendData() {
 		// 判断当前时间点是否超过N天未读写
 		if now.Sub(lastReadTime) > 24*time.Hour*time.Duration(obsoleteDate) {
 
-			// 判断文件是否读取完，如果没有，就一次性全部读取
+			// 判断文件是否读取完，如果没有，就一次性全部读取, 但要控制内存, 放内存数据太大
 			if fd, ok := GlobalFileStateFds[fileName]; ok && fd != nil {
 				if fstat, err := fd.Stat(); err != nil {
 					k3.K3LogError("stat file error: %s", err)
