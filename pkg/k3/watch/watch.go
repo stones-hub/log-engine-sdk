@@ -443,19 +443,15 @@ func ClockCheckFileStateAndReadFile() error {
 		obInterval = config.GlobalConfig.Watch.ObsoleteInterval
 		t          *time.Ticker
 	)
-
 	if obInterval <= 0 || obInterval > DefaultObsoleteInterval {
 		obInterval = DefaultObsoleteInterval
 	}
-
 	// 创建定时器, 如果定时器间隔时间小于，逻辑处理时间，信号会丢弃，因为定时器的实现原理是chan size = 1
 	t = time.NewTicker(time.Duration(obInterval) * time.Hour)
 
 	GlobalWatchWG.Add(1)
-
 	go func() {
 		defer GlobalWatchWG.Done()
-
 		defer func() {
 			t.Stop()
 		}()
@@ -465,7 +461,7 @@ func ClockCheckFileStateAndReadFile() error {
 			case <-GlobalWatchContext.Done():
 				return
 			case <-t.C:
-				handleReadFileAndSendData()
+				HandleReadFileAndSendData()
 			}
 		}
 	}()
@@ -473,8 +469,8 @@ func ClockCheckFileStateAndReadFile() error {
 	return nil
 }
 
-// handleReadFileAndSendData 处理读取文件并发送数据
-func handleReadFileAndSendData() {
+// HandleReadFileAndSendData 处理读取文件并发送数据
+func HandleReadFileAndSendData() {
 	var (
 		wg           = &sync.WaitGroup{}
 		obsoleteDate = config.GlobalConfig.Watch.ObsoleteDate
@@ -499,7 +495,7 @@ func handleReadFileAndSendData() {
 					if fstat.Size() != fileState.Offset {
 						// 开协程，一次性读取所有内容, 但最好有个阀值， 避免内存过多
 						wg.Add(1)
-						go readFileAndUpdateFileState(fd, fileState, wg)
+						go ReadFileAndSyncFileState(fd, fileState, wg)
 					}
 				}
 			}
@@ -509,7 +505,7 @@ func handleReadFileAndSendData() {
 	wg.Wait()
 }
 
-func readFileAndUpdateFileState(fd *os.File, fileState *FileState, wg *sync.WaitGroup) {
+func ReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sync.WaitGroup) {
 	var (
 		obsoleteMaxReadCount = config.GlobalConfig.Watch.ObsoleteMaxReadCount
 		reader               *bufio.Reader
@@ -523,9 +519,8 @@ func readFileAndUpdateFileState(fd *os.File, fileState *FileState, wg *sync.Wait
 		obsoleteMaxReadCount = DefaultObsoleteMaxReadCount
 	}
 
-	wg.Done()
+	defer wg.Done()
 
-	// TODO 开始循环读取，并发送数据，读取完以后，需要考虑更新file state
 	if _, err = fd.Seek(fileState.Offset, io.SeekStart); err != nil {
 		k3.K3LogError("seek file error: %s", err)
 		return
@@ -555,8 +550,47 @@ func readFileAndUpdateFileState(fd *os.File, fileState *FileState, wg *sync.Wait
 		}
 	}
 
-	// TODO 更新file state
+	if len(content) > 0 {
+		SendData2Consumer(content)
+	}
 
+	// TODO 更新file state
+	if err = SyncFileState(fileState.Path, lastOffset); err != nil {
+		return
+	}
+}
+
+// SendData2Consumer 未使用 将数据发送给consumer
+func SendData2Consumer(content string) error {
+	return nil
+}
+
+// SyncFileState 更新file state
+func SyncFileState(filePath string, lastOffset int64) error {
+	var (
+		fd      *os.File
+		err     error
+		encoder *json.Encoder
+	)
+
+	FileStateLock.Lock()
+	defer FileStateLock.Unlock()
+	GlobalFileStates[filePath].Offset = lastOffset              // 更新最后偏移量
+	GlobalFileStates[filePath].LastReadTime = time.Now().Unix() // 更新最后读取时间
+
+	// 写入文件
+
+	if fd, err = os.OpenFile(config.GlobalConfig.Watch.StateFilePath, os.O_RDWR|os.O_TRUNC, 0666); err != nil {
+		return fmt.Errorf("open state file error: %s", err.Error())
+	}
+
+	defer fd.Close()
+	encoder = json.NewEncoder(fd)
+
+	if err = encoder.Encode(&GlobalFileStates); err != nil {
+		return fmt.Errorf("encode state file error: %s", err.Error())
+	}
+	return nil
 }
 
 // 未使用 ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
@@ -609,16 +643,11 @@ func readFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
 	}
 
 	if len(content) > 0 {
-		if err = sendData2Consumer(content); err != nil {
+		if err = SendData2Consumer(content); err != nil {
 			// TODO 数据读出来了，但是发送失败，需要将失败的数据存储起来, 方便后续处理
 			return lastOffset, err
 		}
 	}
 
 	return lastOffset, nil
-}
-
-// 未使用 将数据发送给consumer
-func sendData2Consumer(content string) error {
-	return nil
 }
