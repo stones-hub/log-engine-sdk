@@ -9,8 +9,11 @@ import (
 	"io"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
+	"log-engine-sdk/pkg/k3/protocol"
+	"log-engine-sdk/pkg/k3/sender"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -47,7 +50,33 @@ var (
 	GlobalWatchWG            *sync.WaitGroup
 	GlobalWatchMutex         sync.Mutex // 控制全局变量的并发
 	FileStateLock            sync.Mutex
+	GlobalDataAnalytics      k3.DataAnalytics
 )
+
+func InitConsumerBatchLog() error {
+	var (
+		elk      *sender.ElasticSearchClient
+		err      error
+		consumer protocol.K3Consumer
+	)
+	if elk, err = sender.NewElasticsearch(config.GlobalConfig.ELK.Address,
+		config.GlobalConfig.ELK.Username,
+		config.GlobalConfig.ELK.Password); err != nil {
+		return err
+	}
+
+	if consumer, err = k3.NewBatchConsumerWithConfig(k3.K3BatchConsumerConfig{
+		Sender:        elk,
+		BatchSize:     config.GlobalConfig.Consumer.ConsumerBatchSize,
+		AutoFlush:     config.GlobalConfig.Consumer.ConsumerBatchAutoFlush,
+		Interval:      config.GlobalConfig.Consumer.ConsumerBatchInterval,
+		CacheCapacity: config.GlobalConfig.Consumer.ConsumerBatchCapacity,
+	}); err != nil {
+		return err
+	}
+	GlobalDataAnalytics = k3.NewDataAnalytics(consumer)
+	return nil
+}
 
 func Run() error {
 
@@ -73,6 +102,11 @@ func Run() error {
 		StateFilePath:    "state/core.json",
 		MaxReadCount:     1000,
 		ObsoleteInterval: 1,
+	}
+
+	if err = InitConsumerBatchLog(); err != nil {
+		k3.K3LogError("WatchRun InitConsumerBatchLog error: %s", err.Error)
+		return err
 	}
 
 	// 如果state file文件没有就创建，如果有就load文件内容到stateFile
@@ -228,6 +262,7 @@ func Close() {
 	}
 	GlobalWatchContextCancel()
 	GlobalWatchWG.Wait()
+	GlobalDataAnalytics.Close()
 }
 
 func InitFileStateFds() error {
@@ -380,7 +415,7 @@ func FetchWatchPathFile(watchPath string) ([]string, error) {
 }
 
 // ForceSyncFileState 强制同步FileState, 先清空，在同步
-func forceSyncFileState() error {
+func ForceSyncFileState() error {
 	var (
 		fd      *os.File
 		err     error
@@ -428,7 +463,7 @@ func ClockSyncFileState() {
 				// 获取到定时时间
 			case <-t.C:
 				// 执行同步逻辑任务
-				if err := forceSyncFileState(); err != nil {
+				if err := ForceSyncFileState(); err != nil {
 					k3.K3LogError("ForceSyncFileState: %s\n", err)
 				}
 			}
@@ -551,17 +586,51 @@ func ReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sync.WaitGr
 	}
 
 	if len(content) > 0 {
-		SendData2Consumer(content)
+		if err = SendData2Consumer(content, fileState); err != nil {
+			k3.K3LogError("SendData2Consumer: %s\n", err)
+			return
+		}
 	}
 
-	// TODO 更新file state
 	if err = SyncFileState(fileState.Path, lastOffset); err != nil {
+		k3.K3LogError("SyncFileState: %s\n", err)
 		return
 	}
 }
 
 // SendData2Consumer 未使用 将数据发送给consumer
-func SendData2Consumer(content string) error {
+func SendData2Consumer(content string, fileState *FileState) error {
+
+	var (
+		ip    string
+		ips   []string
+		datas []string
+		err   error
+	)
+
+	if ips, err = k3.GetLocalIPs(); err != nil {
+		return fmt.Errorf("get local ips error: %s", err)
+	} else {
+		ip = ips[0]
+	}
+
+	datas = strings.Split(content, "\n")
+	for _, data := range datas {
+		data = strings.TrimSpace(data)
+		data = strings.Trim(data, "\n")
+		if len(data) == 0 {
+			continue
+		}
+
+		if err = GlobalDataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, fileState.IndexName,
+			map[string]interface{}{
+				"_data": data,
+			}); err != nil {
+			k3.K3LogError("Track: %s\n", err.Error())
+		}
+
+	}
+
 	return nil
 }
 
@@ -591,63 +660,4 @@ func SyncFileState(filePath string, lastOffset int64) error {
 		return fmt.Errorf("encode state file error: %s", err.Error())
 	}
 	return nil
-}
-
-// 未使用 ReadFileByOffset 从文件偏移量开始读取文件, 并返回当前读取的偏移量和错误信息
-func readFileByOffset(fd *os.File, offset int64) (lastOffset int64, err error) {
-	var (
-		currentReadIndex int // 当前读取次数
-		reader           *bufio.Reader
-		content          string
-		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
-	)
-
-	if fd != nil {
-		return offset, fmt.Errorf("file descriptor is nil")
-	}
-
-	if maxReadCount <= 0 || config.GlobalConfig.Watch.MaxReadCount > DefaultMaxReadCount {
-		maxReadCount = DefaultMaxReadCount
-	}
-
-	currentReadIndex = 0
-	lastOffset = offset
-
-	// 将文件偏移量偏移至指定位置
-	if _, err = fd.Seek(offset, io.SeekStart); err != nil {
-		return offset, fmt.Errorf("seek file error: %s", err.Error())
-	}
-
-	// 封装读取器
-	reader = bufio.NewReader(fd)
-
-	// 循环读取文件
-	for currentReadIndex < maxReadCount {
-
-		// 控制文件读取次数
-		currentReadIndex++
-
-		// 读取文件
-		line, err := reader.ReadString('\n')
-
-		// 读取文件错误, 有可能读完了
-		if err != nil {
-			k3.K3LogError("read file error: %s\n", err)
-			break
-		}
-
-		if len(line) > 0 {
-			content += line
-			lastOffset += int64(len(line))
-		}
-	}
-
-	if len(content) > 0 {
-		if err = SendData2Consumer(content); err != nil {
-			// TODO 数据读出来了，但是发送失败，需要将失败的数据存储起来, 方便后续处理
-			return lastOffset, err
-		}
-	}
-
-	return lastOffset, nil
 }
