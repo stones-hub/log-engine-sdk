@@ -134,8 +134,6 @@ func Run() error {
 		}
 	}
 
-	fmt.Println(diskPaths, diskFilePaths, GlobalFileStates)
-
 	/*
 		watch.yaml 配置文件信息
 			  read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
@@ -156,6 +154,10 @@ func Run() error {
 	if err = InitFileStateFds(); err != nil {
 		return err
 	}
+
+	fmt.Println("-----------------------------")
+	fmt.Println(GlobalFileStateFds, GlobalFileStates)
+	fmt.Println("-----------------------------")
 
 	// 开始监控, 注意多协程处理，每个index name一个线程
 	GlobalWatchContext, GlobalWatchContextCancel = context.WithCancel(context.Background())
