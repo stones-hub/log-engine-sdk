@@ -26,6 +26,11 @@ type FileState struct {
 	IndexName     string
 }
 
+func (f *FileState) String() string {
+	return fmt.Sprintf("Path:%s, Offset:%d, StartReadTime:%v, LastReadTime:%v, IndexName:%s",
+		f.Path, f.Offset, f.StartReadTime, f.LastReadTime, f.IndexName)
+}
+
 /*
   max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数, 默认100次
   sync_interval : 60 # 单位秒，默认60, 程序运行过程中，要定时落盘
@@ -158,6 +163,8 @@ func Run() error {
 	fmt.Println("-----------------------------")
 	fmt.Println(GlobalFileStateFds, GlobalFileStates)
 	fmt.Println("-----------------------------")
+
+	return nil
 
 	// 开始监控, 注意多协程处理，每个index name一个线程
 	GlobalWatchContext, GlobalWatchContextCancel = context.WithCancel(context.Background())
