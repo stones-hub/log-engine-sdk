@@ -164,8 +164,6 @@ func Run() error {
 	fmt.Println(GlobalFileStateFds, GlobalFileStates)
 	fmt.Println("-----------------------------")
 
-	return nil
-
 	// 开始监控, 注意多协程处理，每个index name一个线程
 	GlobalWatchContext, GlobalWatchContextCancel = context.WithCancel(context.Background())
 	GlobalWatchWG = &sync.WaitGroup{}
