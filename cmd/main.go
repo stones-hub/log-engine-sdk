@@ -78,7 +78,8 @@ func main() {
 	// 剔除ReadDirectory中的重复目录
 	ReadDirectory = k3.RemoveDuplicateElement(ReadDirectory)
 
-	err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
+	// err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
+	err = watch.Run()
 
 	if err != nil {
 		k3.K3LogError("watch error: %s", err)
@@ -123,10 +124,10 @@ func graceExit(stateFile string, cleanFuncs ...func()) {
 	}
 
 	// 关闭资源退出, 清理 watch 和 batch 日志提交资源
-	watch.Clean()
+	watch.Close()
 
 	// 退出前全量更新一次state file文件内容
-	if err = watch.SyncToSateFile(stateFile); err != nil {
+	if err = watch.SyncGlobalFileStates2Disk(); err != nil {
 		k3.K3LogError("Closed watcher run save stateFile error: %s", err)
 	}
 
