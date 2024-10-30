@@ -280,7 +280,7 @@ func childGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event,
 		createEvent(watcher, event, indexName)
 
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename { // 文件删除或改名
-		removeAndRenameEvent(watcher, event, indexName)
+		removeAndRenameEvent(watcher, event)
 	}
 }
 
@@ -324,17 +324,12 @@ func createEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName stri
 	SyncGlobalFileStates2Disk()
 }
 
-// TODO SyncGlobalFileStates2Disk 同步GlobalFileStates数据到file state文件, 直接同步无需考虑其他问题，记得加锁即可
-func SyncGlobalFileStates2Disk() {
-
-}
-
 // removeAndRenameEvent 删除或改名事件
-func removeAndRenameEvent(watcher fsnotify.Watcher, event fsnotify.Event, indexName string) {
+func removeAndRenameEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
 
 	// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
 	if err := watcher.Remove(event.Name); err != nil {
-		k3.K3LogWarn("WatchRemove Remove watch [%s] error: %s", name, err)
+		k3.K3LogWarn("WatchRemove Remove watch [%s] error: %s", event.Name, err)
 	}
 
 	// 关闭文件
@@ -417,6 +412,11 @@ func Close() {
 	GlobalWatchContextCancel()
 	GlobalWatchWG.Wait()
 	GlobalDataAnalytics.Close()
+}
+
+// TODO SyncGlobalFileStates2Disk 同步GlobalFileStates数据到file state文件, 直接同步无需考虑其他问题，记得加锁即可
+func SyncGlobalFileStates2Disk() {
+
 }
 
 func InitFileStateFds() error {
