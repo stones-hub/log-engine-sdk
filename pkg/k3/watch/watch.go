@@ -240,7 +240,7 @@ func goroutineDoWatch(indexName string, paths []string) {
 					k3.K3LogError("Child Goroutine Event channel closed %s \n", indexName)
 					return
 				}
-				childGoroutineHandlerEvent(watcher, event)
+				childGoroutineHandlerEvent(watcher, event, indexName)
 
 			case err, ok := <-watcher.Errors:
 				if !ok { // 退出子协程
@@ -259,7 +259,7 @@ func goroutineDoWatch(indexName string, paths []string) {
 }
 
 // childGoroutineHandlerEvent 处理监控到文件的变化
-func childGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
+func childGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName string) {
 	if event.Op&fsnotify.Write == fsnotify.Write { // 文件写入
 
 		// 判断map中是否存在，不存在就返回
@@ -277,16 +277,79 @@ func childGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event)
 
 	} else if event.Op&fsnotify.Create == fsnotify.Create { // 文件或目录创建
 
-		// TODO 判断是否是目录，如果是目录需要添加监控, 如果是文件，就需要将文件添加到FileState并新增FileState fds
+		createEvent(watcher, event, indexName)
 
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename { // 文件删除或改名
-
+		removeAndRenameEvent(watcher, event, indexName)
 	}
 }
 
-func DoRemoveAndRenameEvent() {
-	// TODO 关闭文件，删除文件，更新filestate
+// createEvent 创建文件事件,判断是否是目录，如果是目录需要添加监控, 如果是文件，就需要将文件添加到FileState并新增FileState fds
+func createEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName string) {
+	// 判断是否是目录，如果是目录需要添加监控
+	if fileInfo, err := os.Stat(event.Name); err != nil {
+		k3.K3LogError("WatchCreate Stat error: %s", err)
+		return
+	} else {
+		if fileInfo.IsDir() && watcher != nil {
+			watcher.Add(event.Name)
+			k3.K3LogInfo("WatchCreate add watch path: %s", event.Name)
+			return
+		}
+	}
 
+	// 如果不是目录，则需要将文件添加到fileStates
+	if _, ok := GlobalFileStates[event.Name]; !ok {
+		FileStateLock.Lock()
+		GlobalFileStates[event.Name] = &FileState{
+			Path:          event.Name,
+			Offset:        0,
+			StartReadTime: 0,
+			LastReadTime:  0,
+			IndexName:     indexName,
+		}
+		FileStateLock.Unlock()
+	}
+
+	// 添加到fileStatesFd
+	if _, ok := GlobalFileStateFds[event.Name]; !ok {
+		if file, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
+			k3.K3LogError("WatchCreate OpenFile error: %s", err)
+		} else {
+			FileStateLock.Lock()
+			GlobalFileStateFds[event.Name] = file
+			FileStateLock.Unlock()
+		}
+	}
+	SyncGlobalFileStates2Disk()
+}
+
+// TODO SyncGlobalFileStates2Disk 同步GlobalFileStates数据到file state文件, 直接同步无需考虑其他问题，记得加锁即可
+func SyncGlobalFileStates2Disk() {
+
+}
+
+// removeAndRenameEvent 删除或改名事件
+func removeAndRenameEvent(watcher fsnotify.Watcher, event fsnotify.Event, indexName string) {
+
+	// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
+	if err := watcher.Remove(event.Name); err != nil {
+		k3.K3LogWarn("WatchRemove Remove watch [%s] error: %s", name, err)
+	}
+
+	// 关闭文件
+	if _, ok := GlobalFileStateFds[event.Name]; ok {
+		GlobalFileStateFds[event.Name].Close()
+		delete(GlobalFileStateFds, event.Name)
+	}
+
+	// 删除文件
+	if _, ok := GlobalFileStates[event.Name]; ok {
+		delete(GlobalFileStates, event.Name)
+	}
+
+	// 更新状态文件
+	SyncGlobalFileStates2Disk()
 }
 
 func ReadFileByOffset(fd *os.File, fileState *FileState) {
@@ -339,6 +402,7 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) {
 		currentOffset += int64(len(content))
 	}
 
+	// 将最新的数据，同步给内存和文件
 	if err := SyncFileState(fileState.Path, currentOffset); err != nil {
 		k3.K3LogError("SyncFileState: %s\n", err)
 		return
@@ -374,7 +438,7 @@ func InitFileStateFds() error {
 }
 
 // SyncFileStates2Disk 将FileState数据写入到磁盘, 先删除在覆盖
-func SyncFileStates2Disk(diskFilePaths map[string][]string, filePath string) error {
+func SyncFileStates2Disk(diskFilePaths map[string][]string, fileStatePath string) error {
 	var (
 		fd      *os.File
 		err     error
@@ -388,7 +452,7 @@ func SyncFileStates2Disk(diskFilePaths map[string][]string, filePath string) err
 	defer FileStateLock.Unlock()
 
 	// 将数据写入到 state_file_path
-	if fd, err = os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666); err != nil {
+	if fd, err = os.OpenFile(fileStatePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666); err != nil {
 		return fmt.Errorf("open state file error: %s", err.Error())
 	}
 
