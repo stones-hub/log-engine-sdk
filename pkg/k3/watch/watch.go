@@ -173,6 +173,7 @@ func Run() error {
 	GlobalWatchWG = &sync.WaitGroup{}
 	InitWatcher(diskPaths)
 
+	// TODO 检查这2个定时器
 	ClockSyncFileState()
 	ClockCheckFileStateAndReadFile()
 
@@ -240,7 +241,10 @@ func goroutineDoWatch(indexName string, paths []string) {
 					k3.K3LogError("Child Goroutine Event channel closed %s \n", indexName)
 					return
 				}
-				childGoroutineHandlerEvent(watcher, event, indexName)
+				if err := childGoroutineHandlerEvent(watcher, event, indexName); err != nil {
+					k3.K3LogError("Failed to handle event %s: %v\n", event, err)
+					return
+				}
 
 			case err, ok := <-watcher.Errors:
 				if !ok { // 退出子协程
@@ -259,42 +263,39 @@ func goroutineDoWatch(indexName string, paths []string) {
 }
 
 // childGoroutineHandlerEvent 处理监控到文件的变化
-func childGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName string) {
+func childGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName string) error {
 	if event.Op&fsnotify.Write == fsnotify.Write { // 文件写入
 
 		// 判断map中是否存在，不存在就返回
 		if _, ok := GlobalFileStates[event.Name]; !ok {
-			k3.K3LogError("handlerEvent file not found: %s", event.Name)
-			return
+			return fmt.Errorf("handlerEvent file not found: %s", event.Name)
 		}
 
 		if _, ok := GlobalFileStateFds[event.Name]; !ok {
-			k3.K3LogError("handlerEvent file fd not found: %s", event.Name)
-			return
+			return fmt.Errorf("handlerEvent file fd not found: %s", event.Name)
 		}
 
-		ReadFileByOffset(GlobalFileStateFds[event.Name], GlobalFileStates[event.Name])
+		return ReadFileByOffset(GlobalFileStateFds[event.Name], GlobalFileStates[event.Name])
 
 	} else if event.Op&fsnotify.Create == fsnotify.Create { // 文件或目录创建
-
-		createEvent(watcher, event, indexName)
-
+		return createEvent(watcher, event, indexName)
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename { // 文件删除或改名
-		removeAndRenameEvent(watcher, event)
+		return removeAndRenameEvent(watcher, event)
 	}
+
+	return nil
 }
 
 // createEvent 创建文件事件,判断是否是目录，如果是目录需要添加监控, 如果是文件，就需要将文件添加到FileState并新增FileState fds
-func createEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName string) {
+func createEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName string) error {
 	// 判断是否是目录，如果是目录需要添加监控
 	if fileInfo, err := os.Stat(event.Name); err != nil {
-		k3.K3LogError("WatchCreate Stat error: %s", err)
-		return
+		return err
 	} else {
 		if fileInfo.IsDir() && watcher != nil {
 			watcher.Add(event.Name)
 			k3.K3LogInfo("WatchCreate add watch path: %s", event.Name)
-			return
+			return nil
 		}
 	}
 
@@ -314,18 +315,19 @@ func createEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName stri
 	// 添加到fileStatesFd
 	if _, ok := GlobalFileStateFds[event.Name]; !ok {
 		if file, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
-			k3.K3LogError("WatchCreate OpenFile error: %s", err)
+			return err
 		} else {
 			FileStateLock.Lock()
 			GlobalFileStateFds[event.Name] = file
 			FileStateLock.Unlock()
 		}
 	}
-	SyncGlobalFileStates2Disk()
+
+	return SyncGlobalFileStates2Disk()
 }
 
 // removeAndRenameEvent 删除或改名事件
-func removeAndRenameEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
+func removeAndRenameEvent(watcher *fsnotify.Watcher, event fsnotify.Event) error {
 
 	// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
 	if err := watcher.Remove(event.Name); err != nil {
@@ -344,10 +346,10 @@ func removeAndRenameEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
 	}
 
 	// 更新状态文件
-	SyncGlobalFileStates2Disk()
+	return SyncGlobalFileStates2Disk()
 }
 
-func ReadFileByOffset(fd *os.File, fileState *FileState) {
+func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 	var (
 		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
 		currentReadCount int
@@ -367,8 +369,7 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) {
 		currentReadCount++
 
 		if _, err := fd.Seek(currentOffset, 0); err != nil {
-			k3.K3LogError("ReadFileByOffset Seek error: %s", err.Error())
-			return
+			return err
 		}
 
 		read = bufio.NewReader(fd)
@@ -390,8 +391,7 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) {
 
 	if len(content) > 0 {
 		if err := SendData2Consumer(content, fileState); err != nil {
-			k3.K3LogError("SendData2Consumer error: %s", err.Error())
-			return
+			return err
 		}
 
 		currentOffset += int64(len(content))
@@ -399,9 +399,10 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) {
 
 	// 将最新的数据，同步给内存和文件
 	if err := SyncFileState(fileState.Path, currentOffset); err != nil {
-		k3.K3LogError("SyncFileState: %s\n", err)
-		return
+		return err
 	}
+
+	return nil
 }
 
 func Close() {
@@ -414,9 +415,30 @@ func Close() {
 	GlobalDataAnalytics.Close()
 }
 
-// TODO SyncGlobalFileStates2Disk 同步GlobalFileStates数据到file state文件, 直接同步无需考虑其他问题，记得加锁即可
-func SyncGlobalFileStates2Disk() {
+// SyncGlobalFileStates2Disk 同步GlobalFileStates数据到file state文件, 直接同步无需考虑其他问题，记得加锁即可
+func SyncGlobalFileStates2Disk() error {
+	// config.GlobalConfig.Watch.StateFilePath
+	var (
+		fd      *os.File
+		err     error
+		encoder *json.Encoder
+	)
+	FileStateLock.Lock()
+	defer FileStateLock.Unlock()
 
+	if fd, err = os.OpenFile(config.GlobalConfig.Watch.StateFilePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666); err != nil {
+		return err
+	}
+
+	defer fd.Close()
+
+	encoder = json.NewEncoder(fd)
+
+	if err = encoder.Encode(GlobalFileStates); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func InitFileStateFds() error {
