@@ -80,6 +80,7 @@ func InitConsumerBatchLog() error {
 		return err
 	}
 	GlobalDataAnalytics = k3.NewDataAnalytics(consumer)
+
 	return nil
 }
 
@@ -128,6 +129,7 @@ func Run() error {
 				k3.K3LogError("FetchWatchPath error: %s", err.Error())
 				return err
 			}
+			// 将所有的indexName对应的子目录全部遍历出来，封装到diskPaths中
 			diskPaths[indexName] = subPaths
 
 			filePaths, err := FetchWatchPathFile(path)
@@ -135,6 +137,7 @@ func Run() error {
 				k3.K3LogError("FetchWatchPathFile error: %s", err.Error())
 				return err
 			}
+			// 将所有的indexName对应的文件全部遍历出来，封装到diskFilePaths中
 			diskFilePaths[indexName] = filePaths
 		}
 	}
@@ -175,6 +178,7 @@ func Run() error {
 	return nil
 }
 
+// InitWatcher 初始化监控的协程, 每个indexName开一个协程来处理监控目录问题, 每个indexName 都对应了一批目录（是主目录遍历出来的所有子目录的集合）
 func InitWatcher(diskPaths map[string][]string) {
 
 	// 循环开协程，每个index name 一个协程
