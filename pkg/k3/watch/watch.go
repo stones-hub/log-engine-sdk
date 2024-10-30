@@ -48,14 +48,15 @@ var (
 	DefaultObsoleteDate         = 1    // 单位填， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
 	DefaultObsoleteMaxReadCount = 5000 // 对于长时间没有读写的文件， 一次最大读取次数
 
-	GlobalFileStateFds       = make(map[string]*os.File)   // 对应所有要监控的文件fd
-	GlobalFileStates         = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
-	GlobalWatchContextCancel context.CancelFunc
-	GlobalWatchContext       context.Context // 控制协程主动退出
-	GlobalWatchWG            *sync.WaitGroup
-	GlobalWatchMutex         sync.Mutex // 控制全局变量的并发
-	FileStateLock            sync.Mutex
-	GlobalDataAnalytics      k3.DataAnalytics
+	GlobalFileStateFds = make(map[string]*os.File)   // 对应所有要监控的文件fd
+	GlobalFileStates   = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
+
+	GlobalWatchContextCancel context.CancelFunc // 每个indexName都对应一批目录，被一个单独的watch监控。用于取消watch的协程
+	GlobalWatchContext       context.Context    // 控制watch协程主动退出
+	GlobalWatchWG            *sync.WaitGroup    // 控制watch级别协程的等待退出
+	GlobalWatchMutex         sync.Mutex         // 控制watch级别的并发操作的锁
+	FileStateLock            sync.Mutex         // 控制GlobalFileStates的锁
+	GlobalDataAnalytics      k3.DataAnalytics   // 日志接收器
 )
 
 func InitConsumerBatchLog() error {
