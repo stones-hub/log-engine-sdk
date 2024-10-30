@@ -173,7 +173,7 @@ func Run() error {
 	GlobalWatchWG = &sync.WaitGroup{}
 	InitWatcher(diskPaths)
 
-	// TODO 检查这2个定时器
+	// TODO 检查这2个定时器, 同时思考当InitWather初始化完以后，后续出现了异常，返回错误，协程结束，程序会如何
 	ClockSyncFileState()
 	ClockCheckFileStateAndReadFile()
 
