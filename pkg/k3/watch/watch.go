@@ -183,14 +183,14 @@ func Run() error {
 func InitWatcher(diskPaths map[string][]string) {
 
 	// 循环开协程，每个index name 一个协程
-	for index, paths := range diskPaths {
+	for indexName, paths := range diskPaths {
 		GlobalWatchWG.Add(1)
-		go doWatch(index, paths)
+		go goroutineDoWatch(indexName, paths)
 	}
 
 }
 
-func doWatch(index string, paths []string) {
+func goroutineDoWatch(indexName string, paths []string) {
 	var (
 		childWG = &sync.WaitGroup{}
 		err     error
@@ -205,7 +205,7 @@ func doWatch(index string, paths []string) {
 		GlobalWatchMutex.Lock()
 		GlobalWatchContextCancel()
 		GlobalWatchMutex.Unlock()
-		k3.K3LogError("Failed to create watcher for %s: %v\n", index, err)
+		k3.K3LogError("Failed to create watcher for %s: %v\n", indexName, err)
 		return
 	}
 	defer watcher.Close()
@@ -216,7 +216,7 @@ func doWatch(index string, paths []string) {
 			GlobalWatchMutex.Lock()
 			GlobalWatchContextCancel()
 			GlobalWatchMutex.Unlock()
-			k3.K3LogError("Failed to add %s to watcher for %s: %v\n", path, index, err)
+			k3.K3LogError("Failed to add %s to watcher for %s: %v\n", path, indexName, err)
 			return
 		}
 	}
