@@ -200,10 +200,10 @@ func goroutineDoWatch(indexName string, paths []string) {
 	// 协程退出
 	defer GlobalWatchWG.Done()
 
-	// 初始化协程watcher
+	// 初始化协程watcher, 如果协程中的watcher初始化失败，需要关闭整个程序
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
 		GlobalWatchMutex.Lock()
-		GlobalWatchContextCancel()
+		GlobalWatchContextCancel() // 避免多个协程同时发送cancel信号
 		GlobalWatchMutex.Unlock()
 		k3.K3LogError("Failed to create watcher for %s: %v\n", indexName, err)
 		return
@@ -212,7 +212,7 @@ func goroutineDoWatch(indexName string, paths []string) {
 
 	// 开始监听目录, 如果错误就退出
 	for _, path := range paths {
-		if err = watcher.Add(path); err != nil {
+		if err = watcher.Add(path); err != nil { // 添加监听目录，如果一个协程的监听出现问题，就关闭整个程序
 			GlobalWatchMutex.Lock()
 			GlobalWatchContextCancel()
 			GlobalWatchMutex.Unlock()
@@ -221,7 +221,7 @@ func goroutineDoWatch(indexName string, paths []string) {
 		}
 	}
 
-	childWG.Add(1)
+	childWG.Add(1) // 子协程， 父协程用于创建watch，子协程用于收集监听的目录的事件和处理，注意这里是循环的，证明协程是不会退出的, 除非异常或者主动cancel
 	go func() {
 		defer childWG.Done()
 		defer func() {
@@ -237,21 +237,19 @@ func goroutineDoWatch(indexName string, paths []string) {
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok { // 退出子协程
+					k3.K3LogError("Child Goroutine Event channel closed %s \n", indexName)
 					return
 				}
-
-				// TODO  检查是不是每个watcher是对应index_name创建的，如何解决每个watcher监控后文件的处理
-				// TODO 检查在创建watcher之前，filestates中是不是其实已经分好了index_name对应的文件，并检查下是什么时候初始化的
-				handlerEvent(watcher, event)
+				childGoroutineHandlerEvent(watcher, event)
 
 			case err, ok := <-watcher.Errors:
 				if !ok { // 退出子协程
+					k3.K3LogError("Child Goroutine Error reading %s: %v\n", indexName, err)
 					return
 				}
-				k3.K3LogError("Child Goroutine Error reading %s: %v\n", index, err)
 
 			case <-GlobalWatchContext.Done(): // 退出子协程
-				k3.K3LogInfo("Received exit signal, child goroutine stopping....\n")
+				k3.K3LogInfo("Child Goroutine Received exit signal %s\n", indexName)
 				return
 			}
 		}
@@ -260,8 +258,8 @@ func goroutineDoWatch(indexName string, paths []string) {
 	childWG.Wait()
 }
 
-// handlerEvent 处理监控到文件的变化
-func handlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
+// childGoroutineHandlerEvent 处理监控到文件的变化
+func childGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
 	if event.Op&fsnotify.Write == fsnotify.Write { // 文件写入
 
 		// 判断map中是否存在，不存在就返回
@@ -335,6 +333,7 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) {
 	if len(content) > 0 {
 		if err := SendData2Consumer(content, fileState); err != nil {
 			k3.K3LogError("SendData2Consumer error: %s", err.Error())
+			return
 		}
 
 		currentOffset += int64(len(content))
