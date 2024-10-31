@@ -14,12 +14,23 @@ import (
 	"time"
 )
 
+var (
+	ConfigPath string
+	Tag        string
+	Version    string
+	BuildTime  string
+)
+
 func main() {
 	var (
-		dir     string
-		err     error
-		configs []string
+		dir       string
+		err       error
+		configs   []string
+		configDir string
 	)
+
+	k3.K3LogInfo("Start with arguments Version: %s, BuildTime: %s, Tag: %s, ConfigPath: %s\n", Version, BuildTime, Tag, ConfigPath)
+
 	// 初始化配置文件, 必须通过make运行
 	if dir, err = os.Getwd(); err != nil {
 		k3.K3LogError("get current dir error: %s", err)
@@ -36,8 +47,18 @@ func main() {
 	})
 	defer config.GlobalConsumer.Close()
 
+	if len(ConfigPath) != 0 {
+		configDir = ConfigPath
+	} else {
+		configDir = dir + "/configs"
+	}
+
+	fmt.Println("----------------------------------")
+	fmt.Printf("configDir : %s\n", configDir)
+	fmt.Println("----------------------------------")
+
 	// 获取configs文件目录所有文件
-	if configs, err = k3.FetchDirectory(dir+"/configs", -1); err != nil {
+	if configs, err = k3.FetchDirectory(configDir, -1); err != nil {
 		k3.K3LogError("fetch directory error: %s", err)
 	}
 	config.MustLoad(configs...)

@@ -21,10 +21,12 @@ GIT_HASH    = $(shell git rev-parse --short HEAD)
 # 拼接成可发版版本的命名tag
 RELEASE_TAG = $(RELEASE_VERSION).$(GIT_COUNT).$(GIT_HASH)
 
-# ldflags 参数 , -X 命令可以用于往main包传入参数这里传入了 version, tag, build 3个参数值
-GO_LDFLAGS = -X main.Version=$(RELEASE_VERSION)  -X main.Tag=$(RELEASE_TAG) -X main.BuildTime=$(NOW)
+CONFIG_PATH = "/Users/yelei/data/code/go-projects/log-engine-sdk/configs"
 
-DIRS = log scripts
+# ldflags 参数 , -X 命令可以用于往main包传入参数这里传入了 version, tag, build 3个参数值
+GO_LDFLAGS = -X main.Version=$(RELEASE_VERSION) -X main.Tag=$(RELEASE_TAG) -X main.BuildTime=$(NOW) -X main.ConfigPath=$(CONFIG_PATH)
+
+DIRS = log scripts state
 
 # 命令名称
 all: pack
@@ -53,7 +55,7 @@ run:
 	@go run -ldflags "-w -s $(GO_LDFLAGS)" ./cmd/main.go
 
 start:
-	./${APP} > log/$(APP).log 2>&1 &
+	./${APP} >> log/$(APP).log 2>&1 &
 
 stop:
 	./scripts/stop.sh $(APP)

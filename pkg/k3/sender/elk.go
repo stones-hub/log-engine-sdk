@@ -187,7 +187,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				}
 			}
 			res.Body.Close()
-			k3.K3LogDebug("Send data (document_id: %v) to Elasticsearch successfully.", data.UUID)
+			k3.K3LogDebug("Send data (%v) to Elasticsearch successfully.", data)
 		}
 	}
 }

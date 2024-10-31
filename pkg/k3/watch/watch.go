@@ -93,24 +93,6 @@ func Run() error {
 		err           error
 	)
 
-	// 用于测试用
-	config.GlobalConfig.Watch = config.Watch{
-		ReadPath: map[string][]string{
-			"index_nginx": []string{
-				"/Users/yelei/data/code/go-projects/logs/nginx",
-			},
-			"index_admin": []string{
-				"/Users/yelei/data/code/go-projects/logs/admin",
-			},
-			"index_api": []string{
-				"/Users/yelei/data/code/go-projects/logs/api",
-			},
-		},
-		StateFilePath:    "state/core.json",
-		MaxReadCount:     1000,
-		ObsoleteInterval: 1,
-	}
-
 	if err = InitConsumerBatchLog(); err != nil {
 		k3.K3LogError("WatchRun InitConsumerBatchLog error: %s", err.Error)
 		return err
@@ -197,6 +179,8 @@ func goroutineDoWatch(indexName string, paths []string) {
 		watcher *fsnotify.Watcher
 	)
 
+	k3.K3LogDebug("Start goroutine watch %s", indexName)
+
 	// 协程退出
 	defer GlobalWatchWG.Done()
 
@@ -223,6 +207,7 @@ func goroutineDoWatch(indexName string, paths []string) {
 
 	childWG.Add(1) // 子协程， 父协程用于创建watch，子协程用于收集监听的目录的事件和处理，注意这里是循环的，证明协程是不会退出的, 除非异常或者主动cancel
 	go func() {
+		k3.K3LogDebug("Start goroutine child watch %s", indexName)
 		defer childWG.Done()
 		defer func() {
 			if r := recover(); r != nil {
@@ -259,6 +244,9 @@ func goroutineDoWatch(indexName string, paths []string) {
 	}()
 	// 等待子协程退出
 	childWG.Wait()
+	k3.K3LogDebug("Stop goroutine child watch %s", indexName)
+
+	k3.K3LogDebug("Stop goroutine watch %s", indexName)
 }
 
 // childGoroutineHandlerEvent 处理监控到文件的变化
@@ -364,12 +352,12 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 	currentReadCount = 0
 	currentOffset = fileState.Offset
 
+	if _, err := fd.Seek(currentOffset, io.SeekStart); err != nil {
+		return err
+	}
+
 	for currentReadCount < maxReadCount {
 		currentReadCount++
-
-		if _, err := fd.Seek(currentOffset, 0); err != nil {
-			return err
-		}
 
 		read = bufio.NewReader(fd)
 		line, err := read.ReadString('\n')
@@ -406,7 +394,8 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 
 func Close() {
 	// 关闭所有打开的文件
-	for _, fd := range GlobalFileStateFds {
+	for fileName, fd := range GlobalFileStateFds {
+		k3.K3LogDebug("Close file: %s", fileName)
 		fd.Close()
 	}
 	GlobalWatchContextCancel()

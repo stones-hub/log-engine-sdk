@@ -1,6 +1,9 @@
 package protocol
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Data 需要提交给日志存储服务器的数据接口
 type Data struct {
@@ -11,6 +14,10 @@ type Data struct {
 	Timestamp  time.Time              `json:"Timestamp"`            // 日志时间
 	EventName  string                 `json:"event_name,omitempty"` // 所读文件路径string
 	Properties map[string]interface{} `json:"properties"`           // 日志具体内容
+}
+
+func (d *Data) String() string {
+	return fmt.Sprintf("UUID:%s, AccountId:%s, AppId:%s, Ip:%s, Timestamp:%v, EventName:%s, Properties:%v", d.UUID, d.AccountId, d.AppId, d.Ip, d.Timestamp, d.EventName, d.Properties)
 }
 
 type K3Consumer interface {
