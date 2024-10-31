@@ -173,7 +173,6 @@ func Run() error {
 	GlobalWatchWG = &sync.WaitGroup{}
 	InitWatcher(diskPaths)
 
-	// TODO 检查这2个定时器, 同时思考当InitWather初始化完以后，后续出现了异常，返回错误，协程结束，程序会如何
 	ClockSyncFileState()
 	ClockCheckFileStateAndReadFile()
 
@@ -323,7 +322,7 @@ func createEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName stri
 		}
 	}
 
-	return SyncGlobalFileStates2Disk()
+	return ForceSyncFileState()
 }
 
 // removeAndRenameEvent 删除或改名事件
@@ -346,7 +345,7 @@ func removeAndRenameEvent(watcher *fsnotify.Watcher, event fsnotify.Event) error
 	}
 
 	// 更新状态文件
-	return SyncGlobalFileStates2Disk()
+	return ForceSyncFileState()
 }
 
 func ReadFileByOffset(fd *os.File, fileState *FileState) error {
@@ -413,32 +412,6 @@ func Close() {
 	GlobalWatchContextCancel()
 	GlobalWatchWG.Wait()
 	GlobalDataAnalytics.Close()
-}
-
-// SyncGlobalFileStates2Disk 同步GlobalFileStates数据到file state文件, 直接同步无需考虑其他问题，记得加锁即可
-func SyncGlobalFileStates2Disk() error {
-	// config.GlobalConfig.Watch.StateFilePath
-	var (
-		fd      *os.File
-		err     error
-		encoder *json.Encoder
-	)
-	FileStateLock.Lock()
-	defer FileStateLock.Unlock()
-
-	if fd, err = os.OpenFile(config.GlobalConfig.Watch.StateFilePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666); err != nil {
-		return err
-	}
-
-	defer fd.Close()
-
-	encoder = json.NewEncoder(fd)
-
-	if err = encoder.Encode(GlobalFileStates); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func InitFileStateFds() error {
@@ -689,6 +662,7 @@ func HandleReadFileAndSendData() {
 		obsoleteDate = DefaultObsoleteDate
 	}
 
+	// 遍历所有的文件, 每个文件开一个协程
 	for fileName, fileState := range GlobalFileStates {
 		now := time.Now()
 		lastReadTime := time.Unix(fileState.LastReadTime, 0)
@@ -704,7 +678,7 @@ func HandleReadFileAndSendData() {
 					if fstat.Size() != fileState.Offset {
 						// 开协程，一次性读取所有内容, 但最好有个阀值， 避免内存过多
 						wg.Add(1)
-						go ReadFileAndSyncFileState(fd, fileState, wg)
+						go goRoutineReadFileAndSyncFileState(fd, fileState, wg)
 					}
 				}
 			}
@@ -714,7 +688,7 @@ func HandleReadFileAndSendData() {
 	wg.Wait()
 }
 
-func ReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sync.WaitGroup) {
+func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sync.WaitGroup) {
 	var (
 		obsoleteMaxReadCount = config.GlobalConfig.Watch.ObsoleteMaxReadCount
 		reader               *bufio.Reader
