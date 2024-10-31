@@ -127,7 +127,7 @@ func graceExit(stateFile string, cleanFuncs ...func()) {
 	watch.Close()
 
 	// 退出前全量更新一次state file文件内容
-	if err = watch.SyncGlobalFileStates2Disk(); err != nil {
+	if err = watch.ForceSyncFileState(); err != nil {
 		k3.K3LogError("Closed watcher run save stateFile error: %s", err)
 	}
 

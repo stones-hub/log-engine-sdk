@@ -662,26 +662,40 @@ func HandleReadFileAndSendData() {
 		obsoleteDate = DefaultObsoleteDate
 	}
 
-	// 遍历所有的文件, 每个文件开一个协程
+	// 遍历所有的文件, 每个文件开一个协程来处理每个文件，都做一次判断，如果超过N天文件未读写，就一次性读取
 	for fileName, fileState := range GlobalFileStates {
-		now := time.Now()
-		lastReadTime := time.Unix(fileState.LastReadTime, 0)
-		// 判断当前时间点是否超过N天未读写
-		if now.Sub(lastReadTime) > 24*time.Hour*time.Duration(obsoleteDate) {
 
-			// 判断文件是否读取完，如果没有，就一次性全部读取, 但要控制内存, 放内存数据太大
-			if fd, ok := GlobalFileStateFds[fileName]; ok && fd != nil {
-				if fstat, err := fd.Stat(); err != nil {
-					k3.K3LogError("stat file error: %s", err)
-					continue
-				} else {
-					if fstat.Size() != fileState.Offset {
-						// 开协程，一次性读取所有内容, 但最好有个阀值， 避免内存过多
-						wg.Add(1)
-						go goRoutineReadFileAndSyncFileState(fd, fileState, wg)
-					}
-				}
+		var (
+			fd    *os.File
+			ok    bool
+			fstat os.FileInfo
+			err   error
+		)
+
+		// 如果文件不存在就跳过
+		if fd, ok = GlobalFileStateFds[fileName]; !ok || fd == nil {
+			k3.K3LogError("file not exist: %s", fileName)
+			continue
+		}
+
+		// 获取文件最后的修改时间
+		if fstat, err = fd.Stat(); err != nil {
+			k3.K3LogError("stat file error: %s", err)
+			continue
+		} else {
+			// 判断文件是否已经读完了, 如果读完了就下一个
+			if fstat.Size() == fileState.Offset {
+				continue
 			}
+
+			// 判断当前时间点是否超过N小时未读写，如果N小时没有读写就一次性读完
+			lastModTime := fstat.ModTime()
+			now := time.Now()
+			if now.Sub(lastModTime) < time.Hour*time.Duration(obsoleteDate) {
+				continue
+			}
+			wg.Add(1)
+			go goRoutineReadFileAndSyncFileState(fd, fileState, wg)
 		}
 	}
 
