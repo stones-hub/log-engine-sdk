@@ -31,15 +31,6 @@ func (f *FileState) String() string {
 		f.Path, f.Offset, f.StartReadTime, f.LastReadTime, f.IndexName)
 }
 
-/*
-  max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数, 默认100次
-  sync_interval : 60 # 单位秒，默认60, 程序运行过程中，要定时落盘
-  state_file_path : "/state/core.json" # 记录监控文件的offset
-  obsolete_interval : 1 # 单位小时, 默认1 表示定时多久时间检查文件是否已经读完了
-  obsolete_date : 1 # 单位填， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
-  obsolete_max_read_count : 1000 # 对于长时间没有读写的文件， 一次最大读取次数
-*/
-
 var (
 	DefaultMaxReadCount = 200
 	DefaultSyncInterval = 60 // 单位秒, 用于解决运行时，不断落盘
@@ -125,18 +116,6 @@ func Run() error {
 		}
 	}
 
-	/*
-		watch.yaml 配置文件信息
-			  read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
-			    index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
-			    index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
-			    index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
-			  max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数, 默认100次
-			  sync_interval : 60 # 单位秒，默认60, 程序运行过程中，要定时落盘
-			  state_file_path : "/state/core.json" # 记录监控文件的offset
-			  obsolete_interval : 1 # 单位小时, 默认1 表示定时多久时间检查文件是否已经读完了
-			  obsolete_date : 1 # 单位填， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
-	*/
 	if err = SyncFileStates2Disk(diskFilePaths, config.GlobalConfig.Watch.StateFilePath); err != nil {
 		return err
 	}
@@ -777,7 +756,7 @@ func SendData2Consumer(content string, fileState *FileState) error {
 
 		if err = GlobalDataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, fileState.IndexName,
 			map[string]interface{}{
-				"_data": data,
+				"log": data,
 			}); err != nil {
 			k3.K3LogError("Track: %s\n", err.Error())
 		}
