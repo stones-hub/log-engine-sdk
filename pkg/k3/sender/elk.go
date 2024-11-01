@@ -119,7 +119,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 		)
 
 		select {
-		// 获取consumer 提交过来的日志， 存储格式: protocol.Data
+		// 获取consumer 提交过来的日志， 存储格式: protocol.Data 其中 data.eventName是索引名称， data.properties['_data'].eventName 是日志唯一名称
 		case data, ok := <-client.dataChan:
 			if !ok {
 				k3.K3LogError("WriteDataToElasticSearch Data channel closed !")
