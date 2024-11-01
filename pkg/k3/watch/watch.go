@@ -756,7 +756,7 @@ func SendData2Consumer(content string, fileState *FileState) error {
 
 		if err = GlobalDataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, fileState.IndexName,
 			map[string]interface{}{
-				"submitLog": data,
+				"SubmitLog": data,
 			}); err != nil {
 			k3.K3LogError("Track: %s\n", err.Error())
 		}

@@ -3,7 +3,6 @@ package protocol
 import "time"
 
 type ElasticSearchData struct {
-	Flag       bool       `json:"flag"`        // 兼容老版本
 	UUID       string     `json:"uuid"`        // 日志唯一ID， elk document id  √
 	LogLevel   string     `json:"log_level"`   // 日志级别 warn, error, debug, info
 	HostName   string     `json:"host_name"`   // 日志落盘主机名 √

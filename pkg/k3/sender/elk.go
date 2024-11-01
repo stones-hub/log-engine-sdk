@@ -105,68 +105,39 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 		if r := recover(); r != nil {
 			k3.K3LogError("Recovered WriteDataToElasticSearch from panic: %v", r)
 		}
+		// TODO 考虑watch中是否也需要在协程中处理类似的协程退出工作
 		client.sg.Done()
 	}()
 
 	for {
 		var (
-			b                 []byte
-			err               error
-			req               esapi.IndexRequest
-			res               *esapi.Response
-			e                 map[string]interface{}
 			elasticSearchData protocol.ElasticSearchData
-			_index            = config.GlobalConfig.ELK.DefaultIndexName
+			err               error
+			b                 []byte
+
+			req esapi.IndexRequest     // 提交给elk的请求体
+			res *esapi.Response        // elk返回的结果体
+			e   map[string]interface{} // elk返回的结果，被转换成map
 		)
 
 		select {
+		// 获取consumer 提交过来的日志， 存储格式: protocol.Data
 		case data, ok := <-client.dataChan:
 			if !ok {
 				k3.K3LogError("WriteDataToElasticSearch Data channel closed !")
 				return
 			}
 
-		outerLoop:
-			// 获取索引名称
-			for index, filepaths := range config.GlobalConfig.Watch.ReadPath {
-				for _, filepath := range filepaths {
-					if strings.HasPrefix(data.EventName, filepath) {
-						_index = index
-						break outerLoop
-					}
-				}
-			}
-
-			if config.GlobalConfig.ELK.IsUseSuffixDate {
-				_index = _index + "_" + data.Timestamp.Format("20060102")
-			}
-
-			// 如果解析失败，则直接赋值给text字段
-			if err = json.Unmarshal([]byte(data.Properties["_data"].(string)), &elasticSearchData); err != nil || elasticSearchData.Flag == false {
-				elasticSearchData.ExtendData.Content = make(map[string]interface{})
-				elasticSearchData.ExtendData.Content["text"] = data.Properties["_data"]
-			}
-
-			if elasticSearchData.UUID == "" {
-				elasticSearchData.UUID = data.UUID
-			}
-			if elasticSearchData.HostName == "" {
-				elasticSearchData.HostName, _ = os.Hostname()
-			}
-			if elasticSearchData.HostIp == "" {
-				elasticSearchData.HostIp = data.Ip
-			}
-			elasticSearchData.Timestamp = data.Timestamp
+			// 将consumerData的数据结构转换成Elk的数据结构
+			elasticSearchData = consumerDataToElkData(data)
 
 			if b, err = json.Marshal(elasticSearchData); err != nil {
 				k3.K3LogError("WriteDataToElasticSearch Failed to marshal data: %v", err)
 				continue
 			}
 
-			// fmt.Printf("document_id(%s), _index(%s), body(%s)\n", elasticSearchData.UUID, _index, string(b))
-
 			req = esapi.IndexRequest{
-				Index:      _index,
+				Index:      data.EventName,
 				DocumentID: fmt.Sprintf("%s", elasticSearchData.UUID),
 				Body:       strings.NewReader(string(b)),
 				Pretty:     true,
@@ -244,4 +215,53 @@ func (e *ElasticSearchClient) prepareBulkData(data []protocol.Data) ([]byte, err
 		bulkData.WriteString("\n")
 	}
 	return bulkData.Bytes(), nil
+}
+
+// consumerDataToElkData 将consumer的数据转换为elk的数据
+func consumerDataToElkData(data *protocol.Data) protocol.ElasticSearchData {
+
+	var (
+		elkData  protocol.ElasticSearchData
+		hostName string
+		err      error
+	)
+
+	// host_ip 和 host_name 、uuid 需要生成，SubmitLog 中并没有这些数据
+	if hostName, err = os.Hostname(); err != nil {
+		k3.K3LogError("Failed to get hostname: %v", err)
+		hostName = "unknown"
+	}
+
+	// TODO 判断consumer提交的数据是不是Json 如果不是json , 就当成一个text处理，如果是json就将数据映射到elkData中
+
+	elkData = protocol.ElasticSearchData{
+		UUID:      data.UUID,
+		HostName:  hostName,
+		HostIp:    data.Ip,
+		LogLevel:  "",
+		TraceId:   "",
+		Domain:    "",
+		Protocol:  "",
+		HttpCode:  0,
+		ClientIp:  "",
+		Org:       "",
+		Project:   "",
+		CodeName:  "",
+		LogSrc:    "",
+		EventId:   0,
+		EventName: data.EventName,
+		Timestamp: data.Timestamp,
+		ExtendData: protocol.ExtendData{
+			Uid:      "",
+			GameName: "",
+			Amount:   0,
+			Currency: "",
+			Language: "",
+			Version:  "",
+			Code:     0,
+			Content:  nil,
+		},
+	}
+
+	return elkData
 }
