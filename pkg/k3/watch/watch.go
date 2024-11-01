@@ -168,7 +168,7 @@ func goroutineDoWatch(indexName string, paths []string) {
 		GlobalWatchMutex.Lock()
 		GlobalWatchContextCancel() // 避免多个协程同时发送cancel信号
 		GlobalWatchMutex.Unlock()
-		k3.K3LogError("Failed to create watcher for %s: %v\n", indexName, err)
+		k3.K3LogError("Failed to create watcher for %s: %v", indexName, err)
 		return
 	}
 	defer watcher.Close()
@@ -179,7 +179,7 @@ func goroutineDoWatch(indexName string, paths []string) {
 			GlobalWatchMutex.Lock()
 			GlobalWatchContextCancel()
 			GlobalWatchMutex.Unlock()
-			k3.K3LogError("Failed to add %s to watcher for %s: %v\n", path, indexName, err)
+			k3.K3LogError("Failed to add %s to watcher for %s: %v", path, indexName, err)
 			return
 		}
 	}
@@ -193,7 +193,7 @@ func goroutineDoWatch(indexName string, paths []string) {
 				GlobalWatchMutex.Lock()
 				GlobalWatchContextCancel()
 				GlobalWatchMutex.Unlock()
-				k3.K3LogError("doWatch child goroutine panic: %s\n", r)
+				k3.K3LogError("doWatch child goroutine panic: %s", r)
 			}
 		}()
 
@@ -201,22 +201,22 @@ func goroutineDoWatch(indexName string, paths []string) {
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok { // 退出子协程
-					k3.K3LogError("Child Goroutine Event channel closed %s \n", indexName)
+					k3.K3LogError("Child Goroutine Event channel closed %s ", indexName)
 					return
 				}
 				if err := childGoroutineHandlerEvent(watcher, event, indexName); err != nil {
-					k3.K3LogError("Failed to handle event %s: %v\n", event, err)
+					k3.K3LogError("Failed to handle event %s: %v", event, err)
 					return
 				}
 
 			case err, ok := <-watcher.Errors:
 				if !ok { // 退出子协程
-					k3.K3LogError("Child Goroutine Error reading %s: %v\n", indexName, err)
+					k3.K3LogError("Child Goroutine Error reading %s: %v", indexName, err)
 					return
 				}
 
 			case <-GlobalWatchContext.Done(): // 退出子协程
-				k3.K3LogInfo("Child Goroutine Received exit signal %s\n", indexName)
+				k3.K3LogInfo("Child Goroutine Received exit signal %s", indexName)
 				return
 			}
 		}
@@ -343,7 +343,7 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 
 		if err != nil {
 			if err == io.EOF {
-				k3.K3LogInfo("ReadFileByOffset ReadString error: %s", err.Error())
+				k3.K3LogDebug("ReadFileByOffset ReadString %s", err.Error())
 			} else {
 				k3.K3LogError("ReadFileByOffset ReadString error: %s", err.Error())
 			}
@@ -702,9 +702,9 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 		// 读取文件错误, 有可能读完了
 		if err != nil {
 			if err == io.EOF {
-				k3.K3LogInfo("read file eof\n")
+				k3.K3LogInfo("read file eof")
 			} else {
-				k3.K3LogError("read file error: %s\n", err)
+				k3.K3LogError("read file error: %s", err)
 			}
 			break
 		}
@@ -716,7 +716,7 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 
 	if len(content) > 0 {
 		if err = SendData2Consumer(content, fileState); err != nil {
-			k3.K3LogError("SendData2Consumer: %s\n", err)
+			k3.K3LogError("SendData2Consumer: %s", err)
 			return
 		}
 
@@ -758,7 +758,7 @@ func SendData2Consumer(content string, fileState *FileState) error {
 			map[string]interface{}{
 				"_data": data,
 			}); err != nil {
-			k3.K3LogError("Track: %s\n", err.Error())
+			k3.K3LogError("Track: %s", err.Error())
 		}
 	}
 

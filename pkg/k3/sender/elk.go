@@ -125,16 +125,6 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				return
 			}
 
-			/*
-				UUID       string                 `json:"uuid,omitempty"`       // 日志唯一ID
-				AccountId  string                 `json:"account_id,omitempty"` // 账户ID
-				AppId      string                 `json:"app_id,omitempty"`     // APPID
-				Ip         string                 `json:"ip,omitempty"`         // 日志来源ID
-				Timestamp  time.Time              `json:"Timestamp"`            // 日志时间
-				EventName  string                 `json:"event_name,omitempty"` // 所读文件路径string
-				Properties map[string]interface{} `json:"properties"`           // 日志具体内容
-			*/
-
 			if requestBody = consumerDataToElkData(data); len(requestBody) == 0 {
 				continue
 			}
@@ -147,7 +137,6 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			}
 
 			k3.K3LogDebug("Send data to Elasticsearch: %s", requestBody)
-			continue
 
 			if res, err = req.Do(context.Background(), client.client); err != nil {
 				k3.K3LogError("Failed to send data to Elasticsearch: %v", err)
@@ -246,6 +235,9 @@ func consumerDataToElkData(data *protocol.Data) string {
 	// consumer的数据，无法转换为ElasticSearchData，证明有可能是text或者其他内容， 直接强转成string返回即可
 	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil {
 		k3.K3LogError("Failed to unmarshal _data field: %v", err)
+		return _data.(string)
+	} else if len(elkData.EventName) == 0 {
+		// 用eventName来判断日志是老版本还是新版本, 因为新版本的日志必须应该有eventName, 作为日志的唯一名称
 		return _data.(string)
 	}
 
