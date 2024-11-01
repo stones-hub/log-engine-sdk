@@ -111,9 +111,8 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 	for {
 		var (
 			err         error
-			req         esapi.IndexRequest     // 提交给elk的请求体
-			res         *esapi.Response        // elk返回的结果体
-			e           map[string]interface{} // elk返回的结果，被转换成map
+			req         esapi.IndexRequest // 提交给elk的请求体
+			res         *esapi.Response    // elk返回的结果体
 			requestBody string
 			index       string
 		)
@@ -155,14 +154,11 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			}
 
 			if res.IsError() {
-				if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
-					k3.K3LogError("Error parsing the response body: %s", err)
-					continue
-				} else {
-					k3.K3LogError("Error response: %s: %s\n", res.Status(), e["error"])
-					continue
-				}
+				k3.K3LogError("Unexpected error in Elasticsearch response: %s", res.String())
+				res.Body.Close()
+				continue
 			}
+
 			res.Body.Close()
 			k3.K3LogDebug("Send data (%v) to Elasticsearch successfully.", data)
 		}
