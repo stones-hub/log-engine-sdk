@@ -223,12 +223,10 @@ func (e *ElasticSearchClient) prepareBulkData(data []protocol.Data) ([]byte, err
 func consumerDataToElkData(data *protocol.Data) string {
 
 	var (
-		ok    bool
-		_data interface{}
-
-		err error
-		b   []byte
-
+		ok       bool
+		_data    interface{}
+		err      error
+		b        []byte
 		elkData  protocol.ElasticSearchData
 		hostName string
 	)
@@ -239,12 +237,18 @@ func consumerDataToElkData(data *protocol.Data) string {
 		return ""
 	}
 
-	// consumer的数据，无法转换为ElasticSearchData，证明有可能是text或者其他内容， 直接强转成string返回即可
 	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil {
-		k3.K3LogInfo("Failed to unmarshal _data field: %v", err)
-		return _data.(string)
+		// 非json强制转换成json发送
+		tMap := make(map[string]string)
+		tMap["text"] = _data.(string)
+		jsonText, err := json.Marshal(&tMap)
+		if err != nil {
+			k3.K3LogError("Failed to marshal data: %v", err)
+			return ""
+		}
+		return string(jsonText)
 	} else if len(elkData.EventName) == 0 {
-		// 用eventName来判断日志是老版本还是新版本, 因为新版本的日志必须应该有eventName, 作为日志的唯一名称
+		// 是json但是是旧日志，无需转换, 因为新日志必须有eventName
 		return _data.(string)
 	}
 
