@@ -3,6 +3,8 @@ package protocol
 import "time"
 
 type ElasticSearchData struct {
+	AppId      string     `json:"app_id"`
+	AccountId  string     `json:"account_id"`
 	UUID       string     `json:"uuid"`        // 日志唯一ID， elk document id  √
 	LogLevel   string     `json:"log_level"`   // 日志级别 warn, error, debug, info
 	HostName   string     `json:"host_name"`   // 日志落盘主机名 √

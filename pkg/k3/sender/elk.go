@@ -110,12 +110,11 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 
 	for {
 		var (
-			elasticSearchData protocol.ElasticSearchData
-			err               error
-			b                 []byte                 // 需要提交给elk的数据
-			req               esapi.IndexRequest     // 提交给elk的请求体
-			res               *esapi.Response        // elk返回的结果体
-			e                 map[string]interface{} // elk返回的结果，被转换成map
+			err         error
+			req         esapi.IndexRequest     // 提交给elk的请求体
+			res         *esapi.Response        // elk返回的结果体
+			e           map[string]interface{} // elk返回的结果，被转换成map
+			requestBody string
 		)
 
 		select {
@@ -126,20 +125,29 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				return
 			}
 
-			// 将consumerData的数据结构转换成Elk的数据结构
-			elasticSearchData = consumerDataToElkData(data)
+			/*
+				UUID       string                 `json:"uuid,omitempty"`       // 日志唯一ID
+				AccountId  string                 `json:"account_id,omitempty"` // 账户ID
+				AppId      string                 `json:"app_id,omitempty"`     // APPID
+				Ip         string                 `json:"ip,omitempty"`         // 日志来源ID
+				Timestamp  time.Time              `json:"Timestamp"`            // 日志时间
+				EventName  string                 `json:"event_name,omitempty"` // 所读文件路径string
+				Properties map[string]interface{} `json:"properties"`           // 日志具体内容
+			*/
 
-			if b, err = json.Marshal(elasticSearchData); err != nil {
-				k3.K3LogError("WriteDataToElasticSearch Failed to marshal data: %v", err)
+			if requestBody = consumerDataToElkData(data); len(requestBody) == 0 {
 				continue
 			}
 
 			req = esapi.IndexRequest{
 				Index:      data.EventName,
-				DocumentID: fmt.Sprintf("%s", elasticSearchData.UUID),
-				Body:       strings.NewReader(string(b)),
+				DocumentID: fmt.Sprintf("%s", data.UUID),
+				Body:       strings.NewReader(requestBody),
 				Pretty:     true,
 			}
+
+			k3.K3LogDebug("Send data to Elasticsearch: %s", requestBody)
+			continue
 
 			if res, err = req.Do(context.Background(), client.client); err != nil {
 				k3.K3LogError("Failed to send data to Elasticsearch: %v", err)
@@ -216,13 +224,30 @@ func (e *ElasticSearchClient) prepareBulkData(data []protocol.Data) ([]byte, err
 }
 
 // consumerDataToElkData 将consumer的数据转换为elk的数据
-func consumerDataToElkData(data *protocol.Data) protocol.ElasticSearchData {
+func consumerDataToElkData(data *protocol.Data) string {
 
 	var (
+		ok    bool
+		_data interface{}
+
+		err error
+		b   []byte
+
 		elkData  protocol.ElasticSearchData
 		hostName string
-		err      error
 	)
+
+	// consumer的数据没有_data, 证明无需处理当前日志
+	if _data, ok = data.Properties["_data"]; !ok {
+		k3.K3LogError("No _data field in data: %v", data)
+		return ""
+	}
+
+	// consumer的数据，无法转换为ElasticSearchData，证明有可能是text或者其他内容， 直接强转成string返回即可
+	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil {
+		k3.K3LogError("Failed to unmarshal _data field: %v", err)
+		return _data.(string)
+	}
 
 	// host_ip 和 host_name 、uuid 需要生成，SubmitLog 中并没有这些数据
 	if hostName, err = os.Hostname(); err != nil {
@@ -230,39 +255,35 @@ func consumerDataToElkData(data *protocol.Data) protocol.ElasticSearchData {
 		hostName = "unknown"
 	}
 
-	// TODO 判断consumer提交的数据是不是Json 如果不是json , 就当成一个text处理，如果是json就将数据映射到elkData中
-
-	// 获取真实的submit日志内容
-	data.Properties["SubmitLog"]
-
-	elkData = protocol.ElasticSearchData{
-		UUID:      data.UUID,
-		HostName:  hostName,
-		HostIp:    data.Ip,
-		LogLevel:  "",
-		TraceId:   "",
-		Domain:    "",
-		Protocol:  "",
-		HttpCode:  0,
-		ClientIp:  "",
-		Org:       "",
-		Project:   "",
-		CodeName:  "",
-		LogSrc:    "",
-		EventId:   0,
-		EventName: data.EventName,
-		Timestamp: data.Timestamp,
-		ExtendData: protocol.ExtendData{
-			Uid:      "",
-			GameName: "",
-			Amount:   0,
-			Currency: "",
-			Language: "",
-			Version:  "",
-			Code:     0,
-			Content:  nil,
-		},
+	// consumer的数据是可以转成elkData的, 需要对数据做补充
+	if elkData.HostName == "" {
+		elkData.HostName = hostName
 	}
 
-	return elkData
+	if elkData.HostIp == "" {
+		elkData.HostIp = data.Ip
+	}
+
+	if elkData.UUID == "" {
+		elkData.UUID = data.UUID
+	}
+
+	if elkData.AccountId == "" {
+		elkData.AccountId = data.AccountId
+	}
+
+	if elkData.AppId == "" {
+		elkData.AppId = data.AppId
+	}
+
+	if elkData.Timestamp.IsZero() {
+		elkData.Timestamp = data.Timestamp
+	}
+
+	if b, err = json.Marshal(elkData); err != nil {
+		k3.K3LogError("Failed to marshal elkData: %v", err)
+		return _data.(string)
+	}
+
+	return string(b)
 }
