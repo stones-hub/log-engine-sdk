@@ -320,7 +320,7 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
 		currentReadCount int
 		currentOffset    int64
-		read             *bufio.Reader
+		reader           *bufio.Reader
 		content          string
 	)
 
@@ -328,39 +328,38 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 		maxReadCount = DefaultMaxReadCount
 	}
 
+	reader = bufio.NewReader(fd)
 	currentReadCount = 0
 	currentOffset = fileState.Offset
-
-	if _, err := fd.Seek(currentOffset, io.SeekStart); err != nil {
-		return err
-	}
 
 	for currentReadCount < maxReadCount {
 		currentReadCount++
 
-		read = bufio.NewReader(fd)
-		line, err := read.ReadString('\n')
+		_, err := fd.Seek(currentOffset, 0)
+		if err != nil {
+			k3.K3LogError("ReadFileByOffset seek error: %s", err)
+			break
+		}
 
+		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				k3.K3LogDebug("ReadFileByOffset ReadString %s", err.Error())
+				k3.K3LogInfo("ReadFileByOffset read file end: %s", err)
 			} else {
-				k3.K3LogError("ReadFileByOffset ReadString error: %s", err.Error())
+				k3.K3LogError("ReadFileByOffset read file error: %s", err)
 			}
 			break
 		}
 
-		if len(line) > 0 {
-			content += line
-		}
+		k3.K3LogDebug("ReadFileByOffset ReadLine : %s", line)
+		currentOffset += int64(len(line))
+		content += line
 	}
 
 	if len(content) > 0 {
 		if err := SendData2Consumer(content, fileState); err != nil {
 			return err
 		}
-
-		currentOffset += int64(len(content))
 	}
 
 	// 将最新的数据，同步给内存和文件
@@ -676,7 +675,6 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 		reader               *bufio.Reader
 		lastOffset           int64
 		currentReadCount     int
-		err                  error
 		content              string
 	)
 
@@ -686,19 +684,20 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 
 	defer wg.Done()
 
-	if _, err = fd.Seek(fileState.Offset, io.SeekStart); err != nil {
-		k3.K3LogError("seek file error: %s", err)
-		return
-	}
-
 	lastOffset = fileState.Offset
 	currentReadCount = 0
 	reader = bufio.NewReader(fd)
 
 	for currentReadCount < obsoleteMaxReadCount {
 		currentReadCount++
-		line, err := reader.ReadString('\n')
 
+		_, err := fd.Seek(lastOffset, io.SeekStart)
+		if err != nil {
+			k3.K3LogError("clock seek file error: %s", err)
+			break
+		}
+
+		line, err := reader.ReadString('\n')
 		// 读取文件错误, 有可能读完了
 		if err != nil {
 			if err == io.EOF {
@@ -709,22 +708,19 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 			break
 		}
 
-		if len(line) > 0 {
-			content += line
-		}
+		k3.K3LogDebug("goRoutineReadFileAndSyncFileState ReadLine: %s", line)
+		lastOffset += int64(len(line))
+		content += line
 	}
 
 	if len(content) > 0 {
-		if err = SendData2Consumer(content, fileState); err != nil {
+		if err := SendData2Consumer(content, fileState); err != nil {
 			k3.K3LogError("SendData2Consumer: %s", err)
 			return
 		}
-
-		// 发送成功以后，才可以改变偏移量
-		lastOffset += int64(len(content))
 	}
 
-	if err = SyncFileState(fileState.Path, lastOffset); err != nil {
+	if err := SyncFileState(fileState.Path, lastOffset); err != nil {
 		k3.K3LogError("SyncFileState: %s\n", err)
 		return
 	}

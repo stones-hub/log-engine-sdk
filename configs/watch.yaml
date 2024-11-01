@@ -4,7 +4,7 @@ watch :
     index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
     index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
     index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
-  max_read_count : 100 # 监控到文件变化时，一次读取文件最大次数, 默认100次
+  max_read_count : 3 # 监控到文件变化时，一次读取文件最大次数, 默认100次
   sync_interval : 60 # 单位秒，默认60, 程序运行过程中，要定时落盘
   state_file_path : "state/core.json" # 记录监控文件的offset
   obsolete_interval : 1 # 单位小时, 默认1 表示定时多久时间检查文件是否已经读完了
