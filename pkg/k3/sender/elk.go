@@ -105,7 +105,6 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 		if r := recover(); r != nil {
 			k3.K3LogError("Recovered WriteDataToElasticSearch from panic: %v", r)
 		}
-		// TODO 考虑watch中是否也需要在协程中处理类似的协程退出工作
 		client.sg.Done()
 	}()
 
@@ -113,11 +112,10 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 		var (
 			elasticSearchData protocol.ElasticSearchData
 			err               error
-			b                 []byte
-
-			req esapi.IndexRequest     // 提交给elk的请求体
-			res *esapi.Response        // elk返回的结果体
-			e   map[string]interface{} // elk返回的结果，被转换成map
+			b                 []byte                 // 需要提交给elk的数据
+			req               esapi.IndexRequest     // 提交给elk的请求体
+			res               *esapi.Response        // elk返回的结果体
+			e                 map[string]interface{} // elk返回的结果，被转换成map
 		)
 
 		select {
@@ -233,6 +231,9 @@ func consumerDataToElkData(data *protocol.Data) protocol.ElasticSearchData {
 	}
 
 	// TODO 判断consumer提交的数据是不是Json 如果不是json , 就当成一个text处理，如果是json就将数据映射到elkData中
+
+	// 获取真实的submit日志内容
+	data.Properties["SubmitLog"]
 
 	elkData = protocol.ElasticSearchData{
 		UUID:      data.UUID,
