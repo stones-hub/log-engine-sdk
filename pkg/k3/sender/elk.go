@@ -115,6 +115,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 			res         *esapi.Response        // elk返回的结果体
 			e           map[string]interface{} // elk返回的结果，被转换成map
 			requestBody string
+			index       string
 		)
 
 		select {
@@ -129,8 +130,18 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				continue
 			}
 
+			if len(data.EventName) == 0 {
+				index = config.GlobalConfig.ELK.DefaultIndexName
+			} else {
+				index = data.EventName
+			}
+
+			if config.GlobalConfig.ELK.IsUseSuffixDate {
+				index = index + "_" + time.Now().Format("20060102")
+			}
+
 			req = esapi.IndexRequest{
-				Index:      data.EventName,
+				Index:      index,
 				DocumentID: fmt.Sprintf("%s", data.UUID),
 				Body:       strings.NewReader(requestBody),
 				Pretty:     true,
@@ -234,7 +245,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 
 	// consumer的数据，无法转换为ElasticSearchData，证明有可能是text或者其他内容， 直接强转成string返回即可
 	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil {
-		k3.K3LogError("Failed to unmarshal _data field: %v", err)
+		k3.K3LogInfo("Failed to unmarshal _data field: %v", err)
 		return _data.(string)
 	} else if len(elkData.EventName) == 0 {
 		// 用eventName来判断日志是老版本还是新版本, 因为新版本的日志必须应该有eventName, 作为日志的唯一名称
