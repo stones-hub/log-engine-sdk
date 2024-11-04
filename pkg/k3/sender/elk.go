@@ -261,8 +261,13 @@ func consumerDataToElkData(data *protocol.Data) string {
 		if elkData.EventName == "" { // 旧日志，但是是一个json文件
 			return _data.(string)
 		} else {
-
 			// 新日志
+			elkData.HostIp = data.Ip
+			elkData.HostName = hostName
+			elkData.UUID = data.UUID
+			elkData.AccountId = data.AccountId
+			elkData.AppId = data.AppId
+			elkData.Timestamp = data.Timestamp
 			if b, err = json.Marshal(elkData); err != nil {
 				k3.K3LogError("Failed to marshal elkData: %v", err)
 				return _data.(string)
