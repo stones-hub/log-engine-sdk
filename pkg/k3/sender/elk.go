@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"log"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
@@ -21,7 +22,7 @@ var (
 	DefaultMaxRetry       = 10    // 重试次数
 	DefaultTimeout        = 30    // 秒, 数据发送的超时时间
 	DefaultRetryInterval  = 3     // 秒， 默认队列满等待时间间隔
-	MaxBulkSize           = 100   // 提交给ElasticSearch的批量大小
+	MaxBulkSize           = 10    // 提交给ElasticSearch的批量大小
 	BulkData              []*Bulk
 )
 
@@ -110,17 +111,16 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 func WriteDataToElasticSearch(client *ElasticSearchClient) {
 	defer client.sg.Done()
 
+	BulkData = make([]*Bulk, 0)
+
 	for {
 		var (
-			err         error
-			req         esapi.IndexRequest // 提交给elk的请求体
-			res         *esapi.Response    // elk返回的结果体
 			requestBody string
 			index       string
 		)
 
 		select {
-		// 获取consumer 提交过来的日志， 存储格式: protocol.Data 其中 data.eventName是索引名称， data.properties['_data'].eventName 是日志唯一名称
+		// 获取consumer 提交过来的日志
 		case data, ok := <-client.dataChan:
 			if !ok {
 				k3.K3LogError("WriteDataToElasticSearch Data channel closed !")
@@ -141,28 +141,14 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				index = index + "_" + time.Now().Format("20060102")
 			}
 
-			req = esapi.IndexRequest{
+			// 将数据写入BulkData
+			BulkData = append(BulkData, &Bulk{
 				Index:      index,
-				DocumentID: fmt.Sprintf("%s", data.UUID),
-				Body:       strings.NewReader(requestBody),
-				Pretty:     true,
-			}
+				DocumentId: fmt.Sprintf("%s", data.UUID),
+				body:       requestBody,
+			})
 
-			k3.K3LogDebug("Send data to Elasticsearch: %s", requestBody)
-
-			if res, err = req.Do(context.Background(), client.client); err != nil {
-				k3.K3LogError("Failed to send data to Elasticsearch: %v", err)
-				continue
-			}
-
-			if res.IsError() {
-				k3.K3LogError("Unexpected error in Elasticsearch response: %s", res.String())
-				res.Body.Close()
-				continue
-			}
-
-			res.Body.Close()
-			k3.K3LogDebug("Send data (%v) to Elasticsearch successfully.", data)
+			sendBulkElasticSearch(client.client, false)
 		}
 	}
 }
@@ -170,10 +156,60 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 func (e *ElasticSearchClient) Close() error {
 	close(e.dataChan)
 	e.sg.Wait()
-
-	// TODO flush all
-
+	sendBulkElasticSearch(e.client, true)
 	return nil
+}
+
+func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
+
+	var buffer strings.Builder
+	currentBulkSize := len(BulkData)
+	if currentBulkSize == 0 {
+		return
+	}
+
+	// 检查是否满足批量提交的条件
+	if currentBulkSize >= MaxBulkSize || force == true {
+
+		for _, item := range BulkData {
+			action := map[string]interface{}{
+				"index": map[string]interface{}{
+					"_index": item.Index,
+					"_id":    item.DocumentId,
+				},
+			}
+			buffer.WriteString(mustMarshal(action))
+			buffer.WriteString("\n")
+			buffer.WriteString(item.body)
+			buffer.WriteString("\n")
+		}
+
+		BulkData = make([]*Bulk, 0)
+
+		// 创建批量请求
+		req := esapi.BulkRequest{
+			Body: strings.NewReader(buffer.String()),
+		}
+
+		// 批量提交
+		res, err := req.Do(context.Background(), client)
+
+		if err != nil {
+			k3.K3LogError("Failed to send data to Elasticsearch: %v", err)
+			return
+		}
+
+		if res.IsError() {
+			k3.K3LogError("Unexpected error in Elasticsearch response: %s", res.String())
+			res.Body.Close()
+			return
+		}
+
+		res.Body.Close()
+		k3.K3LogDebug("Send data(line:%v) to Elasticsearch successfully.", currentBulkSize)
+	} else {
+		k3.K3LogDebug("Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, MaxBulkSize)
+	}
 }
 
 func (e *ElasticSearchClient) Send(data []protocol.Data) error {
@@ -285,4 +321,13 @@ func consumerDataToElkData(data *protocol.Data) string {
 			}
 		}
 	}
+}
+
+// mustMarshal 将结构体或映射转换为JSON字符串
+func mustMarshal(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		log.Fatalf("Error marshaling JSON: %s", err)
+	}
+	return string(b)
 }
