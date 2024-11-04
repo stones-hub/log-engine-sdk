@@ -237,56 +237,38 @@ func consumerDataToElkData(data *protocol.Data) string {
 		return ""
 	}
 
-	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil {
-		// 非json强制转换成json发送
-		tMap := make(map[string]string)
-		tMap["text"] = _data.(string)
-		jsonText, err := json.Marshal(&tMap)
-		if err != nil {
-			k3.K3LogError("Failed to marshal data: %v", err)
-			return ""
-		}
-		return string(jsonText)
-	} else if len(elkData.EventName) == 0 {
-		// 是json但是是旧日志，无需转换, 因为新日志必须有eventName
-		return _data.(string)
-	}
-
 	// host_ip 和 host_name 、uuid 需要生成，SubmitLog 中并没有这些数据
 	if hostName, err = os.Hostname(); err != nil {
 		k3.K3LogError("Failed to get hostname: %v", err)
 		hostName = "unknown"
 	}
 
-	// consumer的数据是可以转成elkData的, 需要对数据做补充
-	if elkData.HostName == "" {
-		elkData.HostName = hostName
-	}
-
-	if elkData.HostIp == "" {
+	// 将日志解析成elkData ， 解析失败，就将原来的数据封装到elkData下的text字段内发送
+	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil {
 		elkData.HostIp = data.Ip
-	}
-
-	if elkData.UUID == "" {
+		elkData.HostName = hostName
 		elkData.UUID = data.UUID
-	}
-
-	if elkData.AccountId == "" {
 		elkData.AccountId = data.AccountId
-	}
-
-	if elkData.AppId == "" {
 		elkData.AppId = data.AppId
-	}
-
-	if elkData.Timestamp.IsZero() {
 		elkData.Timestamp = data.Timestamp
-	}
+		elkData.ExtendData.Content["text"] = _data.(string)
+		if b, err = json.Marshal(&elkData); err != nil {
+			return _data.(string)
+		} else {
+			return string(b)
+		}
+	} else {
+		if elkData.EventName == "" { // 旧日志，但是是一个json文件
+			return _data.(string)
+		} else {
 
-	if b, err = json.Marshal(elkData); err != nil {
-		k3.K3LogError("Failed to marshal elkData: %v", err)
-		return _data.(string)
+			// 新日志
+			if b, err = json.Marshal(elkData); err != nil {
+				k3.K3LogError("Failed to marshal elkData: %v", err)
+				return _data.(string)
+			} else {
+				return string(b)
+			}
+		}
 	}
-
-	return string(b)
 }
