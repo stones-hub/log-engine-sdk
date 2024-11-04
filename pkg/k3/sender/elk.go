@@ -131,6 +131,8 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				continue
 			}
 
+			k3.K3LogDebug("WriteDataToElasticSearch: %s", requestBody)
+
 			if len(data.IndexName) == 0 {
 				index = config.GlobalConfig.ELK.DefaultIndexName
 			} else {
@@ -183,6 +185,8 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 			buffer.WriteString(item.body)
 			buffer.WriteString("\n")
 		}
+
+		k3.K3LogDebug("bulk_data:%s\n", buffer.String())
 
 		BulkData = make([]*Bulk, 0)
 
