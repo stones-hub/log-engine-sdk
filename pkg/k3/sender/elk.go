@@ -101,12 +101,7 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 // WriteDataToElasticSearch 从管道读取数据，写入elk
 func WriteDataToElasticSearch(client *ElasticSearchClient) {
 
-	defer func() {
-		if r := recover(); r != nil {
-			k3.K3LogError("Recovered WriteDataToElasticSearch from panic: %v", r)
-		}
-		client.sg.Done()
-	}()
+	defer client.sg.Done()
 
 	for {
 		var (
@@ -251,7 +246,11 @@ func consumerDataToElkData(data *protocol.Data) string {
 		elkData.AccountId = data.AccountId
 		elkData.AppId = data.AppId
 		elkData.Timestamp = data.Timestamp
-		elkData.ExtendData.Content["text"] = _data.(string)
+		elkData.ExtendData = protocol.ExtendData{
+			Content: map[string]interface{}{
+				"text": _data.(string),
+			},
+		}
 		if b, err = json.Marshal(&elkData); err != nil {
 			return _data.(string)
 		} else {
