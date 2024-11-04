@@ -21,7 +21,15 @@ var (
 	DefaultMaxRetry       = 10    // 重试次数
 	DefaultTimeout        = 30    // 秒, 数据发送的超时时间
 	DefaultRetryInterval  = 3     // 秒， 默认队列满等待时间间隔
+	MaxBulkSize           = 100   // 提交给ElasticSearch的批量大小
+	BulkData              []*Bulk
 )
+
+type Bulk struct {
+	Index      string
+	DocumentId string
+	body       string
+}
 
 type ElasticSearchClient struct {
 	config        elasticsearch.Config
@@ -100,7 +108,6 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 
 // WriteDataToElasticSearch 从管道读取数据，写入elk
 func WriteDataToElasticSearch(client *ElasticSearchClient) {
-
 	defer client.sg.Done()
 
 	for {
@@ -124,10 +131,10 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				continue
 			}
 
-			if len(data.EventName) == 0 {
+			if len(data.IndexName) == 0 {
 				index = config.GlobalConfig.ELK.DefaultIndexName
 			} else {
-				index = data.EventName
+				index = data.IndexName
 			}
 
 			if config.GlobalConfig.ELK.IsUseSuffixDate {
@@ -163,6 +170,9 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 func (e *ElasticSearchClient) Close() error {
 	close(e.dataChan)
 	e.sg.Wait()
+
+	// TODO flush all
+
 	return nil
 }
 

@@ -30,7 +30,7 @@ func TestBatchConsumer(t *testing.T) {
 		AppId:     "appid-1001",
 		Ip:        ips[0],
 		Timestamp: time.Now(),
-		EventName: "1001",
+		IndexName: "1001",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,
@@ -43,7 +43,7 @@ func TestBatchConsumer(t *testing.T) {
 		AppId:     "appid-1001",
 		Ip:        ips[0],
 		Timestamp: time.Now(),
-		EventName: "1001",
+		IndexName: "1001",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,
@@ -56,7 +56,7 @@ func TestBatchConsumer(t *testing.T) {
 		AppId:     "appid-1001",
 		Ip:        ips[0],
 		Timestamp: time.Now(),
-		EventName: "1001",
+		IndexName: "1001",
 		Properties: map[string]interface{}{
 			"user_name": "stones",
 			"age":       18,

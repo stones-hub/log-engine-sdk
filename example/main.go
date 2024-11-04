@@ -40,7 +40,7 @@ func TestConsumerLog() {
 		AppId:     "1001-01",
 		Ip:        "127.0.0.1",
 		Timestamp: time.Now(),
-		EventName: "event_name",
+		IndexName: "index_name",
 		Properties: map[string]interface{}{
 			"property": "test",
 		},
@@ -69,7 +69,7 @@ func TestConsumerBatchLog() {
 		AppId:     "1001-01",
 		Ip:        "127.0.0.1",
 		Timestamp: time.Now(),
-		EventName: "event_name",
+		IndexName: "index_name",
 		Properties: map[string]interface{}{
 			"property": "batch test",
 		},

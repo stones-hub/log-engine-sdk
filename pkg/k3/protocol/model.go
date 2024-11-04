@@ -12,12 +12,12 @@ type Data struct {
 	AppId      string                 `json:"app_id,omitempty"`     // APPID
 	Ip         string                 `json:"ip,omitempty"`         // 日志来源ID
 	Timestamp  time.Time              `json:"Timestamp"`            // 日志时间
-	EventName  string                 `json:"event_name,omitempty"` // 所读文件路径string
+	IndexName  string                 `json:"index_name,omitempty"` // 所读文件的索引标识
 	Properties map[string]interface{} `json:"properties"`           // 日志具体内容
 }
 
 func (d *Data) String() string {
-	return fmt.Sprintf("UUID:%s, AccountId:%s, AppId:%s, Ip:%s, Timestamp:%v, EventName:%s, Properties:%v", d.UUID, d.AccountId, d.AppId, d.Ip, d.Timestamp, d.EventName, d.Properties)
+	return fmt.Sprintf("UUID:%s, AccountId:%s, AppId:%s, Ip:%s, Timestamp:%v, IndexName:%s, Properties:%v", d.UUID, d.AccountId, d.AppId, d.Ip, d.Timestamp, d.IndexName, d.Properties)
 }
 
 type K3Consumer interface {
