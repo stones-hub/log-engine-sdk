@@ -305,6 +305,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 			fmt.Println("1======>", _data.(string))
 			return _data.(string)
 		} else {
+			fmt.Println("4======>", string(b))
 			return string(b)
 		}
 	} else {
