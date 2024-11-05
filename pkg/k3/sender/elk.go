@@ -289,7 +289,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 	}
 
 	// 将日志解析成elkData ， 解析失败，就将原来的数据封装到elkData下的text字段内发送
-	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil {
+	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil || elkData.EventName == "" {
 		elkData.HostIp = data.Ip
 		elkData.HostName = hostName
 		elkData.UUID = data.UUID
@@ -309,34 +309,19 @@ func consumerDataToElkData(data *protocol.Data) string {
 			return string(b)
 		}
 	} else {
-		if elkData.EventName == "" { // 旧日志，但是是一个json文件
-			k3.K3LogDebug("3======>%v", _data.(string))
-
-			m := make(map[string]interface{})
-			_ = json.Unmarshal([]byte(_data.(string)), &m)
-			if _, ok := m["@timestamp"]; !ok {
-				m["@timestamp"] = time.Now()
-			}
-			if b, err = json.Marshal(&m); err != nil {
-				return _data.(string)
-			} else {
-				return string(b)
-			}
+		// 新日志
+		elkData.HostIp = data.Ip
+		elkData.HostName = hostName
+		elkData.UUID = data.UUID
+		elkData.AccountId = data.AccountId
+		elkData.AppId = data.AppId
+		elkData.Timestamp = data.Timestamp
+		if b, err = json.Marshal(elkData); err != nil {
+			k3.K3LogError("Failed to marshal elkData: %v", err)
+			return _data.(string)
 		} else {
-			// 新日志
-			elkData.HostIp = data.Ip
-			elkData.HostName = hostName
-			elkData.UUID = data.UUID
-			elkData.AccountId = data.AccountId
-			elkData.AppId = data.AppId
-			elkData.Timestamp = data.Timestamp
-			if b, err = json.Marshal(elkData); err != nil {
-				k3.K3LogError("Failed to marshal elkData: %v", err)
-				return _data.(string)
-			} else {
-				k3.K3LogDebug("4======>%v", string(b))
-				return string(b)
-			}
+			k3.K3LogDebug("3======>%v", string(b))
+			return string(b)
 		}
 	}
 }
