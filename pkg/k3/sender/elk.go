@@ -302,12 +302,14 @@ func consumerDataToElkData(data *protocol.Data) string {
 			},
 		}
 		if b, err = json.Marshal(&elkData); err != nil {
+			fmt.Println("1======>", _data.(string))
 			return _data.(string)
 		} else {
 			return string(b)
 		}
 	} else {
 		if elkData.EventName == "" { // 旧日志，但是是一个json文件
+			fmt.Println("2======>", _data.(string))
 			return _data.(string)
 		} else {
 			// 新日志
@@ -321,6 +323,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 				k3.K3LogError("Failed to marshal elkData: %v", err)
 				return _data.(string)
 			} else {
+				fmt.Println("3========>", string(b))
 				return string(b)
 			}
 		}
