@@ -302,16 +302,26 @@ func consumerDataToElkData(data *protocol.Data) string {
 			},
 		}
 		if b, err = json.Marshal(&elkData); err != nil {
-			fmt.Println("1======>", _data.(string))
+			k3.K3LogDebug("1======>%v", _data.(string))
 			return _data.(string)
 		} else {
-			fmt.Println("4======>", string(b))
+			k3.K3LogDebug("2======>%v", string(b))
 			return string(b)
 		}
 	} else {
 		if elkData.EventName == "" { // 旧日志，但是是一个json文件
-			fmt.Println("2======>", _data.(string))
-			return _data.(string)
+			k3.K3LogDebug("3======>%v", _data.(string))
+
+			m := make(map[string]interface{})
+			_ = json.Unmarshal([]byte(_data.(string)), &m)
+			if _, ok := m["@timestamp"]; !ok {
+				m["@timestamp"] = time.Now()
+			}
+			if b, err = json.Marshal(&m); err != nil {
+				return _data.(string)
+			} else {
+				return string(b)
+			}
 		} else {
 			// 新日志
 			elkData.HostIp = data.Ip
@@ -324,7 +334,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 				k3.K3LogError("Failed to marshal elkData: %v", err)
 				return _data.(string)
 			} else {
-				fmt.Println("3========>", string(b))
+				k3.K3LogDebug("4======>%v", string(b))
 				return string(b)
 			}
 		}

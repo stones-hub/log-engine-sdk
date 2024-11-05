@@ -6,7 +6,6 @@ import (
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
-	"log-engine-sdk/pkg/k3/watch"
 	"os"
 	"time"
 )
@@ -115,8 +114,7 @@ type TestData struct {
 }
 
 func main() {
-
-	watch.Run()
+	// watch.Run()
 
 }
 
