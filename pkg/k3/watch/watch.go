@@ -344,7 +344,7 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				k3.K3LogInfo("ReadFileByOffset read file end: %s", err)
+				k3.K3LogDebug("ReadFileByOffset read file end: %s", err)
 			} else {
 				k3.K3LogError("ReadFileByOffset read file error: %s", err)
 			}
@@ -701,7 +701,7 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 		// 读取文件错误, 有可能读完了
 		if err != nil {
 			if err == io.EOF {
-				k3.K3LogInfo("read file eof")
+				k3.K3LogDebug("read file eof")
 			} else {
 				k3.K3LogError("read file error: %s", err)
 			}
