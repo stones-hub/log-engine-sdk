@@ -78,6 +78,11 @@ func FindStatusRouter(w http.ResponseWriter, r *http.Request) {
 // 写入ELK累计失败数
 // 写入ELK累计写入数
 
+var (
+	GlobalWriteFailedCount  int
+	GlobalWriteSuccessCount int
+)
+
 type Status struct {
 	Alloc      uint64 // 当前已分配的内存 KB
 	TotalAlloc uint64 // 程序运行以来总共分配的内存字节数 KB。
