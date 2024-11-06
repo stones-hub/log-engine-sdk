@@ -68,9 +68,9 @@ func FindStatusRouter(w http.ResponseWriter, r *http.Request) {
 	status.WriteFailedCount = GlobalWriteFailedCount
 
 	if b, err = json.Marshal(status); err != nil {
-		w.Write([]byte(err.Error()))
+		_, _ = w.Write([]byte(err.Error()))
 	} else {
-		w.Write(b)
+		_, _ = w.Write(b)
 	}
 
 }
