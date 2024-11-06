@@ -199,17 +199,20 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 		res, err := req.Do(context.Background(), client)
 
 		if err != nil {
+			k3.GlobalWriteFailedCount = k3.GlobalWriteFailedCount + currentBulkSize
 			k3.K3LogError("Failed to send data to Elasticsearch: %v", err)
 			return
 		}
 
 		if res.IsError() {
+			k3.GlobalWriteFailedCount = k3.GlobalWriteFailedCount + currentBulkSize
 			k3.K3LogError("Unexpected error in Elasticsearch response: %s", res.String())
 			res.Body.Close()
 			return
 		}
 
 		res.Body.Close()
+		k3.GlobalWriteSuccessCount = k3.GlobalWriteSuccessCount + currentBulkSize
 		k3.K3LogDebug("Send data(line:%v) to Elasticsearch successfully.", currentBulkSize)
 	} else {
 		k3.K3LogDebug("Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, MaxBulkSize)
@@ -243,6 +246,7 @@ func (e *ElasticSearchClient) sendWithRetries(d *protocol.Data) error {
 		}
 	}
 
+	k3.GlobalWriteToChannelFailedCount++
 	k3.K3LogError("Data channel is still full, data will be discarded, data (UUID: %d): %v", d.UUID, d)
 	return fmt.Errorf("data channel is full after retries")
 }
