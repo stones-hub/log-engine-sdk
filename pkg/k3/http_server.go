@@ -75,12 +75,6 @@ func FindStatusRouter(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// TODO
-// 当前程序所占内存指标
-// 当前管道队列长度
-// 写入ELK累计失败数
-// 写入ELK累计写入数
-
 var (
 	GlobalWriteFailedCount          int
 	GlobalWriteSuccessCount         int
@@ -88,11 +82,11 @@ var (
 )
 
 type Status struct {
-	Alloc                     uint64 `json:"alloc"`       // 当前已分配的内存 KB
-	TotalAlloc                uint64 `json:"total_alloc"` // 程序运行以来总共分配的内存字节数 KB。
-	Sys                       uint64 `json:"sys"`         // 操作系统获取的总内存量 KB
-	NumGC                     uint32 `json:"num_gc"`      // 表示垃圾回收的次
-	WriteFailedCount          int    `json:"write_failed_count"`
-	WriteSuccessCount         int    `json:"write_success_count"`
-	WriteToChannelFailedCount int    `json:"write_to_channel_failed_count"`
+	Alloc                     uint64 `json:"alloc"`                         // 当前已分配的内存 KB
+	TotalAlloc                uint64 `json:"total_alloc"`                   // 程序运行以来总共分配的内存字节数 KB。
+	Sys                       uint64 `json:"sys"`                           // 操作系统获取的总内存量 KB
+	NumGC                     uint32 `json:"num_gc"`                        // 表示垃圾回收的次
+	WriteFailedCount          int    `json:"write_failed_count"`            // 写入ELK失败条数
+	WriteSuccessCount         int    `json:"write_success_count"`           // 写入ELK成功条数
+	WriteToChannelFailedCount int    `json:"write_to_channel_failed_count"` // 写入缓存失败条数
 }
