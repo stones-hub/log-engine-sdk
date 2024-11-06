@@ -2,9 +2,11 @@ package k3
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log-engine-sdk/pkg/k3/config"
 	"net/http"
+	"runtime"
 	"time"
 )
 
@@ -46,9 +48,39 @@ func HttpServer(ctx context.Context) (func(), error) {
 	}, nil
 }
 
-// FindStatusRouter
-// TODO  获取Reqeust URI 的信息, 来决定业务逻辑
+// FindStatusRouter 查询当前进程状态
 func FindStatusRouter(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("hello world"))
 
+	var (
+		memStats runtime.MemStats
+		status   Status
+		b        []byte
+		err      error
+	)
+
+	runtime.ReadMemStats(&memStats)
+	status.Alloc = memStats.Alloc / 1024
+	status.TotalAlloc = memStats.TotalAlloc / 1024
+	status.Sys = memStats.Sys / 1024
+	status.NumGC = memStats.NumGC
+
+	if b, err = json.Marshal(status); err != nil {
+		w.Write([]byte(err.Error()))
+	} else {
+		w.Write(b)
+	}
+
+}
+
+// TODO
+// 当前程序所占内存指标
+// 当前管道队列长度
+// 写入ELK累计失败数
+// 写入ELK累计写入数
+
+type Status struct {
+	Alloc      uint64 // 当前已分配的内存 KB
+	TotalAlloc uint64 // 程序运行以来总共分配的内存字节数 KB。
+	Sys        uint64 // 操作系统获取的总内存量 KB
+	NumGC      uint32 // 表示垃圾回收的次
 }
