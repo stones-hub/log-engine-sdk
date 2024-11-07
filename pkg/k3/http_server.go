@@ -59,9 +59,9 @@ func FindStatusRouter(w http.ResponseWriter, r *http.Request) {
 	)
 
 	runtime.ReadMemStats(&memStats)
-	status.Alloc = memStats.Alloc / 1024
-	status.TotalAlloc = memStats.TotalAlloc / 1024
-	status.Sys = memStats.Sys / 1024
+	status.Alloc = memStats.Alloc / 1024 / 1024
+	status.TotalAlloc = memStats.TotalAlloc / 1024 / 1024
+	status.Sys = memStats.Sys / 1024 / 1024
 	status.NumGC = memStats.NumGC
 	status.WriteToChannelFailedCount = GlobalWriteToChannelFailedCount
 	status.WriteSuccessCount = GlobalWriteSuccessCount
