@@ -41,6 +41,13 @@ func main() {
 		return
 	}
 
+	// 注入根目录
+	if len(config.GlobalConfig.System.RootPath) > 0 {
+		dir = config.GlobalConfig.System.RootPath
+	} else {
+		config.GlobalConfig.System.RootPath = dir
+	}
+
 	// 初始化日志记录器, 用于记录日志同K3_log一样，只是单纯的用于记录日志而已
 	config.GlobalConsumer, _ = k3.NewLogConsumerWithConfig(k3.K3LogConsumerConfig{
 		Directory:      dir + "/log",
@@ -66,11 +73,6 @@ func main() {
 		k3.K3LogError("fetch directory error: %s", err)
 	}
 	config.MustLoad(configs...)
-
-	// 注入RootPath
-	if len(config.GlobalConfig.System.RootPath) == 0 {
-		config.GlobalConfig.System.RootPath = dir
-	}
 
 	if config.GlobalConfig.System.LogLevel > 0 {
 		k3.CurrentLogLevel = k3.K3LogLevel(config.GlobalConfig.System.LogLevel)
