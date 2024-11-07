@@ -18,11 +18,11 @@ import (
 )
 
 var (
-	DefaultMaxChannelSize = 10000 // 队列管道的最大长度
+	DefaultMaxChannelSize = 20000 // 队列管道的最大长度
 	DefaultMaxRetry       = 10    // 重试次数
 	DefaultTimeout        = 30    // 秒, 数据发送的超时时间
 	DefaultRetryInterval  = 3     // 秒， 默认队列满等待时间间隔
-	MaxBulkSize           = 10    // 提交给ElasticSearch的批量大小
+	MaxBulkSize           = 100   // 提交给ElasticSearch的批量大小
 	BulkData              []*Bulk
 )
 
@@ -213,7 +213,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 
 		res.Body.Close()
 		k3.GlobalWriteSuccessCount = k3.GlobalWriteSuccessCount + currentBulkSize
-		k3.K3LogDebug("Send data(line:%v) to Elasticsearch successfully.", currentBulkSize)
+		k3.K3LogInfo("Send data(line:%v) to Elasticsearch successfully.", currentBulkSize)
 	} else {
 		k3.K3LogDebug("Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, MaxBulkSize)
 	}
