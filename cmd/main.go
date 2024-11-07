@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/watch"
+	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"strings"
@@ -111,6 +115,8 @@ func main() {
 		// 启动http服务器
 		httpClean, _ = k3.HttpServer(context.Background())
 	}
+
+	pprof()
 	graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
 }
 
@@ -161,4 +167,18 @@ func graceExit(stateFile string, cleanFuncs ...func()) {
 
 	time.Sleep(1 * time.Second)
 	os.Exit(state)
+}
+
+func pprof() {
+
+	go func() {
+
+		listener, err := net.Listen("tcp", ":6060")
+		if err != nil {
+			log.Fatalf("Failed to start pprof server: %v", err)
+		}
+		log.Println(http.Serve(listener, nil))
+
+	}()
+
 }

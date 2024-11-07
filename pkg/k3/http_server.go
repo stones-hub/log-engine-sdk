@@ -72,7 +72,6 @@ func FindStatusRouter(w http.ResponseWriter, r *http.Request) {
 	} else {
 		_, _ = w.Write(b)
 	}
-
 }
 
 var (

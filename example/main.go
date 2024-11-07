@@ -3,9 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"time"
 )
@@ -115,6 +118,12 @@ type TestData struct {
 
 func main() {
 	// watch.Run()
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+	// 你的应用逻辑
+	select {} // 阻塞主 goroutine，防止应用退出
 
 }
 
