@@ -22,7 +22,6 @@ var (
 	DefaultMaxRetry       = 10    // 重试次数
 	DefaultTimeout        = 30    // 秒, 数据发送的超时时间
 	DefaultRetryInterval  = 3     // 秒， 默认队列满等待时间间隔
-	MaxBulkSize           = 100   // 提交给ElasticSearch的批量大小
 	BulkData              []*Bulk
 )
 
@@ -171,7 +170,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 	}
 
 	// 检查是否满足批量提交的条件
-	if currentBulkSize >= MaxBulkSize || force == true {
+	if currentBulkSize >= config.GlobalConfig.ELK.BulkSize || force == true {
 
 		for _, item := range BulkData {
 			action := map[string]interface{}{
@@ -215,7 +214,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 		k3.GlobalWriteSuccessCount = k3.GlobalWriteSuccessCount + currentBulkSize
 		k3.K3LogInfo("Send data(line:%v) to Elasticsearch successfully.", currentBulkSize)
 	} else {
-		k3.K3LogInfo("Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, MaxBulkSize)
+		k3.K3LogInfo("Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, config.GlobalConfig.ELK.BulkSize)
 	}
 }
 

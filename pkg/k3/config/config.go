@@ -26,6 +26,7 @@ type ELK struct {
 	Timeout          int      `yaml:"timeout"`
 	DefaultIndexName string   `yaml:"default_index_name"`                                                     // 默认ELK索引名
 	IsUseSuffixDate  bool     `yaml:"is_use_suffix_date" json:"is_use_suffix_date" toml:"is_use_suffix_date"` // 是否使用时间戳后缀给索引
+	BulkSize         int      `yaml:"bulk_size" json:"bulk_size" toml:"bulk_size"`                            // bulk_size
 }
 
 type Watch struct {
