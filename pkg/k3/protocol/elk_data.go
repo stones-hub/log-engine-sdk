@@ -21,6 +21,7 @@ type ElasticSearchData struct {
 	EventId    int        `json:"event_id"`    // 日志事件ID
 	EventName  string     `json:"event_name"`  // 日志事件名称(每种日志唯一)
 	Timestamp  time.Time  `json:"@timestamp"`  // 日志产生时间 "2024-10-01 12:00:00 " √
+	Path       string     `json:"@path"`       // 日志内容来源的文件地址
 	ExtendData ExtendData `json:"extend_data"` // 扩展字段
 }
 

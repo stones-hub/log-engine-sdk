@@ -274,6 +274,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 	var (
 		ok       bool
 		_data    interface{}
+		_path    interface{}
 		err      error
 		b        []byte
 		elkData  protocol.ElasticSearchData
@@ -284,6 +285,10 @@ func consumerDataToElkData(data *protocol.Data) string {
 	if _data, ok = data.Properties["_data"]; !ok {
 		k3.K3LogError("No _data field in data: %v", data)
 		return ""
+	}
+
+	if _path, ok = data.Properties["_path"]; !ok {
+		_path = "nil"
 	}
 
 	// host_ip 和 host_name 、uuid 需要生成，SubmitLog 中并没有这些数据
@@ -300,6 +305,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 		elkData.AccountId = data.AccountId
 		elkData.AppId = data.AppId
 		elkData.Timestamp = data.Timestamp
+		elkData.Path = _path.(string)
 		elkData.ExtendData = protocol.ExtendData{
 			Content: map[string]interface{}{
 				"text": _data.(string),
@@ -320,6 +326,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 		elkData.AccountId = data.AccountId
 		elkData.AppId = data.AppId
 		elkData.Timestamp = data.Timestamp
+		elkData.Path = _path.(string)
 		if b, err = json.Marshal(elkData); err != nil {
 			k3.K3LogError("Failed to marshal elkData: %v", err)
 			return _data.(string)
