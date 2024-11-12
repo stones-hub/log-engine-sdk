@@ -594,6 +594,8 @@ func ForceSyncFileState() error {
 	if err = encoder.Encode(&GlobalFileStates); err != nil {
 		return fmt.Errorf("[ForceSyncFileState] encode file state error: %s", err)
 	}
+
+	k3.K3LogWarn("[ForceSyncFileState] sync file state success")
 	return nil
 }
 

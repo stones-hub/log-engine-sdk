@@ -213,7 +213,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 		k3.GlobalWriteSuccessCount = k3.GlobalWriteSuccessCount + currentBulkSize
 		k3.K3LogWarn("Bulk send data(line:%v) to elasticsearch successfully.", currentBulkSize)
 	} else {
-		k3.K3LogInfo("Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, config.GlobalConfig.ELK.BulkSize)
+		k3.K3LogWarn("Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, config.GlobalConfig.ELK.BulkSize)
 	}
 }
 
