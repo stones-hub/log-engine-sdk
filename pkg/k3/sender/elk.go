@@ -238,7 +238,7 @@ func (e *ElasticSearchClient) sendWithRetries(d *protocol.Data) error {
 		case e.dataChan <- d:
 			return nil
 		default:
-			k3.K3LogWarn("%d attempt, the data-channel is full, data(%v) retry ......", i, d.UUID)
+			k3.K3LogWarn("%d attempt, the data-channel is full, uuid(%v) retry ......", i, d.UUID)
 			time.Sleep(time.Duration(e.retryInterval) * time.Second)
 		}
 	}
