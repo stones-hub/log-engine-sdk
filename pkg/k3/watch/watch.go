@@ -486,21 +486,21 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 
 		_, err := fd.Seek(currentOffset, 0)
 		if err != nil {
-			k3.K3LogError("ReadFileByOffset seek error: %s", err)
+			k3.K3LogError("[ReadFileByOffset] seek error: %s", err)
 			break
 		}
 
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				k3.K3LogDebug("ReadFileByOffset read file end: %s", err)
+				k3.K3LogDebug("[ReadFileByOffset] read file end: %s", err)
 			} else {
-				k3.K3LogError("ReadFileByOffset read file error: %s", err)
+				k3.K3LogError("[ReadFileByOffset] read file error: %s", err)
 			}
 			break
 		}
 
-		k3.K3LogDebug("ReadFileByOffset ReadLine : %s", line)
+		k3.K3LogDebug("[ReadFileByOffset] ReadLine : %s", line)
 		currentOffset += int64(len(line))
 		content += line
 	}
