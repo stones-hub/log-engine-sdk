@@ -76,407 +76,6 @@ func InitConsumerBatchLog() error {
 	return nil
 }
 
-func Run() error {
-
-	var (
-		diskPaths     = make(map[string][]string)
-		diskFilePaths = make(map[string][]string)
-		err           error
-	)
-
-	if err = InitConsumerBatchLog(); err != nil {
-		k3.K3LogError("WatchRun InitConsumerBatchLog error: %s", err.Error)
-		return err
-	}
-
-	// 如果state file文件没有就创建，如果有就load文件内容到stateFile
-	if GlobalFileStates, err = CreateORLoadFileState(config.GlobalConfig.Watch.StateFilePath); err != nil {
-		k3.K3LogError("WatchRun CreateAndLoadFileState error: %s", err.Error())
-		return err
-	}
-
-	// 遍历所有的目录,找到所有需要监控的目录(包含子目录) 和 所有文件
-	for indexName, paths := range config.GlobalConfig.Watch.ReadPath {
-		for _, path := range paths {
-			subPaths, err := FetchWatchPath(path)
-			if err != nil {
-				k3.K3LogError("FetchWatchPath error: %s", err.Error())
-				return err
-			}
-			// 将所有的indexName对应的子目录全部遍历出来，封装到diskPaths中
-			diskPaths[indexName] = subPaths
-
-			filePaths, err := FetchWatchPathFile(path)
-			if err != nil {
-				k3.K3LogError("FetchWatchPathFile error: %s", err.Error())
-				return err
-			}
-			// 将所有的indexName对应的文件全部遍历出来，封装到diskFilePaths中
-			diskFilePaths[indexName] = filePaths
-		}
-	}
-
-	if err = SyncFileStates2Disk(diskFilePaths, config.GlobalConfig.Watch.StateFilePath); err != nil {
-		return err
-	}
-
-	// 初始化待监控的所有文件的FD
-	if err = InitFileStateFds(); err != nil {
-		return err
-	}
-
-	fmt.Println("-----------------------------")
-	fmt.Println(GlobalFileStateFds, GlobalFileStates)
-	fmt.Println("-----------------------------")
-
-	// 开始监控, 注意多协程处理，每个index name一个线程
-	GlobalWatchContext, GlobalWatchContextCancel = context.WithCancel(context.Background())
-	GlobalWatchWG = &sync.WaitGroup{}
-	InitWatcher(diskPaths)
-
-	ClockSyncFileState()
-	ClockCheckFileStateAndReadFile()
-
-	return nil
-}
-
-// InitWatcher 初始化监控的协程, 每个indexName开一个协程来处理监控目录问题, 每个indexName 都对应了一批目录（是主目录遍历出来的所有子目录的集合）
-func InitWatcher(diskPaths map[string][]string) {
-
-	// 循环开协程，每个index name 一个协程
-	for indexName, paths := range diskPaths {
-		GlobalWatchWG.Add(1)
-		go goroutineDoWatch(indexName, paths)
-	}
-
-}
-
-func goroutineDoWatch(indexName string, paths []string) {
-	var (
-		childWG = &sync.WaitGroup{}
-		err     error
-		watcher *fsnotify.Watcher
-	)
-
-	k3.K3LogDebug("Start goroutine watch %s", indexName)
-
-	// 协程退出
-	defer GlobalWatchWG.Done()
-
-	// 初始化协程watcher, 如果协程中的watcher初始化失败，需要关闭整个程序
-	if watcher, err = fsnotify.NewWatcher(); err != nil {
-		GlobalWatchMutex.Lock()
-		GlobalWatchContextCancel() // 避免多个协程同时发送cancel信号
-		GlobalWatchMutex.Unlock()
-		k3.K3LogError("Failed to create watcher for %s: %v", indexName, err)
-		return
-	}
-	defer watcher.Close()
-
-	// 开始监听目录, 如果错误就退出
-	for _, path := range paths {
-		if err = watcher.Add(path); err != nil { // 添加监听目录，如果一个协程的监听出现问题，就关闭整个程序
-			GlobalWatchMutex.Lock()
-			GlobalWatchContextCancel()
-			GlobalWatchMutex.Unlock()
-			k3.K3LogError("Failed to add %s to watcher for %s: %v", path, indexName, err)
-			return
-		}
-	}
-
-	childWG.Add(1) // 子协程， 父协程用于创建watch，子协程用于收集监听的目录的事件和处理，注意这里是循环的，证明协程是不会退出的, 除非异常或者主动cancel
-	go func() {
-		k3.K3LogDebug("Start goroutine child watch %s", indexName)
-		defer childWG.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				GlobalWatchMutex.Lock()
-				GlobalWatchContextCancel()
-				GlobalWatchMutex.Unlock()
-				k3.K3LogError("doWatch child goroutine panic: %s", r)
-			}
-		}()
-
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok { // 退出子协程
-					k3.K3LogError("Child Goroutine Event channel closed %s ", indexName)
-					return
-				}
-				if err := childGoroutineHandlerEvent(watcher, event, indexName); err != nil {
-					k3.K3LogError("Failed to handle event %s: %v", event, err)
-					return
-				}
-
-			case err, ok := <-watcher.Errors:
-				if !ok { // 退出子协程
-					k3.K3LogError("Child Goroutine Error reading %s: %v", indexName, err)
-					return
-				}
-
-			case <-GlobalWatchContext.Done(): // 退出子协程
-				k3.K3LogInfo("Child Goroutine Received exit signal %s", indexName)
-				return
-			}
-		}
-	}()
-	// 等待子协程退出
-	childWG.Wait()
-	k3.K3LogDebug("Stop goroutine child watch %s", indexName)
-
-	k3.K3LogDebug("Stop goroutine watch %s", indexName)
-}
-
-// childGoroutineHandlerEvent 处理监控到文件的变化
-func childGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName string) error {
-	if event.Op&fsnotify.Write == fsnotify.Write { // 文件写入
-
-		// 判断map中是否存在，不存在就返回
-		if _, ok := GlobalFileStates[event.Name]; !ok {
-			return fmt.Errorf("handlerEvent file not found: %s", event.Name)
-		}
-
-		if _, ok := GlobalFileStateFds[event.Name]; !ok {
-			return fmt.Errorf("handlerEvent file fd not found: %s", event.Name)
-		}
-
-		return ReadFileByOffset(GlobalFileStateFds[event.Name], GlobalFileStates[event.Name])
-
-	} else if event.Op&fsnotify.Create == fsnotify.Create { // 文件或目录创建
-		return createEvent(watcher, event, indexName)
-	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename { // 文件删除或改名
-		return removeAndRenameEvent(watcher, event)
-	}
-
-	return nil
-}
-
-// createEvent 创建文件事件,判断是否是目录，如果是目录需要添加监控, 如果是文件，就需要将文件添加到FileState并新增FileState fds
-func createEvent(watcher *fsnotify.Watcher, event fsnotify.Event, indexName string) error {
-	// 判断是否是目录，如果是目录需要添加监控
-	if fileInfo, err := os.Stat(event.Name); err != nil {
-		return err
-	} else {
-		if fileInfo.IsDir() && watcher != nil {
-			watcher.Add(event.Name)
-			k3.K3LogInfo("WatchCreate add watch path: %s", event.Name)
-			return nil
-		}
-	}
-
-	// 如果不是目录，则需要将文件添加到fileStates
-	if _, ok := GlobalFileStates[event.Name]; !ok {
-		FileStateLock.Lock()
-		GlobalFileStates[event.Name] = &FileState{
-			Path:          event.Name,
-			Offset:        0,
-			StartReadTime: 0,
-			LastReadTime:  0,
-			IndexName:     indexName,
-		}
-		FileStateLock.Unlock()
-	}
-
-	// 添加到fileStatesFd
-	if _, ok := GlobalFileStateFds[event.Name]; !ok {
-		if file, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
-			return err
-		} else {
-			FileStateLock.Lock()
-			GlobalFileStateFds[event.Name] = file
-			FileStateLock.Unlock()
-		}
-	}
-
-	return ForceSyncFileState()
-}
-
-// removeAndRenameEvent 删除或改名事件
-func removeAndRenameEvent(watcher *fsnotify.Watcher, event fsnotify.Event) error {
-
-	// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
-	if err := watcher.Remove(event.Name); err != nil {
-		k3.K3LogWarn("WatchRemove Remove watch [%s] error: %s", event.Name, err)
-	}
-
-	// 关闭文件
-	if _, ok := GlobalFileStateFds[event.Name]; ok {
-		GlobalFileStateFds[event.Name].Close()
-		delete(GlobalFileStateFds, event.Name)
-	}
-
-	// 删除文件
-	if _, ok := GlobalFileStates[event.Name]; ok {
-		delete(GlobalFileStates, event.Name)
-	}
-
-	// 更新状态文件
-	return ForceSyncFileState()
-}
-
-func ReadFileByOffset(fd *os.File, fileState *FileState) error {
-	var (
-		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
-		currentReadCount int
-		currentOffset    int64
-		reader           *bufio.Reader
-		content          string
-	)
-
-	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
-		maxReadCount = DefaultMaxReadCount
-	}
-
-	reader = bufio.NewReader(fd)
-	currentReadCount = 0
-	currentOffset = fileState.Offset
-
-	for currentReadCount < maxReadCount {
-		currentReadCount++
-
-		_, err := fd.Seek(currentOffset, 0)
-		if err != nil {
-			k3.K3LogError("ReadFileByOffset seek error: %s", err)
-			break
-		}
-
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				k3.K3LogDebug("ReadFileByOffset read file end: %s", err)
-			} else {
-				k3.K3LogError("ReadFileByOffset read file error: %s", err)
-			}
-			break
-		}
-
-		k3.K3LogDebug("ReadFileByOffset ReadLine : %s", line)
-		currentOffset += int64(len(line))
-		content += line
-	}
-
-	if len(content) > 0 {
-		if err := SendData2Consumer(content, fileState); err != nil {
-			return err
-		}
-	}
-
-	// 将最新的数据，同步给内存和文件
-	if err := SyncFileState(fileState.Path, currentOffset); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func Close() {
-	// 关闭所有打开的文件
-	for fileName, fd := range GlobalFileStateFds {
-		k3.K3LogDebug("Close file: %s", fileName)
-		fd.Close()
-	}
-	GlobalWatchContextCancel()
-	GlobalWatchWG.Wait()
-	GlobalDataAnalytics.Close()
-}
-
-func InitFileStateFds() error {
-	var (
-		err error
-	)
-
-	for filePath, _ := range GlobalFileStates {
-		if GlobalFileStateFds[filePath], err = os.OpenFile(filePath, os.O_RDONLY, 0666); err != nil {
-			return fmt.Errorf("InitFileStateFds open file error: %s", err.Error())
-		}
-
-		if GlobalFileStates[filePath].StartReadTime == 0 {
-			GlobalFileStates[filePath].StartReadTime = time.Now().Unix()
-		}
-	}
-
-	return nil
-}
-
-// SyncFileStates2Disk 将FileState数据写入到磁盘, 先删除在覆盖
-func SyncFileStates2Disk(diskFilePaths map[string][]string, fileStatePath string) error {
-	var (
-		fd      *os.File
-		err     error
-		encoder *json.Encoder
-	)
-
-	SyncWatchFiles2FileStates(diskFilePaths)
-	SyncFileStates2WatchFiles(diskFilePaths)
-
-	FileStateLock.Lock()
-	defer FileStateLock.Unlock()
-
-	// 将数据写入到 state_file_path
-	if fd, err = os.OpenFile(fileStatePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666); err != nil {
-		return fmt.Errorf("open state file error: %s", err.Error())
-	}
-
-	defer fd.Close()
-
-	encoder = json.NewEncoder(fd)
-
-	if err = encoder.Encode(GlobalFileStates); err != nil {
-		return fmt.Errorf("encode state file error: %s", err.Error())
-	}
-
-	return nil
-}
-
-// SyncWatchFiles2FileStates 初始化时
-// 遍历硬盘上被监控目录的所有文件, 判断文件是否在FileState中，如果不在，证明是新增的文件, 则添加到FileState中
-func SyncWatchFiles2FileStates(watchFiles map[string][]string) {
-	for index, files := range watchFiles {
-		for _, diskFilePath := range files {
-			if !CheckDiskFileIsExistInFileStates(diskFilePath) {
-				GlobalFileStates[diskFilePath] = &FileState{
-					Path:      diskFilePath,
-					Offset:    0,
-					IndexName: index,
-				}
-			}
-		}
-	}
-}
-
-// CheckDiskFileIsExistInFileStates 判断文件是否在FileState中
-func CheckDiskFileIsExistInFileStates(diskFilePath string) bool {
-	for filePath := range GlobalFileStates {
-		if filePath == diskFilePath {
-			return true
-		}
-	}
-	return false
-}
-
-// SyncFileStates2WatchFiles 初始化时
-// 遍历FileState中记录的所有文件，如果文件不存在于本地硬盘中，证明已经被删除了，对应在FileState中删除
-func SyncFileStates2WatchFiles(watchFiles map[string][]string) {
-	for fileStatePath := range GlobalFileStates {
-		if !CheckFileStateIsExistInDiskFiles(fileStatePath, watchFiles) {
-			delete(GlobalFileStates, fileStatePath)
-		}
-	}
-}
-
-// CheckFileStateIsExistInDiskFiles 判断FileState是否在硬盘中
-func CheckFileStateIsExistInDiskFiles(fileStatePath string, watchFiles map[string][]string) bool {
-	for _, files := range watchFiles {
-		for _, diskFilePath := range files {
-			if diskFilePath == fileStatePath {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // CreateORLoadFileState 创建并加载状态文件
 func CreateORLoadFileState(fileSatePath string) (map[string]*FileState, error) {
 	var (
@@ -530,24 +129,470 @@ func FetchWatchPathFile(watchPath string) ([]string, error) {
 	return k3.FetchDirectory(watchPath, -1)
 }
 
-// ForceSyncFileState 强制同步FileState, 先清空，在同步
+// InitSyncFileStates2Disk 将FileState数据写入到磁盘, 先删除在覆盖
+func InitSyncFileStates2Disk(diskFilePaths map[string][]string, fileStatePath string) error {
+	var (
+		fd      *os.File
+		err     error
+		encoder *json.Encoder
+	)
+
+	InitSyncWatchFiles2FileStates(diskFilePaths)
+	InitSyncFileStates2WatchFiles(diskFilePaths)
+
+	FileStateLock.Lock()
+	defer FileStateLock.Unlock()
+
+	// 将数据写入到 state_file_path
+	if fd, err = os.OpenFile(fileStatePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666); err != nil {
+		return fmt.Errorf("open state file error: %s", err.Error())
+	}
+
+	defer fd.Close()
+
+	encoder = json.NewEncoder(fd)
+
+	if err = encoder.Encode(GlobalFileStates); err != nil {
+		return fmt.Errorf("encode state file error: %s", err.Error())
+	}
+
+	return nil
+}
+
+// InitSyncWatchFiles2FileStates 初始化时
+// 遍历硬盘上被监控目录的所有文件, 判断文件是否在FileState中，如果不在，证明是新增的文件, 则添加到FileState中
+func InitSyncWatchFiles2FileStates(watchFiles map[string][]string) {
+	for index, files := range watchFiles {
+		for _, diskFilePath := range files {
+			if !InitCheckDiskFileIsExistInFileStates(diskFilePath) {
+				GlobalFileStates[diskFilePath] = &FileState{
+					Path:      diskFilePath,
+					Offset:    0,
+					IndexName: index,
+				}
+			}
+		}
+	}
+}
+
+// InitSyncFileStates2WatchFiles 初始化时
+// 遍历FileState中记录的所有文件，如果文件不存在于本地硬盘中，证明已经被删除了，对应在FileState中删除
+func InitSyncFileStates2WatchFiles(watchFiles map[string][]string) {
+	for fileStatePath := range GlobalFileStates {
+		if !InitCheckFileStateIsExistInDiskFiles(fileStatePath, watchFiles) {
+			delete(GlobalFileStates, fileStatePath)
+		}
+	}
+}
+
+// InitCheckDiskFileIsExistInFileStates 判断文件是否在FileState中
+func InitCheckDiskFileIsExistInFileStates(diskFilePath string) bool {
+	for filePath := range GlobalFileStates {
+		if filePath == diskFilePath {
+			return true
+		}
+	}
+	return false
+}
+
+// InitCheckFileStateIsExistInDiskFiles 判断FileState是否在硬盘中
+func InitCheckFileStateIsExistInDiskFiles(fileStatePath string, watchFiles map[string][]string) bool {
+	for _, files := range watchFiles {
+		for _, diskFilePath := range files {
+			if diskFilePath == fileStatePath {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func InitFileStateFds() error {
+	var (
+		err error
+	)
+
+	for filePath, _ := range GlobalFileStates {
+		if GlobalFileStateFds[filePath], err = os.OpenFile(filePath, os.O_RDONLY, 0666); err != nil {
+			return fmt.Errorf("InitFileStateFds open file error: %s", err.Error())
+		}
+
+		if GlobalFileStates[filePath].StartReadTime == 0 {
+			GlobalFileStates[filePath].StartReadTime = time.Now().Unix()
+		}
+	}
+
+	return nil
+}
+
+func Run() error {
+
+	var (
+		diskPaths     = make(map[string][]string)
+		diskFilePaths = make(map[string][]string)
+		err           error
+	)
+
+	if err = InitConsumerBatchLog(); err != nil {
+		k3.K3LogError("[Run] InitConsumerBatchLog error: %s", err.Error)
+		return err
+	}
+
+	// 如果state file文件没有就创建，如果有就load文件内容到stateFile
+	if GlobalFileStates, err = CreateORLoadFileState(config.GlobalConfig.Watch.StateFilePath); err != nil {
+		k3.K3LogError("[Run] CreateORLoadFileState error: %s", err.Error())
+		return err
+	}
+
+	// 遍历所有的目录,找到所有需要监控的目录(包含子目录) 和 所有文件
+	for indexName, paths := range config.GlobalConfig.Watch.ReadPath {
+		for _, path := range paths {
+			subPaths, err := FetchWatchPath(path)
+			if err != nil {
+				k3.K3LogError("[Run] FetchWatchPath error: %s", err.Error())
+				return err
+			}
+			// 将所有的indexName对应的子目录全部遍历出来，封装到diskPaths中
+			diskPaths[indexName] = subPaths
+
+			filePaths, err := FetchWatchPathFile(path)
+			if err != nil {
+				k3.K3LogError("[Run] FetchWatchPathFile error: %s", err.Error())
+				return err
+			}
+			// 将所有的indexName对应的文件全部遍历出来，封装到diskFilePaths中
+			diskFilePaths[indexName] = filePaths
+		}
+	}
+
+	if err = InitSyncFileStates2Disk(diskFilePaths, config.GlobalConfig.Watch.StateFilePath); err != nil {
+		return err
+	}
+
+	// 初始化待监控的所有文件的FD
+	if err = InitFileStateFds(); err != nil {
+		return err
+	}
+
+	fmt.Println("-----------------------------")
+	fmt.Println(GlobalFileStateFds, GlobalFileStates)
+	fmt.Println("-----------------------------")
+
+	// 开始监控, 注意多协程处理，每个index name一个线程
+	GlobalWatchContext, GlobalWatchContextCancel = context.WithCancel(context.Background())
+	GlobalWatchWG = &sync.WaitGroup{}
+	InitWatcher(diskPaths)
+
+	ClockSyncFileState()
+	ClockCheckFileStateAndReadFile()
+
+	return nil
+}
+
+// InitWatcher 初始化监控的协程, 每个indexName开一个协程来处理监控目录问题, 每个indexName 都对应了一批目录（是主目录遍历出来的所有子目录的集合）
+func InitWatcher(diskPaths map[string][]string) {
+
+	// 循环开协程，每个index name 一个协程
+	for indexName, paths := range diskPaths {
+		GlobalWatchWG.Add(1)
+		go GoroutineDoWatch(indexName, paths)
+	}
+
+}
+
+// GoroutineDoWatch 开协程，每个index_name 开一个协程, ****此函数会被调用多次****
+func GoroutineDoWatch(indexName string, paths []string) {
+	var (
+		childWG = &sync.WaitGroup{}
+		err     error
+		watcher *fsnotify.Watcher
+	)
+
+	k3.K3LogInfo("[GoroutineDoWatch] Start goroutine watch NO.[%s]", indexName)
+
+	// 协程退出
+	defer GlobalWatchWG.Done()
+
+	// 初始化协程watcher, 如果协程中的watcher初始化失败，需要关闭整个程序
+	if watcher, err = fsnotify.NewWatcher(); err != nil {
+		GlobalWatchMutex.Lock()
+		GlobalWatchContextCancel() // 避免多个协程同时发送cancel信号
+		GlobalWatchMutex.Unlock()
+		k3.K3LogError("[GoroutineDoWatch] Failed to create watcher for %s: %v", indexName, err)
+		return
+	}
+	defer watcher.Close()
+
+	// 开始监听目录, 如果错误就退出
+	for _, path := range paths {
+		if err = watcher.Add(path); err != nil { // 添加监听目录，如果一个协程的监听出现问题，就关闭整个程序
+			GlobalWatchMutex.Lock()
+			GlobalWatchContextCancel()
+			GlobalWatchMutex.Unlock()
+			k3.K3LogError("[GoroutineDoWatch] Failed to add %s to watcher for %s: %v", path, indexName, err)
+			return
+		}
+	}
+
+	childWG.Add(1) // 子协程， 父协程用于创建watch，子协程用于收集监听的目录的事件和处理，注意这里是循环的，证明协程是不会退出的, 除非异常或者主动cancel
+	go func() {
+		k3.K3LogInfo("[GoroutineDoWatch] Start child goroutine %s", indexName)
+		defer childWG.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				GlobalWatchMutex.Lock()
+				GlobalWatchContextCancel()
+				GlobalWatchMutex.Unlock()
+				panic(r)
+			}
+		}()
+
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok { // 退出子协程 -> 主协程也会退出
+					k3.K3LogError("[GoroutineDoWatch] Child goroutine Event channel closed %s ", indexName)
+					return
+				}
+				// 处理Event事件
+				ChildGoroutineHandlerEvent(watcher, event, indexName)
+
+			case err, ok := <-watcher.Errors:
+				if !ok { // 退出子协程 -> 主协程也会退出
+					k3.K3LogError("[GoroutineDoWatch] Child Goroutine Error reading %s: %v", indexName, err)
+					return
+				}
+
+			case <-GlobalWatchContext.Done(): // 退出子协程
+				k3.K3LogWarn("[GoroutineDoWatch] Child Goroutine Received exit signal %s", indexName)
+				return
+			}
+		}
+	}()
+	// 等待子协程退出
+	childWG.Wait()
+	k3.K3LogWarn("[GoroutineDoWatch] Stop goroutine child watch %s", indexName)
+	k3.K3LogWarn("[GoroutineDoWatch] Stop goroutine watch %s", indexName)
+}
+
+// ChildGoroutineHandlerEvent 处理监控到文件的变化
+func ChildGoroutineHandlerEvent(watcher *fsnotify.Watcher, event fsnotify.Event, index string) {
+	if event.Op&fsnotify.Write == fsnotify.Write { // 文件写入
+		WriterEvent(event, index)
+	} else if event.Op&fsnotify.Create == fsnotify.Create { // 文件或目录创建
+		CreateEvent(watcher, event, index)
+	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename { // 文件删除或改名
+		RemoveAndRenameEvent(watcher, event)
+	}
+}
+
+// WriterEvent 监听到文件被写入
+func WriterEvent(event fsnotify.Event, index string) {
+	UpdateFileStateAndFileSateFds(event, index)
+
+	// 监测到某个文件有写入，循环读取
+	if err := ReadFileByOffset(GlobalFileStateFds[event.Name], GlobalFileStates[event.Name]); err != nil {
+		k3.K3LogError("[WriterEvent] ReadFileByOffset error: %s", err)
+	}
+}
+
+// CreateEvent 监听创建文件事件,判断是否是目录，如果是目录需要添加监控, 如果是文件，就需要将文件添加到FileState并新增FileState fds
+func CreateEvent(watcher *fsnotify.Watcher, event fsnotify.Event, index string) {
+	// 判断是否是目录，如果是目录需要添加监控
+	if fileInfo, err := os.Stat(event.Name); err != nil {
+		k3.K3LogError("[CreateEvent] Stat file error: %s", err)
+	} else {
+		if fileInfo.IsDir() && watcher != nil {
+			watcher.Add(event.Name)
+			k3.K3LogInfo("[CreateEvent] Add watch path: %s", event.Name)
+		} else {
+			UpdateFileStateAndFileSateFds(event, index)
+		}
+	}
+}
+
+// RemoveAndRenameEvent 监听删除或改名事件
+func RemoveAndRenameEvent(watcher *fsnotify.Watcher, event fsnotify.Event) {
+	// 哪怕报错。保险点，都剔除监控，因为已经删除了， 没办法判断是不是目录
+	if err := watcher.Remove(event.Name); err != nil {
+		k3.K3LogWarn("[RemoveAndRenameEvent] Remove watch [%s] error: %s", event.Name, err)
+	}
+	UpdateFileStateAndFileSateFds(event, "")
+}
+
+// UpdateFileStateAndFileSateFds 更新FileState和FileStateFds
+func UpdateFileStateAndFileSateFds(event fsnotify.Event, index string) {
+	FileStateLock.Lock()
+	defer FileStateLock.Unlock()
+
+	if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
+		// 将新增文件添加到fileStates
+		if _, ok := GlobalFileStates[event.Name]; !ok {
+			GlobalFileStates[event.Name] = &FileState{
+				Path:          event.Name,
+				Offset:        0,
+				StartReadTime: 0,
+				LastReadTime:  0,
+				IndexName:     index,
+			}
+		}
+		// 将新增文件添加到fileStatesFd
+		if fd, ok := GlobalFileStateFds[event.Name]; !ok || fd == nil {
+			if file, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
+				k3.K3LogError("[UpdateFileStateAndFileSateFds] Open file error: %s", err)
+			} else {
+				GlobalFileStateFds[event.Name] = file
+			}
+		}
+	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename {
+
+		// 关闭文件
+		if _, ok := GlobalFileStateFds[event.Name]; ok {
+			GlobalFileStateFds[event.Name].Close()
+			delete(GlobalFileStateFds, event.Name)
+		}
+		// 删除文件
+		if _, ok := GlobalFileStates[event.Name]; ok {
+			delete(GlobalFileStates, event.Name)
+		}
+	}
+}
+
+// ReadFileByOffset 按偏移量读取文件 读取的是单个文件
+func ReadFileByOffset(fd *os.File, fileState *FileState) error {
+	var (
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
+		currentReadCount int
+		currentOffset    int64
+		reader           *bufio.Reader
+		content          string
+	)
+
+	// 防止有可能FD或者FileState失效的问题
+	if fd == nil || fileState == nil {
+		return fmt.Errorf("fd or fileState is nil")
+	}
+
+	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
+		maxReadCount = DefaultMaxReadCount
+	}
+
+	reader = bufio.NewReader(fd)
+	currentReadCount = 0
+	currentOffset = fileState.Offset
+
+	for currentReadCount < maxReadCount {
+		currentReadCount++
+
+		_, err := fd.Seek(currentOffset, 0)
+		if err != nil {
+			k3.K3LogError("ReadFileByOffset seek error: %s", err)
+			break
+		}
+
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				k3.K3LogDebug("ReadFileByOffset read file end: %s", err)
+			} else {
+				k3.K3LogError("ReadFileByOffset read file error: %s", err)
+			}
+			break
+		}
+
+		k3.K3LogDebug("ReadFileByOffset ReadLine : %s", line)
+		currentOffset += int64(len(line))
+		content += line
+	}
+
+	if len(content) > 0 {
+		if err := SendData2Consumer(content, fileState); err != nil {
+			return err
+		}
+	}
+
+	// 将最新的文件数据，同步给内存
+	FileStateLock.Lock()
+	GlobalFileStates[fileState.Path].Offset = currentOffset
+	if GlobalFileStates[fileState.Path].StartReadTime == 0 {
+		GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
+	}
+	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
+	FileStateLock.Unlock()
+
+	return nil
+}
+
+// SendData2Consumer  将数据发送给 consumer
+func SendData2Consumer(content string, fileState *FileState) error {
+
+	var (
+		ip    string
+		ips   []string
+		datas []string
+		err   error
+	)
+
+	if ips, err = k3.GetLocalIPs(); err != nil {
+		return fmt.Errorf("get local ips error: %s", err)
+	} else {
+		ip = ips[0]
+	}
+
+	datas = strings.Split(content, "\n")
+	for _, data := range datas {
+		data = strings.TrimSpace(data)
+		data = strings.Trim(data, "\n")
+		if len(data) == 0 {
+			continue
+		}
+
+		if err = GlobalDataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, fileState.IndexName,
+			map[string]interface{}{
+				"_data": data,
+				"_path": fileState.Path,
+			}); err != nil {
+			k3.K3LogError("Track: %s", err.Error())
+			return err
+		}
+	}
+
+	return nil
+}
+
+func Close() {
+	// 关闭所有打开的文件
+	for fileName, fd := range GlobalFileStateFds {
+		k3.K3LogDebug("Close file: %s", fileName)
+		fd.Close()
+	}
+	GlobalWatchContextCancel()
+	GlobalWatchWG.Wait()
+	GlobalDataAnalytics.Close()
+}
+
+// ForceSyncFileState 强制将内存中的file state 写入硬盘
 func ForceSyncFileState() error {
 	var (
 		fd      *os.File
 		err     error
 		encoder *json.Encoder
 	)
+
 	FileStateLock.Lock()
 	defer FileStateLock.Unlock()
-	if fd, err = os.OpenFile(config.GlobalConfig.Watch.StateFilePath, os.O_RDWR|os.O_TRUNC, 0666); err != nil {
-		return fmt.Errorf("open state file error: %s", err.Error())
+
+	// 将GlobalFileStates 写入到文件
+	if fd, err = os.OpenFile(config.GlobalConfig.Watch.StateFilePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666); err != nil {
+		return fmt.Errorf("[ForceSyncFileState] open file error: %s", err)
 	}
 
 	defer fd.Close()
+
 	encoder = json.NewEncoder(fd)
 
 	if err = encoder.Encode(&GlobalFileStates); err != nil {
-		return fmt.Errorf("encode state file error: %s", err.Error())
+		return fmt.Errorf("[ForceSyncFileState] encode file state error: %s", err)
 	}
 	return nil
 }
@@ -575,12 +620,12 @@ func ClockSyncFileState() {
 		for {
 			select {
 			case <-GlobalWatchContext.Done():
+				// 退出定时器
 				return
-				// 获取到定时时间
 			case <-t.C:
-				// 执行同步逻辑任务
+				// 定时执行同步任务
 				if err := ForceSyncFileState(); err != nil {
-					k3.K3LogError("ForceSyncFileState: %s\n", err)
+					k3.K3LogError("[ClockSyncFileState] ForceSyncFileState: %s\n", err)
 				}
 			}
 		}
@@ -641,13 +686,13 @@ func HandleReadFileAndSendData() {
 
 		// 如果文件不存在就跳过
 		if fd, ok = GlobalFileStateFds[fileName]; !ok || fd == nil {
-			k3.K3LogError("file not exist: %s", fileName)
+			k3.K3LogError("[HandleReadFileAndSendData] file not exist: %s", fileName)
 			continue
 		}
 
 		// 获取文件最后的修改时间
 		if fstat, err = fd.Stat(); err != nil {
-			k3.K3LogError("stat file error: %s", err)
+			k3.K3LogError("[HandleReadFileAndSendData]  stat file error: %s", err)
 			continue
 		} else {
 			// 判断文件是否已经读完了, 如果读完了就下一个
@@ -693,7 +738,7 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 
 		_, err := fd.Seek(lastOffset, io.SeekStart)
 		if err != nil {
-			k3.K3LogError("clock seek file error: %s", err)
+			k3.K3LogError("[goRoutineReadFileAndSyncFileState] clock seek file error: %s", err)
 			break
 		}
 
@@ -708,88 +753,24 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 			break
 		}
 
-		k3.K3LogDebug("goRoutineReadFileAndSyncFileState ReadLine: %s", line)
+		k3.K3LogDebug("[goRoutineReadFileAndSyncFileState] ReadLine: %s", line)
 		lastOffset += int64(len(line))
 		content += line
 	}
 
 	if len(content) > 0 {
 		if err := SendData2Consumer(content, fileState); err != nil {
-			k3.K3LogError("SendData2Consumer: %s", err)
+			k3.K3LogError("[goRoutineReadFileAndSyncFileState] SendData2Consumer: %s", err)
 			return
 		}
 	}
 
-	if err := SyncFileState(fileState.Path, lastOffset); err != nil {
-		k3.K3LogError("SyncFileState: %s\n", err)
-		return
-	}
-}
-
-// SendData2Consumer 未使用 将数据发送给consumer
-func SendData2Consumer(content string, fileState *FileState) error {
-
-	var (
-		ip    string
-		ips   []string
-		datas []string
-		err   error
-	)
-
-	if ips, err = k3.GetLocalIPs(); err != nil {
-		return fmt.Errorf("get local ips error: %s", err)
-	} else {
-		ip = ips[0]
-	}
-
-	datas = strings.Split(content, "\n")
-	for _, data := range datas {
-		data = strings.TrimSpace(data)
-		data = strings.Trim(data, "\n")
-		if len(data) == 0 {
-			continue
-		}
-
-		if err = GlobalDataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, fileState.IndexName,
-			map[string]interface{}{
-				"_data": data,
-				"_path": fileState.Path,
-			}); err != nil {
-			k3.K3LogError("Track: %s", err.Error())
-		}
-	}
-
-	return nil
-}
-
-// SyncFileState 更新file state
-func SyncFileState(filePath string, lastOffset int64) error {
-	var (
-		fd      *os.File
-		err     error
-		encoder *json.Encoder
-	)
-
+	// 修改内存即可，同步到硬盘交给定时器
 	FileStateLock.Lock()
-	defer FileStateLock.Unlock()
-
-	if GlobalFileStates[filePath].StartReadTime == 0 {
-		GlobalFileStates[filePath].StartReadTime = time.Now().Unix()
+	GlobalFileStates[fileState.Path].Offset = lastOffset
+	if GlobalFileStates[fileState.Path].StartReadTime == 0 {
+		GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
 	}
-	GlobalFileStates[filePath].Offset = lastOffset              // 更新最后偏移量
-	GlobalFileStates[filePath].LastReadTime = time.Now().Unix() // 更新最后读取时间
-
-	// 写入文件
-
-	if fd, err = os.OpenFile(config.GlobalConfig.Watch.StateFilePath, os.O_RDWR|os.O_TRUNC, 0666); err != nil {
-		return fmt.Errorf("open state file error: %s", err.Error())
-	}
-
-	defer fd.Close()
-	encoder = json.NewEncoder(fd)
-
-	if err = encoder.Encode(&GlobalFileStates); err != nil {
-		return fmt.Errorf("encode state file error: %s", err.Error())
-	}
-	return nil
+	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
+	FileStateLock.Unlock()
 }
