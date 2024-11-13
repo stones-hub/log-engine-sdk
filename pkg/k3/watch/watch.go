@@ -602,7 +602,7 @@ func ForceSyncFileState() error {
 // ClockSyncFileState 定时将内存中的file state 写入硬盘
 func ClockSyncFileState() {
 	var (
-		syncInterval = config.GlobalConfig.Watch.ObsoleteInterval
+		syncInterval = config.GlobalConfig.Watch.SyncInterval
 		t            *time.Ticker
 	)
 
