@@ -83,7 +83,7 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 	}
 
 	if client, err = elasticsearch.NewClient(cfg); err != nil {
-		k3.K3LogError("Failed to create Elasticsearch client: %v", err)
+		k3.K3LogError("[NewElasticsearchWithConfig] Failed to create Elasticsearch client: %v", err)
 		return nil, err
 	}
 
@@ -121,7 +121,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 		// 获取consumer 提交过来的日志
 		case data, ok := <-client.dataChan:
 			if !ok {
-				k3.K3LogError("WriteDataToElasticSearch data-channel closed !")
+				k3.K3LogError("[WriteDataToElasticSearch] data-channel closed !")
 				return
 			}
 
@@ -129,7 +129,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 				continue
 			}
 
-			k3.K3LogDebug("WriteDataToElasticSearch: %s", requestBody)
+			k3.K3LogDebug("[WriteDataToElasticSearch] request body : %s", requestBody)
 
 			if len(data.IndexName) == 0 {
 				index = config.GlobalConfig.ELK.DefaultIndexName
@@ -184,7 +184,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 			buffer.WriteString("\n")
 		}
 
-		k3.K3LogDebug("bulk_data:%s\n", buffer.String())
+		k3.K3LogDebug("[sendBulkElasticSearch] bulk_data:%s\n", buffer.String())
 
 		BulkData = make([]*Bulk, 0)
 
@@ -198,22 +198,22 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 
 		if err != nil {
 			k3.GlobalWriteFailedCount = k3.GlobalWriteFailedCount + currentBulkSize
-			k3.K3LogError("Bulk send to elasticsearch failed: %v", err)
+			k3.K3LogError("[sendBulkElasticSearch] Bulk send to elasticsearch failed: %v", err)
 			return
 		}
 
 		if res.IsError() {
 			k3.GlobalWriteFailedCount = k3.GlobalWriteFailedCount + currentBulkSize
-			k3.K3LogError("Bulk response from elasticsearch failed: %s", res.String())
+			k3.K3LogError("[sendBulkElasticSearch] Bulk response from elasticsearch failed: %s", res.String())
 			res.Body.Close()
 			return
 		}
 
 		res.Body.Close()
 		k3.GlobalWriteSuccessCount = k3.GlobalWriteSuccessCount + currentBulkSize
-		k3.K3LogWarn("Bulk send data(line:%v) to elasticsearch successfully.", currentBulkSize)
+		k3.K3LogInfo("[sendBulkElasticSearch] Bulk send data(line:%v) to elasticsearch successfully.", currentBulkSize)
 	} else {
-		k3.K3LogWarn("Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, config.GlobalConfig.ELK.BulkSize)
+		k3.K3LogDebug("[sendBulkElasticSearch] Bulk size(%v) is less than MaxBulkSize(%v)", currentBulkSize, config.GlobalConfig.ELK.BulkSize)
 	}
 }
 
@@ -221,7 +221,7 @@ func (e *ElasticSearchClient) Send(data []protocol.Data) error {
 	// 循环发送数据
 	for _, d := range data {
 		if err := e.sendWithRetries(&d); err != nil {
-			k3.K3LogError("Send data(%v) to elk's data-channel error : %v", d.UUID, err)
+			k3.K3LogError("[Send] data(%v) to elk's data-channel error : %v", d.UUID, err)
 		}
 	}
 	return nil
@@ -238,34 +238,14 @@ func (e *ElasticSearchClient) sendWithRetries(d *protocol.Data) error {
 		case e.dataChan <- d:
 			return nil
 		default:
-			k3.K3LogInfo("%d attempt, the data-channel is full, uuid(%v) retry ......", i, d.UUID)
+			k3.K3LogWarn("[sendWithRetries] %d attempt, the data-channel is full, uuid(%v) retry ......", i, d.UUID)
 			time.Sleep(time.Duration(e.retryInterval) * time.Second)
 		}
 	}
 
 	k3.GlobalWriteToChannelFailedCount++
-	return fmt.Errorf("data-channel is full after retries")
+	return fmt.Errorf("[sendWithRetries] data-channel is full after retries")
 }
-
-// 将多条数据封装成1条数据, 暂时先不测试
-/*
-func (e *ElasticSearchClient) prepareBulkData(data []protocol.Data) ([]byte, error) {
-	var bulkData bytes.Buffer
-
-	for _, d := range data {
-		jsonData, err := json.Marshal(d)
-		if err != nil {
-			return nil, err
-		}
-
-		bulkData.WriteString(fmt.Sprintf(`{"index":{"_id":"%s"}}\n`, d.UUID))
-		bulkData.Write(jsonData)
-		bulkData.WriteString("\n")
-	}
-	return bulkData.Bytes(), nil
-}
-
-*/
 
 // consumerDataToElkData 将consumer的数据转换为elk的数据
 func consumerDataToElkData(data *protocol.Data) string {
@@ -282,7 +262,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 
 	// consumer的数据没有_data, 证明无需处理当前日志
 	if _data, ok = data.Properties["_data"]; !ok {
-		k3.K3LogError("No _data field in data: %v", data)
+		k3.K3LogError("[consumerDataToElkData] No _data field in data: %v", data)
 		return ""
 	}
 
@@ -292,7 +272,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 
 	// host_ip 和 host_name 、uuid 需要生成，SubmitLog 中并没有这些数据
 	if hostName, err = os.Hostname(); err != nil {
-		k3.K3LogError("Failed to get hostname: %v", err)
+		k3.K3LogError("[consumerDataToElkData] Failed to get hostname: %v", err)
 		hostName = "unknown"
 	}
 

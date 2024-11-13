@@ -470,7 +470,7 @@ func ReadFileByOffset(fd *os.File, fileState *FileState) error {
 
 	// 防止有可能FD或者FileState失效的问题
 	if fd == nil || fileState == nil {
-		return fmt.Errorf("fd or fileState is nil")
+		return fmt.Errorf("[ReadFileByOffset] fd or fileState is nil")
 	}
 
 	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
@@ -563,7 +563,7 @@ func SendData2Consumer(content string, fileState *FileState) error {
 func Close() {
 	// 关闭所有打开的文件
 	for fileName, fd := range GlobalFileStateFds {
-		k3.K3LogDebug("Close file: %s", fileName)
+		k3.K3LogInfo("Close file: %s", fileName)
 		fd.Close()
 	}
 	GlobalWatchContextCancel()
@@ -595,7 +595,7 @@ func ForceSyncFileState() error {
 		return fmt.Errorf("[ForceSyncFileState] encode file state error: %s", err)
 	}
 
-	k3.K3LogWarn("[ForceSyncFileState] sync file state success")
+	k3.K3LogInfo("[ForceSyncFileState] sync file state success")
 	return nil
 }
 
@@ -748,9 +748,9 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 		// 读取文件错误, 有可能读完了
 		if err != nil {
 			if err == io.EOF {
-				k3.K3LogDebug("read file eof")
+				k3.K3LogDebug("[goRoutineReadFileAndSyncFileState] read file eof")
 			} else {
-				k3.K3LogError("read file error: %s", err)
+				k3.K3LogError("[goRoutineReadFileAndSyncFileState] read file error: %s", err)
 			}
 			break
 		}
