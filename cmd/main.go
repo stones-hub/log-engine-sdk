@@ -64,9 +64,12 @@ func main() {
 		configDir = dir + "/configs"
 	}
 
-	fmt.Println("----------------------------------")
-	fmt.Printf("configDir : %s\n", configDir)
-	fmt.Println("----------------------------------")
+	/*
+		fmt.Println("----------------------------------")
+		fmt.Printf("configDir : %s\n", configDir)
+		fmt.Println("----------------------------------")
+
+	*/
 
 	// 获取configs文件目录所有文件
 	if configs, err = k3.FetchDirectory(configDir, -1); err != nil {
