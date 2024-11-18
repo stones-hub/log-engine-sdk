@@ -244,6 +244,10 @@ func (e *ElasticSearchClient) sendWithRetries(d *protocol.Data) error {
 	}
 
 	k3.GlobalWriteToChannelFailedCount++
+	// 记录丢弃日志
+
+	_ = config.GlobalConsumer.Add(*d)
+
 	return fmt.Errorf("[sendWithRetries] data-channel is full after retries")
 }
 

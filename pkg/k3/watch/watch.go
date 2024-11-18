@@ -207,22 +207,25 @@ func InitCheckFileStateIsExistInDiskFiles(fileStatePath string, watchFiles map[s
 	return false
 }
 
-func InitFileStateFds() error {
+func InitFileStateFds() {
 	var (
 		err error
+		fd  *os.File
 	)
 
 	for filePath, _ := range GlobalFileStates {
-		if GlobalFileStateFds[filePath], err = os.OpenFile(filePath, os.O_RDONLY, 0666); err != nil {
-			return fmt.Errorf("InitFileStateFds open file error: %s", err.Error())
-		}
-
-		if GlobalFileStates[filePath].StartReadTime == 0 {
-			GlobalFileStates[filePath].StartReadTime = time.Now().Unix()
+		if fd, err = os.OpenFile(filePath, os.O_RDONLY, 0666); err != nil {
+			// 文件不存在， 从GlobalFileStateFds删除
+			delete(GlobalFileStateFds, filePath)
+			k3.K3LogWarn(filePath, "[InitFileStateFds] file not exist : %s", err.Error())
+			continue
+		} else {
+			GlobalFileStateFds[filePath] = fd
+			if GlobalFileStates[filePath].StartReadTime == 0 {
+				GlobalFileStates[filePath].StartReadTime = time.Now().Unix()
+			}
 		}
 	}
-
-	return nil
 }
 
 func Run() error {
@@ -269,10 +272,10 @@ func Run() error {
 		return err
 	}
 
-	// 初始化待监控的所有文件的FD
-	if err = InitFileStateFds(); err != nil {
-		return err
-	}
+	// 解决在打开FD的时候，文件已经没有了，此时要修改FileStates，并同步到硬盘
+	InitFileStateFds()
+	// 强制再次同步
+	_ = ForceSyncFileState()
 
 	fmt.Println("-----------------------------")
 	fmt.Println(GlobalFileStateFds, GlobalFileStates)
