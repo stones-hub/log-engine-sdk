@@ -779,30 +779,3 @@ func goRoutineReadFileAndSyncFileState(fd *os.File, fileState *FileState, wg *sy
 	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
 	FileStateLock.Unlock()
 }
-
-// HandleFile 处理文件，保证FileStates和FileStateFds中的数据是一致的, 并保证原子性
-func HandleFile(fileName string) error {
-	FileStateLock.Lock()
-	defer FileStateLock.Unlock()
-
-	fd, exists := GlobalFileStateFds[fileName]
-	if !exists {
-
-		newFd, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
-		if err != nil {
-			return err
-		}
-
-		GlobalFileStateFds[fileName] = newFd
-		GlobalFileStates[fileName] = &FileState{
-			Path:          fileName,
-			Offset:        0,
-			StartReadTime: 0,
-			LastReadTime:  0,
-			IndexName:     "",
-		}
-
-		return nil
-	}
-
-}
