@@ -42,6 +42,11 @@ var (
 	GlobalDataAnalytics k3.DataAnalytics // 日志接收器
 )
 
+// Run 启动监听
+func Run() {
+
+}
+
 // ClockSyncFileState2Disk 定时将GlobalFileStates数据同步到Disk硬盘存储
 func ClockSyncFileState2Disk() {
 
