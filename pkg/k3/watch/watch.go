@@ -45,6 +45,8 @@ var (
 // Run 启动监听
 func Run() {
 
+	// 启动监听文件目录
+
 }
 
 // ClockSyncFileState2Disk 定时将GlobalFileStates数据同步到Disk硬盘存储
