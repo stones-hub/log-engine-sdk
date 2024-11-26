@@ -7,6 +7,8 @@ import (
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
+	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -69,6 +71,36 @@ func InitConsumerBatchLog() error {
 	GlobalDataAnalytics = k3.NewDataAnalytics(consumer)
 
 	return nil
+}
+
+// FetchWatchPath 获取需要监控的目录中的所有子目录
+func FetchWatchPath(watchPath string) ([]string, error) {
+
+	var (
+		paths []string
+		err   error
+	)
+
+	if err = filepath.WalkDir(watchPath, func(currentPath string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			paths = append(paths, currentPath)
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return paths, err
+}
+
+// FetchWatchPathFile 获取监控目录中的所有文件
+func FetchWatchPathFile(watchPath string) ([]string, error) {
+	return k3.FetchDirectory(watchPath, -1)
 }
 
 // Run 启动监听
