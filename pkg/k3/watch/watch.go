@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
+	"log-engine-sdk/pkg/k3/config"
+	"log-engine-sdk/pkg/k3/protocol"
+	"log-engine-sdk/pkg/k3/sender"
 	"sync"
 )
 
@@ -42,9 +45,34 @@ var (
 	GlobalDataAnalytics k3.DataAnalytics // 日志接收器
 )
 
+func InitConsumerBatchLog() error {
+	var (
+		elk      *sender.ElasticSearchClient
+		err      error
+		consumer protocol.K3Consumer
+	)
+	if elk, err = sender.NewElasticsearch(config.GlobalConfig.ELK.Address,
+		config.GlobalConfig.ELK.Username,
+		config.GlobalConfig.ELK.Password); err != nil {
+		return err
+	}
+
+	if consumer, err = k3.NewBatchConsumerWithConfig(k3.K3BatchConsumerConfig{
+		Sender:        elk,
+		BatchSize:     config.GlobalConfig.Consumer.ConsumerBatchSize,
+		AutoFlush:     config.GlobalConfig.Consumer.ConsumerBatchAutoFlush,
+		Interval:      config.GlobalConfig.Consumer.ConsumerBatchInterval,
+		CacheCapacity: config.GlobalConfig.Consumer.ConsumerBatchCapacity,
+	}); err != nil {
+		return err
+	}
+	GlobalDataAnalytics = k3.NewDataAnalytics(consumer)
+
+	return nil
+}
+
 // Run 启动监听
 func Run() {
-
 	// 启动监听文件目录
 
 }
