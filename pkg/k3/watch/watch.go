@@ -105,6 +105,14 @@ func FetchWatchPathFile(watchPath string) ([]string, error) {
 
 // Run 启动监听
 func Run() {
+	// 初始化批量日志写入
+	if err := InitConsumerBatchLog(); err != nil {
+		k3.K3LogError("[Run] InitConsumerBatchLog failed: ", err.Error())
+		return
+	}
+
+	//  检查状态文件， 如果没有就创建，如果有就对比当前目录所有的文件做一次整体更新
+
 	// 启动监听文件目录
 
 }
