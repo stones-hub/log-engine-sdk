@@ -103,13 +103,20 @@ func FetchWatchPathFile(watchPath string) ([]string, error) {
 	return k3.FetchDirectory(watchPath, -1)
 }
 
-// InitFileState 初始化FileState文件
-// 如果文件存在就同步硬盘和FileState文件数据，如果不存在就创建一个新文件并同步文件数据
-func InitFileState(filePath string) error {
+// ForceSyncFileStateToDisk 强制遍历硬盘所有文件，同步到FileState中并生成硬盘文件
+func ForceSyncFileStateToDisk() error {
 
 	return nil
 }
 
+// InitFileState 初始化FileState文件
+// 如果文件存在就同步硬盘和FileState文件数据，如果不存在就创建一个新文件并同步文件数据
+func InitFileState() error {
+
+	return nil
+}
+
+// InitWatcher 初始化Watcher监听
 func InitWatcher(indexName string) {
 
 }
@@ -123,7 +130,7 @@ func Run() {
 	}
 
 	//  检查状态文件， 如果没有就创建，如果有就对比当前目录所有的文件做一次整体更新
-	if err := InitFileState(config.GlobalConfig.Watch.StateFilePath); err != nil {
+	if err := InitFileState(); err != nil {
 		k3.K3LogError("[Run] InitFileState failed: ", err.Error())
 		return
 	}
