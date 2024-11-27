@@ -95,6 +95,8 @@ func FetchWatchPath(watchPath string) ([]string, error) {
 		return nil, err
 	}
 
+	// 获取
+
 	return paths, err
 }
 

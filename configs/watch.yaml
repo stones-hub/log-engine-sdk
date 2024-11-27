@@ -1,7 +1,7 @@
 # watch监控目录列表
 watch :
   read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
-    index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
+    index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx", "/Users/yelei/data/code/go-projects/logs/nginx_temp"] # 必须是目录
     index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
     index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
     index_test : ["/Users/yelei/data/code/go-projects/logs/test"]
