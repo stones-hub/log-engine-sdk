@@ -25,6 +25,7 @@ var (
 	BuildTime  string
 )
 
+// TODO 检查配置文件路径和根目录路径的使用
 func main() {
 	var (
 		dir       string

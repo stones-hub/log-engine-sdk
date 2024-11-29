@@ -112,6 +112,9 @@ func ForceSyncFileStateToDisk() error {
 // InitFileState 初始化FileState文件
 // 如果文件存在就同步硬盘和FileState文件数据，如果不存在就创建一个新文件并同步文件数据
 func InitFileState() error {
+	var (
+		fileStateFilePath string
+	)
 
 	return nil
 }
