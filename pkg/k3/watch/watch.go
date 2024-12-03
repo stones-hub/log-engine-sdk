@@ -115,6 +115,7 @@ func InitFileState() error {
 	var (
 		fileStateFilePath string
 	)
+	// TODO 解决重写问题
 
 	return nil
 }
