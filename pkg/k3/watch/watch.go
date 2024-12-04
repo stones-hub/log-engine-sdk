@@ -103,7 +103,7 @@ func FetchWatchPathFile(watchPath string) ([]string, error) {
 	return k3.FetchDirectory(watchPath, -1)
 }
 
-// ForceSyncFileStateToDisk 强制遍历硬盘所有文件，同步到FileState中并生成硬盘文件
+// ForceSyncFileStateToDisk 强制遍历硬盘所有文件，同步到FileState 中并生成硬盘文件
 func ForceSyncFileStateToDisk() error {
 
 	return nil
