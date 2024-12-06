@@ -154,6 +154,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 }
 
 func (e *ElasticSearchClient) Close() error {
+
 	close(e.dataChan)
 	e.sg.Wait()
 	sendBulkElasticSearch(e.client, true)
