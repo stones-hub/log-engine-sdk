@@ -164,6 +164,7 @@ func (e *ElasticSearchClient) Close() error {
 func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 
 	var buffer strings.Builder
+
 	currentBulkSize := len(BulkData)
 	if currentBulkSize == 0 {
 		return
