@@ -122,6 +122,7 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 		case data, ok := <-client.dataChan:
 			if !ok {
 				k3.K3LogError("[WriteDataToElasticSearch] data-channel closed !")
+			
 				return
 			}
 
