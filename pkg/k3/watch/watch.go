@@ -77,7 +77,7 @@ func InitConsumerBatchLog() error {
 func InitFileState() {
 	// 解决硬盘state/core.json文件问题
 
-	// 判断state/core.json文件是否存在
+	// 判断state/core.json文件是否存在, 如果存在就不管，如果不存在就创建
 
 }
 
