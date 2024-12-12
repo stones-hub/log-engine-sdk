@@ -73,6 +73,14 @@ func InitConsumerBatchLog() error {
 	return nil
 }
 
+// InitFileState 初始化FileState
+func InitFileState() {
+	// 解决硬盘state/core.json文件问题
+
+	// 判断state/core.json文件是否存在
+
+}
+
 // FetchWatchPath 获取需要监控的目录中的所有子目录
 func FetchWatchPath(watchPath string) ([]string, error) {
 
@@ -109,17 +117,6 @@ func ForceSyncFileStateToDisk() error {
 	return nil
 }
 
-// InitFileState 初始化FileState文件
-// 如果文件存在就同步硬盘和FileState文件数据，如果不存在就创建一个新文件并同步文件数据
-func InitFileState() error {
-	var (
-		fileStateFilePath string
-	)
-	// TODO 解决重写问题
-
-	return nil
-}
-
 // InitWatcher 初始化Watcher监听
 func InitWatcher(indexName string) {
 
@@ -132,14 +129,6 @@ func Run() {
 		k3.K3LogError("[Run] InitConsumerBatchLog failed: ", err.Error())
 		return
 	}
-
-	//  检查状态文件， 如果没有就创建，如果有就对比当前目录所有的文件做一次整体更新
-	if err := InitFileState(); err != nil {
-		k3.K3LogError("[Run] InitFileState failed: ", err.Error())
-		return
-	}
-
-	// 初始化监听, 每个index_name 创建一个监听
 
 }
 
