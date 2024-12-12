@@ -4,7 +4,6 @@ go 1.22.4
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
-	github.com/fsnotify/fsnotify v1.7.0
 	github.com/google/uuid v1.6.0
 	github.com/koding/multiconfig v0.0.0-20171124222453-69c27309b2d7
 )
@@ -19,6 +18,5 @@ require (
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
