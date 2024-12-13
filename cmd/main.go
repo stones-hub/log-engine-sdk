@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
+	"log-engine-sdk/pkg/k3/watch"
 	_ "net/http/pprof"
 	"os"
 	"strings"
@@ -65,10 +66,12 @@ func main() {
 	})
 	defer config.GlobalConsumer.Close()
 
-	fmt.Println("----------------------------------")
-	fmt.Printf("configDir : %s\n", configDir)
-	fmt.Printf("logDir : %s\n", config.GlobalConfig.System.LogPath)
-	fmt.Println("----------------------------------")
+	/*
+		fmt.Println("----------------------------------")
+		fmt.Printf("configDir : %s\n", configDir)
+		fmt.Printf("logDir : %s\n", config.GlobalConfig.System.LogPath)
+		fmt.Println("----------------------------------")
+	*/
 
 	// 5. 根据配置文件设置日志等级和配置文件打印到控制台权限
 	if config.GlobalConfig.System.LogLevel > 0 {
@@ -84,55 +87,48 @@ func main() {
 		}
 	}
 
-	var (
-		watchDirs map[string][]string
-	)
-
 	// 6. 遍历配置文件的监控目录，由于watch碰到子目录是不会主动监控的，所以需要子目录递归添加
+	watchDirectory := make(map[string][]string)
+
 	for indexName, dirs := range config.GlobalConfig.Watch.ReadPath {
-		fmt.Println(indexName, dirs)
-	}
-
-	/*
-
-		// 遍历需要监控的目录
-		for _, readDirs := range config.GlobalConfig.Watch.ReadPath {
-			for _, readDir := range readDirs {
-				if !strings.HasSuffix(readDir, "/") {
-					readDir = readDir + "/"
-				}
-				ReadDirectory = append(ReadDirectory, readDir)
+		// 递归目录
+		for _, dir := range dirs {
+			if paths, err := k3.FetchDirectoryPath(dir, -1); err != nil {
+				k3.K3LogError("[main] fetch directory path error: %s", err)
+				continue
+			} else {
+				watchDirectory[indexName] = append(watchDirectory[indexName], paths...)
 			}
 		}
+	}
 
-		// 剔除ReadDirectory中的重复目录
-		ReadDirectory = k3.RemoveDuplicateElement(ReadDirectory)
+	// 7. 清理可能重复的目录
+	for indexName, dirs := range watchDirectory {
+		watchDirectory[indexName] = k3.RemoveDuplicateElement(dirs)
+	}
 
-		fmt.Println("需要监控的目录 ReadDirectory:", ReadDirectory)
+	k3.K3LogDebug("需要监控的目录列表: %v", watchDirectory)
 
-	*/
+	// 8. 将需要监控的目录，放入监控器中，跑起来
+	if err = watch.Run(watchDirectory); err != nil {
+		k3.K3LogError("[main] watch error: %s", err)
+		return
+	}
 
 	os.Exit(0)
 
 	/*
+		if config.GlobalConfig.Http.Enable == true {
+			// 启动http服务器
+			httpClean, _ = k3.HttpServer(context.Background())
+		}
+
+		pprof()
+
 		var (
-			// httpClean     func()
-			)
-			// err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
-			err = watch.Run()
-
-			if err != nil {
-				k3.K3LogError("watch error: %s", err)
-				return
-			}
-
-			if config.GlobalConfig.Http.Enable == true {
-				// 启动http服务器
-				httpClean, _ = k3.HttpServer(context.Background())
-			}
-
-			pprof()
-			graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
+			httpClean func()
+		)
+		graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
 
 	*/
 }

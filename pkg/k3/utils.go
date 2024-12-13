@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -152,6 +153,42 @@ func FetchDirectory(dir string, maxDepth int) ([]string, error) {
 	}
 
 	return files, nil
+}
+
+// FetchDirectoryPath 递归遍历目录, maxDepth -1 全部遍历, 返回所有的目录
+func FetchDirectoryPath(dir string, maxDepth int) ([]string, error) {
+	var (
+		err       error
+		paths     []string
+		rootDepth = len(strings.Split(dir, string(os.PathSeparator)))
+	)
+
+	if err = filepath.WalkDir(dir, func(currentPath string, d fs.DirEntry, err error) error {
+		var (
+			currentDepth int
+		)
+
+		if err != nil {
+			return err
+		}
+
+		currentDepth = len(strings.Split(currentPath, string(os.PathSeparator))) - rootDepth
+
+		if maxDepth != -1 && currentDepth > maxDepth {
+			return filepath.SkipDir
+		}
+
+		if d.IsDir() {
+			paths = append(paths, currentPath)
+		}
+
+		return nil
+
+	}); err != nil {
+		return nil, err
+	}
+
+	return paths, nil
 }
 
 func InterfaceToString(val interface{}) (string, bool) {
