@@ -8,6 +8,7 @@ import (
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
+	"os"
 	"sync"
 )
 
@@ -72,15 +73,47 @@ func InitConsumerBatchLog() error {
 	return nil
 }
 
+func LoadFileState(filePath string) error {
+	var (
+		fd  *os.File
+		err error
+	)
+
+	if fd, err = os.OpenFile(stateFilePath, os.O_RDWR, os.ModePerm); err != nil {
+		return errors.New("[Run] open state file failed: " + err.Error())
+	}
+	defer fd.Close()
+
+	return err
+}
+
 // Run 启动监听
 func Run(directory map[string][]string) error {
+	var (
+		err           error
+		stateFilePath string
+	)
+
 	// 1. 初始化批量日志写入, 引入elk
-	if err := InitConsumerBatchLog(); err != nil {
+	if err = InitConsumerBatchLog(); err != nil {
 		return errors.New("[Run] InitConsumerBatchLog failed: " + err.Error())
 	}
 
 	// 2. 初始化FileState 文件
+	stateFilePath = k3.GetRootPath() + config.GlobalConfig.Watch.StateFilePath
 	// 2.1. 检查core.json是否存在，不存在就创建，并且load到FileState变量中
+	if !k3.FileExists(stateFilePath) {
+		// 创建文件
+		if _, err = os.OpenFile(stateFilePath, os.O_CREATE, os.ModePerm); err != nil {
+			return errors.New("[Run] create state file failed: " + err.Error())
+		}
+	}
+
+	// 打开文件state，load到FileState中
+	if err = LoadFileState(stateFilePath); err != nil {
+		return errors.New("[Run] load file state failed : " + err.Error())
+	}
+
 	// 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
 	// 2.4. 将FileState数据写入硬盘

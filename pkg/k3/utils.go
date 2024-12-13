@@ -235,3 +235,13 @@ func FileExists(filename string) bool {
 	_, err := os.Stat(filename)
 	return err == nil || os.IsExist(err)
 }
+
+// GetRootPath 获取项目根目录
+func GetRootPath() string {
+	if rootPath, err := os.Getwd(); err != nil {
+		return "/"
+	} else {
+		return rootPath
+	}
+
+}
