@@ -1,21 +1,13 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
-	"log-engine-sdk/pkg/k3/watch"
-	"net"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
-	"time"
 )
 
 var (
@@ -27,11 +19,10 @@ var (
 
 func main() {
 	var (
-		dir       string
-		err       error
-		configs   []string
-		configDir string // 配置文件目录
-		logDir    string // 系统日志文件目录
+		err           error
+		configs       []string
+		configDir     string   // 配置文件目录
+		ReadDirectory []string // 需要监控的目录
 	)
 
 	k3.K3LogInfo("Start with arguments Version: %s, BuildTime: %s, Tag: %s, ConfigPath: %s\n", Version, BuildTime, Tag, ConfigPath)
@@ -41,11 +32,12 @@ func main() {
 		configDir = ConfigPath
 	} else {
 
-		if dir, err = os.Getwd(); err != nil {
+		if currentDir, err := os.Getwd(); err != nil {
 			k3.K3LogError("[main] get current work dir error: %s", err)
 			return
+		} else {
+			configDir = currentDir + "/configs"
 		}
-		configDir = dir + "/configs"
 	}
 
 	// 2. 初始化配置文件, 将配置文件的内容全部写入全局变量GlobalConfig
@@ -56,11 +48,11 @@ func main() {
 
 	// 3. 初始化日志文件目录
 	if len(strings.ReplaceAll(config.GlobalConfig.System.LogPath, " ", "")) == 0 {
-		if workDir, err := os.Getwd(); err != nil {
+		if currentDir, err := os.Getwd(); err != nil {
 			k3.K3LogError("[main] get current work dir error: %s", err)
 			return
 		} else {
-			config.GlobalConfig.System.LogPath = workDir + "/log"
+			config.GlobalConfig.System.LogPath = currentDir + "/log"
 		}
 	}
 
@@ -85,7 +77,7 @@ func main() {
 
 	if config.GlobalConfig.System.PrintEnabled == true {
 		if configJson, err := json.Marshal(config.GlobalConfig); err != nil {
-			k3.K3LogError("json marshal error: %s", err)
+			k3.K3LogError("[main] json marshal error: %s", err)
 			return
 		} else {
 			fmt.Println(string(configJson))
@@ -93,8 +85,7 @@ func main() {
 	}
 
 	var (
-		ReadDirectory []string
-		httpClean     func()
+	// httpClean     func()
 	)
 
 	// 遍历需要监控的目录
@@ -110,23 +101,30 @@ func main() {
 	// 剔除ReadDirectory中的重复目录
 	ReadDirectory = k3.RemoveDuplicateElement(ReadDirectory)
 
-	// err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
-	err = watch.Run()
+	fmt.Println("需要监控的目录 ReadDirectory:", ReadDirectory)
 
-	if err != nil {
-		k3.K3LogError("watch error: %s", err)
-		return
-	}
+	os.Exit(0)
+	/*
+		// err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
+		err = watch.Run()
 
-	if config.GlobalConfig.Http.Enable == true {
-		// 启动http服务器
-		httpClean, _ = k3.HttpServer(context.Background())
-	}
+		if err != nil {
+			k3.K3LogError("watch error: %s", err)
+			return
+		}
 
-	pprof()
-	graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
+		if config.GlobalConfig.Http.Enable == true {
+			// 启动http服务器
+			httpClean, _ = k3.HttpServer(context.Background())
+		}
+
+		pprof()
+		graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
+
+	*/
 }
 
+/*
 // GraceExit 保持进程常驻， 等待信号在退出
 func graceExit(stateFile string, cleanFuncs ...func()) {
 	var (
@@ -188,3 +186,6 @@ func pprof() {
 
 	}()
 }
+
+
+*/

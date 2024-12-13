@@ -3,7 +3,7 @@ system:
   print_enabled: true # 是否打印配置信息
   use_elk : true # 是否使用elk
   log_level: 4  # error = 1, warn = 2, info = 3, debug = 4
-  log_path: "logs/core.log"
+  log_path: ""
 
 
 
