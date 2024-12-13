@@ -2,6 +2,7 @@ package watch
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
@@ -73,18 +74,28 @@ func InitConsumerBatchLog() error {
 	return nil
 }
 
+// LoadFileState 从文件加载FileState
 func LoadFileState(filePath string) error {
 	var (
-		fd  *os.File
-		err error
+		fd      *os.File
+		decoder *json.Decoder
+		err     error
 	)
 
+	// 打开文件
 	if fd, err = os.OpenFile(filePath, os.O_RDWR, os.ModePerm); err != nil {
 		return errors.New("[Run] open state file failed: " + err.Error())
 	}
 	defer fd.Close()
 
-	return err
+	// 将文件映射到FileState
+	decoder = json.NewDecoder(fd)
+
+	if err = decoder.Decode(&GlobalFileStates); err != nil {
+		return errors.New("[Run] json decode failed: " + err.Error())
+	}
+
+	return nil
 }
 
 // Run 启动监听
@@ -100,7 +111,7 @@ func Run(directory map[string][]string) error {
 	}
 
 	// 2. 初始化FileState 文件
-	stateFilePath = k3.GetRootPath() + config.GlobalConfig.Watch.StateFilePath
+	stateFilePath = k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath
 	// 2.1. 检查core.json是否存在，不存在就创建，并且load到FileState变量中
 	if !k3.FileExists(stateFilePath) {
 		// 创建文件
@@ -109,10 +120,12 @@ func Run(directory map[string][]string) error {
 		}
 	}
 
-	// 打开文件state，load到FileState中
+	// 打开文件state file, 并将数据load到GlobalFileStates变量中
 	if err = LoadFileState(stateFilePath); err != nil {
 		return errors.New("[Run] load file state failed : " + err.Error())
 	}
+
+	fmt.Println("GlobalFileStates:", GlobalFileStates)
 
 	// TODO 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
