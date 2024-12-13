@@ -2,13 +2,12 @@ package watch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
-	"os"
-	"path/filepath"
 	"sync"
 )
 
@@ -73,68 +72,16 @@ func InitConsumerBatchLog() error {
 	return nil
 }
 
-// InitFileState 初始化FileState
-func InitFileState() {
-	// 解决硬盘state/core.json文件问题
-
-	// 判断state/core.json文件是否存在, 如果存在就不管，如果不存在就创建
-
-}
-
-// FetchWatchPath 获取需要监控的目录中的所有子目录
-func FetchWatchPath(watchPath string) ([]string, error) {
-
-	var (
-		paths []string
-		err   error
-	)
-
-	if err = filepath.WalkDir(watchPath, func(currentPath string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() {
-			paths = append(paths, currentPath)
-		}
-
-		return nil
-	}); err != nil {
-		return nil, err
+// Run 启动监听
+func Run(directory map[string][]string) error {
+	// 1. 初始化批量日志写入, 引入elk
+	if err := InitConsumerBatchLog(); err != nil {
+		return errors.New("[Run] InitConsumerBatchLog failed: " + err.Error())
 	}
 
-	return paths, err
-}
-
-// FetchWatchPathFile 获取监控目录中的所有文件
-func FetchWatchPathFile(watchPath string) ([]string, error) {
-	return k3.FetchDirectory(watchPath, -1)
-}
-
-// ForceSyncFileStateToDisk 强制遍历硬盘所有文件，同步到FileState 中并生成硬盘文件
-func ForceSyncFileStateToDisk() error {
+	// 2. 初始化FileState 文件
 
 	return nil
-}
-
-// InitWatcher 初始化Watcher监听
-func InitWatcher(indexName string) {
-
-}
-
-// Run 启动监听
-func Run() {
-	// 初始化批量日志写入
-	if err := InitConsumerBatchLog(); err != nil {
-		k3.K3LogError("[Run] InitConsumerBatchLog failed: ", err.Error())
-		return
-	}
-
-}
-
-// ClockSyncFileState2Disk 定时将GlobalFileStates数据同步到Disk硬盘存储
-func ClockSyncFileState2Disk() {
-
 }
 
 /*
