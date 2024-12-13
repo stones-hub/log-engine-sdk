@@ -98,6 +98,11 @@ func LoadFileState(filePath string) error {
 	return nil
 }
 
+// SaveFileState 保存FileState的数据到硬盘
+func SaveFileState() error {
+	return nil
+}
+
 // Run 启动监听
 func Run(directory map[string][]string) error {
 	var (
