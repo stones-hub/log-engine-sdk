@@ -19,10 +19,9 @@ var (
 
 func main() {
 	var (
-		err           error
-		configs       []string
-		configDir     string   // 配置文件目录
-		ReadDirectory []string // 需要监控的目录
+		err       error
+		configs   []string
+		configDir string // 配置文件目录
 	)
 
 	k3.K3LogInfo("Start with arguments Version: %s, BuildTime: %s, Tag: %s, ConfigPath: %s\n", Version, BuildTime, Tag, ConfigPath)
@@ -71,6 +70,7 @@ func main() {
 	fmt.Printf("logDir : %s\n", config.GlobalConfig.System.LogPath)
 	fmt.Println("----------------------------------")
 
+	// 5. 根据配置文件设置日志等级和配置文件打印到控制台权限
 	if config.GlobalConfig.System.LogLevel > 0 {
 		k3.CurrentLogLevel = k3.K3LogLevel(config.GlobalConfig.System.LogLevel)
 	}
@@ -85,41 +85,54 @@ func main() {
 	}
 
 	var (
-	// httpClean     func()
+		watchDirs map[string][]string
 	)
 
-	// 遍历需要监控的目录
-	for _, readDirs := range config.GlobalConfig.Watch.ReadPath {
-		for _, readDir := range readDirs {
-			if !strings.HasSuffix(readDir, "/") {
-				readDir = readDir + "/"
-			}
-			ReadDirectory = append(ReadDirectory, readDir)
-		}
+	// 6. 遍历配置文件的监控目录，由于watch碰到子目录是不会主动监控的，所以需要子目录递归添加
+	for indexName, dirs := range config.GlobalConfig.Watch.ReadPath {
+		fmt.Println(indexName, dirs)
 	}
 
-	// 剔除ReadDirectory中的重复目录
-	ReadDirectory = k3.RemoveDuplicateElement(ReadDirectory)
+	/*
 
-	fmt.Println("需要监控的目录 ReadDirectory:", ReadDirectory)
+		// 遍历需要监控的目录
+		for _, readDirs := range config.GlobalConfig.Watch.ReadPath {
+			for _, readDir := range readDirs {
+				if !strings.HasSuffix(readDir, "/") {
+					readDir = readDir + "/"
+				}
+				ReadDirectory = append(ReadDirectory, readDir)
+			}
+		}
+
+		// 剔除ReadDirectory中的重复目录
+		ReadDirectory = k3.RemoveDuplicateElement(ReadDirectory)
+
+		fmt.Println("需要监控的目录 ReadDirectory:", ReadDirectory)
+
+	*/
 
 	os.Exit(0)
+
 	/*
-		// err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
-		err = watch.Run()
+		var (
+			// httpClean     func()
+			)
+			// err = watch.Run(ReadDirectory, dir+config.GlobalConfig.Watch.StateFilePath)
+			err = watch.Run()
 
-		if err != nil {
-			k3.K3LogError("watch error: %s", err)
-			return
-		}
+			if err != nil {
+				k3.K3LogError("watch error: %s", err)
+				return
+			}
 
-		if config.GlobalConfig.Http.Enable == true {
-			// 启动http服务器
-			httpClean, _ = k3.HttpServer(context.Background())
-		}
+			if config.GlobalConfig.Http.Enable == true {
+				// 启动http服务器
+				httpClean, _ = k3.HttpServer(context.Background())
+			}
 
-		pprof()
-		graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
+			pprof()
+			graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
 
 	*/
 }
