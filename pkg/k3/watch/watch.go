@@ -85,15 +85,8 @@ func Run(directory map[string][]string) error {
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
 	// 2.4. 将FileState数据写入硬盘
 
+	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
+
+	// 4. 定时更新 FileState 数据到硬盘
 	return nil
 }
-
-/*
-
-1. 初始化日志批量写入程序, (已引入elk)
-2. 初始化FileState文件 state/core.json
-	1)、如果core.json存在，就遍历当前硬盘所有文件，比对core.json的数据，如果文件名存在就跳过，如果不存在就新增并初始化
-	2)、如果core.json不存在，就遍历当前硬盘所有文件，全部写入到core.json
-	3)、剔除core.json存在，但硬盘中不存在的文件
-3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
-*/
