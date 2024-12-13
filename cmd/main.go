@@ -19,39 +19,47 @@ import (
 )
 
 var (
-	ConfigPath string
+	ConfigPath string // Makefile 中设置，解决config path不在项目内的问题
+	LogPath    string // Makefile 中设置，解决log path不在项目内的问题
 	Tag        string
 	Version    string
 	BuildTime  string
 )
 
-// TODO 检查配置文件路径和根目录路径的使用
 func main() {
 	var (
 		dir       string
 		err       error
 		configs   []string
 		configDir string
+		logDir    string
 	)
 
 	k3.K3LogInfo("Start with arguments Version: %s, BuildTime: %s, Tag: %s, ConfigPath: %s\n", Version, BuildTime, Tag, ConfigPath)
 
-	// 初始化配置文件, 必须通过make运行
-	if dir, err = os.Getwd(); err != nil {
-		k3.K3LogError("get current dir error: %s", err)
-		return
-	}
-
-	// 注入根目录
-	if len(config.GlobalConfig.System.RootPath) > 0 {
-		dir = config.GlobalConfig.System.RootPath
+	// 1. 如果ConfigPath没有设置，则使用当前目录作为配置文件目录
+	if len(ConfigPath) != 0 {
+		configDir = ConfigPath
 	} else {
-		config.GlobalConfig.System.RootPath = dir
+
+		if dir, err = os.Getwd(); err != nil {
+			k3.K3LogError("[main] get current work dir error: %s", err)
+			return
+		}
+		configDir = dir + "/configs"
 	}
 
-	// 初始化日志记录器, 用于记录日志同K3_log一样，只是单纯的用于记录日志而已
+	// 2. 如果LogPath没有设置，则使用当前目录作为日志文件目录
+
+	// 2. 初始化配置文件
+	if configs, err = k3.FetchDirectory(configDir, -1); err != nil {
+		k3.K3LogError("fetch directory error: %s", err)
+	}
+	config.MustLoad(configs...)
+
+	// 3. 初始化日志记录器, 用于记录日志同K3_log一样，只是单纯的用于记录日志而已
 	config.GlobalConsumer, _ = k3.NewLogConsumerWithConfig(k3.K3LogConsumerConfig{
-		Directory:      dir + "/log",
+		Directory:      config.GlobalConfig.System.RootPath + "/log",
 		RoteMode:       k3.ROTATE_DAILY,
 		FileSize:       1024,
 		FileNamePrefix: "disk",
@@ -59,24 +67,12 @@ func main() {
 	})
 	defer config.GlobalConsumer.Close()
 
-	if len(ConfigPath) != 0 {
-		configDir = ConfigPath
-	} else {
-		configDir = dir + "/configs"
-	}
-
 	/*
 		fmt.Println("----------------------------------")
 		fmt.Printf("configDir : %s\n", configDir)
 		fmt.Println("----------------------------------")
 
 	*/
-
-	// 获取configs文件目录所有文件
-	if configs, err = k3.FetchDirectory(configDir, -1); err != nil {
-		k3.K3LogError("fetch directory error: %s", err)
-	}
-	config.MustLoad(configs...)
 
 	if config.GlobalConfig.System.LogLevel > 0 {
 		k3.CurrentLogLevel = k3.K3LogLevel(config.GlobalConfig.System.LogLevel)

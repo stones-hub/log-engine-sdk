@@ -22,6 +22,7 @@ GIT_HASH    = $(shell git rev-parse --short HEAD)
 RELEASE_TAG = $(RELEASE_VERSION).$(GIT_COUNT).$(GIT_HASH)
 
 CONFIG_PATH = "/Users/yelei/data/code/go-projects/log-engine-sdk/configs"
+Log_PATH = "/Users/yelei/data/code/go-projects/log-engine-sdk/log"
 
 # ldflags 参数 , -X 命令可以用于往main包传入参数这里传入了 version, tag, build 3个参数值
 GO_LDFLAGS = -X main.Version=$(RELEASE_VERSION) -X main.Tag=$(RELEASE_TAG) -X main.BuildTime=$(NOW) -X main.ConfigPath=$(CONFIG_PATH)
