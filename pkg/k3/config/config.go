@@ -40,9 +40,10 @@ type Watch struct {
 }
 
 type System struct {
-	PrintEnabled bool `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
-	UseELK       bool `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
-	LogLevel     int  `yaml:"log_level"`
+	PrintEnabled bool   `yaml:"print_enabled" json:"print_enabled,omitempty" toml:"print_enabled"`
+	UseELK       bool   `yaml:"use_elk" json:"use_elk,omitempty" toml:"use_elk"`
+	LogLevel     int    `yaml:"log_level"`
+	LogPath      string `yaml:"log_path" json:"log_path" toml:"log_path"` // 系统日志记录地址
 }
 
 type Account struct {

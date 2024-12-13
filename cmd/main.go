@@ -20,7 +20,6 @@ import (
 
 var (
 	ConfigPath string // Makefile 中设置，解决config path不在项目内的问题
-	LogPath    string // Makefile 中设置，解决log path不在项目内的问题
 	Tag        string
 	Version    string
 	BuildTime  string
@@ -31,8 +30,8 @@ func main() {
 		dir       string
 		err       error
 		configs   []string
-		configDir string
-		logDir    string
+		configDir string // 配置文件目录
+		logDir    string // 系统日志文件目录
 	)
 
 	k3.K3LogInfo("Start with arguments Version: %s, BuildTime: %s, Tag: %s, ConfigPath: %s\n", Version, BuildTime, Tag, ConfigPath)
@@ -49,17 +48,25 @@ func main() {
 		configDir = dir + "/configs"
 	}
 
-	// 2. 如果LogPath没有设置，则使用当前目录作为日志文件目录
-
-	// 2. 初始化配置文件
+	// 2. 初始化配置文件, 将配置文件的内容全部写入全局变量GlobalConfig
 	if configs, err = k3.FetchDirectory(configDir, -1); err != nil {
 		k3.K3LogError("fetch directory error: %s", err)
 	}
 	config.MustLoad(configs...)
 
-	// 3. 初始化日志记录器, 用于记录日志同K3_log一样，只是单纯的用于记录日志而已
+	// 3. 初始化日志文件目录
+	if len(strings.ReplaceAll(config.GlobalConfig.System.LogPath, " ", "")) == 0 {
+		if workDir, err := os.Getwd(); err != nil {
+			k3.K3LogError("[main] get current work dir error: %s", err)
+			return
+		} else {
+			config.GlobalConfig.System.LogPath = workDir + "/log"
+		}
+	}
+
+	// 4. 初始化日志记录器, 用于记录日志同K3_log一样，只是单纯的用于记录日志而已
 	config.GlobalConsumer, _ = k3.NewLogConsumerWithConfig(k3.K3LogConsumerConfig{
-		Directory:      config.GlobalConfig.System.RootPath + "/log",
+		Directory:      config.GlobalConfig.System.LogPath,
 		RoteMode:       k3.ROTATE_DAILY,
 		FileSize:       1024,
 		FileNamePrefix: "disk",
@@ -67,12 +74,10 @@ func main() {
 	})
 	defer config.GlobalConsumer.Close()
 
-	/*
-		fmt.Println("----------------------------------")
-		fmt.Printf("configDir : %s\n", configDir)
-		fmt.Println("----------------------------------")
-
-	*/
+	fmt.Println("----------------------------------")
+	fmt.Printf("configDir : %s\n", configDir)
+	fmt.Printf("logDir : %s\n", config.GlobalConfig.System.LogPath)
+	fmt.Println("----------------------------------")
 
 	if config.GlobalConfig.System.LogLevel > 0 {
 		k3.CurrentLogLevel = k3.K3LogLevel(config.GlobalConfig.System.LogLevel)
