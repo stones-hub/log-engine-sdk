@@ -80,6 +80,10 @@ func Run(directory map[string][]string) error {
 	}
 
 	// 2. 初始化FileState 文件
+	// 2.1. 检查core.json是否存在，不存在就创建，并且load到FileState变量中
+	// 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
+	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
+	// 2.4. 将FileState数据写入硬盘
 
 	return nil
 }
