@@ -79,7 +79,7 @@ func LoadFileState(filePath string) error {
 		err error
 	)
 
-	if fd, err = os.OpenFile(stateFilePath, os.O_RDWR, os.ModePerm); err != nil {
+	if fd, err = os.OpenFile(filePath, os.O_RDWR, os.ModePerm); err != nil {
 		return errors.New("[Run] open state file failed: " + err.Error())
 	}
 	defer fd.Close()
@@ -114,7 +114,7 @@ func Run(directory map[string][]string) error {
 		return errors.New("[Run] load file state failed : " + err.Error())
 	}
 
-	// 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
+	// TODO 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
 	// 2.4. 将FileState数据写入硬盘
 
