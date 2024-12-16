@@ -99,8 +99,25 @@ func LoadFileState(filePath string) error {
 }
 
 // ScanDiskLogAddFileState 遍历硬盘上的所有文件，如果FileState中没有，就add
-func ScanDiskLogAddFileState() error {
-	return nil
+func ScanDiskLogAddFileState(directory map[string][]string) error {
+	var (
+		totalFiles map[string][]string
+		err        error
+		files      []string
+	)
+
+	for indexName, dirs := range directory {
+
+		for _, dir := range dirs {
+			if files, err = k3.FetchDirectory(dir, -1); err != nil {
+				continue
+			}
+			totalFiles[indexName] = append(totalFiles[indexName], files...)
+		}
+	}
+
+	return err
+
 }
 
 // SaveFileStateToDisk 保存FileState的数据到硬盘
