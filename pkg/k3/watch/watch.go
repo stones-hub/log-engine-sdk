@@ -139,5 +139,6 @@ func Run(directory map[string][]string) error {
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
 
 	// 4. 定时更新 FileState 数据到硬盘
+
 	return nil
 }

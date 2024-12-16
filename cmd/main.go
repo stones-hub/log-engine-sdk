@@ -46,7 +46,7 @@ func main() {
 	}
 	config.MustLoad(configs...)
 
-	// 3. 初始化日志文件目录
+	// 3. 初始化日志文件目录, 应用的日志目录是以工作根目录为基准的相对目录
 	if len(strings.ReplaceAll(config.GlobalConfig.System.LogPath, " ", "")) == 0 {
 		if currentDir, err := os.Getwd(); err != nil {
 			k3.K3LogError("[main] get current work dir error: %s", err)
