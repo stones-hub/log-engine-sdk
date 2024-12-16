@@ -98,8 +98,13 @@ func LoadFileState(filePath string) error {
 	return nil
 }
 
-// SaveFileState 保存FileState的数据到硬盘
-func SaveFileState() error {
+// ScanDiskLogAddFileState 遍历硬盘上的所有文件，如果FileState中没有，就add
+func ScanDiskLogAddFileState() error {
+	return nil
+}
+
+// SaveFileStateToDisk 保存FileState的数据到硬盘
+func SaveFileStateToDisk() error {
 	return nil
 }
 
