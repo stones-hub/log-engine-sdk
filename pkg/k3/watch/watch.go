@@ -98,7 +98,7 @@ func LoadFileState(filePath string) error {
 	return nil
 }
 
-// ScanDiskLogAddFileState 遍历硬盘上的所有文件，如果FileState中没有，就add
+// ScanDiskLogAddFileState  TODO 遍历硬盘上的所有文件，如果FileState中没有，就add
 func ScanDiskLogAddFileState(directory map[string][]string) error {
 	var (
 		totalFiles map[string][]string
