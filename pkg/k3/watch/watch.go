@@ -74,7 +74,7 @@ func InitConsumerBatchLog() error {
 	return nil
 }
 
-// LoadFileState 从文件加载FileState
+// LoadFileState 从文件加载FileState内存中
 func LoadFileState(filePath string) error {
 	var (
 		fd      *os.File
@@ -107,7 +107,7 @@ func SaveFileState() error {
 func Run(directory map[string][]string) error {
 	var (
 		err           error
-		stateFilePath string
+		stateFilePath string // state file 文件的绝对路径
 	)
 
 	// 1. 初始化批量日志写入, 引入elk
@@ -115,7 +115,7 @@ func Run(directory map[string][]string) error {
 		return errors.New("[Run] InitConsumerBatchLog failed: " + err.Error())
 	}
 
-	// 2. 初始化FileState 文件
+	// 2. 初始化FileState 文件, state file 文件是以工作根目录为基准的相对目录
 	stateFilePath = k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath
 	// 2.1. 检查core.json是否存在，不存在就创建，并且load到FileState变量中
 	if !k3.FileExists(stateFilePath) {
@@ -133,6 +133,7 @@ func Run(directory map[string][]string) error {
 	fmt.Println("GlobalFileStates:", GlobalFileStates)
 
 	// TODO 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
+
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
 	// 2.4. 将FileState数据写入硬盘
 
