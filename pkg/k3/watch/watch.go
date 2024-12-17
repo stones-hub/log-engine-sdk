@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
@@ -193,6 +194,21 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 
 // WatchGoRoutine  TODO 每个indexName 开一个协程
 func WatchGoRoutine(directory map[string][]string, filePath string) {
+
+	for indexName, dirs := range directory {
+
+		go func() {
+			var (
+				watcher *fsnotify.Watcher
+				err     error
+			)
+			if watcher, err = fsnotify.NewWatcher(); err != nil {
+				k3.K3LogError("[WatchGoRoutine] create fsnotify watcher failed: %v\n", err)
+
+			}
+		}()
+
+	}
 
 }
 
