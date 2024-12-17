@@ -98,7 +98,7 @@ func LoadFileState(filePath string) error {
 	return nil
 }
 
-// ScanDiskLogAddFileState  TODO 遍历硬盘上的所有文件，如果FileState中没有，就add
+// ScanDiskLogAddFileState  保证硬盘文件和FileState一致，并同步到硬盘状态文件
 func ScanDiskLogAddFileState(directory map[string][]string) error {
 	var (
 		totalFiles     map[string][]string
@@ -148,8 +148,11 @@ func ScanDiskLogAddFileState(directory map[string][]string) error {
 		}
 	}
 
-	return err
+	if err = SaveFileStateToDisk(); err != nil {
+		return err
+	}
 
+	return nil
 }
 
 // SaveFileStateToDisk 保存FileState的数据到硬盘
