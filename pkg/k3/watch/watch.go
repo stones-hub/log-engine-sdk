@@ -155,8 +155,9 @@ func ScanDiskLogAddFileState(directory map[string][]string) error {
 	return nil
 }
 
-// SaveFileStateToDisk 保存FileState的数据到硬盘
+// SaveFileStateToDisk 保存GlobalFileState的数据到硬盘
 func SaveFileStateToDisk() error {
+
 	return nil
 }
 
