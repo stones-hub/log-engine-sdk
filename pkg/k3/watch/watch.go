@@ -105,6 +105,7 @@ func ScanDiskLogAddFileState(directory map[string][]string) error {
 		err            error
 		files          []string
 		fileStatesKeys []string
+		tempDiskFiles  []string
 	)
 
 	globalFileStatesInterface := make(map[string]interface{})
@@ -125,8 +126,27 @@ func ScanDiskLogAddFileState(directory map[string][]string) error {
 	}
 
 	// 检查totalFiles是否存在在fileStateKeys 中， 如果不存在就给GlobalFileState add
+	for indexName, diskFiles := range totalFiles {
+		tempDiskFiles = append(tempDiskFiles, diskFiles...)
+		for _, diskFile := range diskFiles {
+			if k3.InSlice(diskFile, fileStatesKeys) == false {
+				GlobalFileStates[diskFile] = &FileState{
+					Path:          diskFile,
+					Offset:        0,
+					StartReadTime: 0,
+					LastReadTime:  0,
+					IndexName:     indexName,
+				}
+			}
+		}
+	}
 
 	// 检查fileStateKeys中的文件是不是在totalFiles中，如果不存在就给GlobalFileState delete
+	for _, fileStateKey := range fileStatesKeys {
+		if k3.InSlice(fileStateKey, tempDiskFiles) == false {
+			delete(GlobalFileStates, fileStateKey)
+		}
+	}
 
 	return err
 
