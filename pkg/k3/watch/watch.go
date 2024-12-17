@@ -101,17 +101,18 @@ func LoadFileState(filePath string) error {
 // ScanDiskLogAddFileState  TODO 遍历硬盘上的所有文件，如果FileState中没有，就add
 func ScanDiskLogAddFileState(directory map[string][]string) error {
 	var (
-		totalFiles    map[string][]string
-		err           error
-		files         []string
-		fileStatesKey []string
+		totalFiles     map[string][]string
+		err            error
+		files          []string
+		fileStatesKeys []string
 	)
 
 	globalFileStatesInterface := make(map[string]interface{})
 	for k, fileState := range GlobalFileStates {
 		globalFileStatesInterface[k] = fileState
 	}
-	fileStatesKey = k3.GetMapKeys(globalFileStatesInterface)
+	// 获取GlobalFileStates的key
+	fileStatesKeys = k3.GetMapKeys(globalFileStatesInterface)
 
 	for indexName, dirs := range directory {
 
@@ -122,6 +123,10 @@ func ScanDiskLogAddFileState(directory map[string][]string) error {
 			totalFiles[indexName] = append(totalFiles[indexName], files...)
 		}
 	}
+
+	// 检查totalFiles是否存在在fileStateKeys 中， 如果不存在就给GlobalFileState add
+
+	// 检查fileStateKeys中的文件是不是在totalFiles中，如果不存在就给GlobalFileState delete
 
 	return err
 
