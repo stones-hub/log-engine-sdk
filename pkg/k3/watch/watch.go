@@ -74,8 +74,8 @@ func InitConsumerBatchLog() error {
 	return nil
 }
 
-// LoadFileState 从文件加载FileState内存中
-func LoadFileState(filePath string) error {
+// LoadDiskFileToGlobalFileStates 从文件加载GlobalFileStates内存中
+func LoadDiskFileToGlobalFileStates(filePath string) error {
 	var (
 		fd      *os.File
 		decoder *json.Decoder
@@ -87,7 +87,7 @@ func LoadFileState(filePath string) error {
 
 	// 打开文件
 	if fd, err = os.OpenFile(filePath, os.O_RDWR, os.ModePerm); err != nil {
-		return errors.New("[Run] open state file failed: " + err.Error())
+		return errors.New("[LoadDiskFileToGlobalFileStates] open state file failed: " + err.Error())
 	}
 	defer fd.Close()
 
@@ -95,14 +95,40 @@ func LoadFileState(filePath string) error {
 	decoder = json.NewDecoder(fd)
 
 	if err = decoder.Decode(&GlobalFileStates); err != nil {
-		return errors.New("[Run] json decode failed: " + err.Error())
+		return errors.New("[LoadDiskFileToGlobalFileStates] json decode failed: " + err.Error())
 	}
 
 	return nil
 }
 
-// ScanDiskLogAddFileState  保证硬盘文件和FileState一致，并同步到硬盘状态文件
-func ScanDiskLogAddFileState(directory map[string][]string) error {
+// SaveFileStateToDiskFile 保存GlobalFileState的数据到硬盘
+func SaveFileStateToDiskFile(filePath string) error {
+	var (
+		fd      *os.File
+		encoder *json.Encoder
+		err     error
+	)
+
+	FileStateLock.Lock()
+	defer FileStateLock.Unlock()
+
+	// 打开文件, 并清空
+	if fd, err = os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, os.ModePerm); err != nil {
+		return errors.New("[SaveFileStateToDiskFile] open state file failed: " + err.Error())
+	}
+	defer fd.Close()
+
+	encoder = json.NewEncoder(fd)
+
+	if err = encoder.Encode(&GlobalFileStates); err != nil {
+		return errors.New("[SaveFileStateToDiskFile] json encode failed: " + err.Error())
+	}
+
+	return nil
+}
+
+// ScanDiskLogFileAddFileState  保证硬盘文件和FileState一致，并同步到硬盘状态文件
+func ScanDiskLogFileAddFileState(directory map[string][]string, filePath string) error {
 	var (
 		totalFiles     map[string][]string
 		err            error
@@ -151,17 +177,9 @@ func ScanDiskLogAddFileState(directory map[string][]string) error {
 		}
 	}
 
-	if err = SaveFileStateToDisk(); err != nil {
-		return err
+	if err = SaveFileStateToDiskFile(filePath); err != nil {
+		return errors.New("[ScanDiskLogAddFileState] save file state to disk failed: " + err.Error())
 	}
-
-	return nil
-}
-
-// SaveFileStateToDisk 保存GlobalFileState的数据到硬盘
-func SaveFileStateToDisk() error {
-	FileStateLock.Lock()
-	FileStateLock.Unlock()
 
 	return nil
 }
@@ -189,7 +207,7 @@ func Run(directory map[string][]string) error {
 	}
 
 	// 打开文件state file, 并将数据load到GlobalFileStates变量中
-	if err = LoadFileState(stateFilePath); err != nil {
+	if err = LoadDiskFileToGlobalFileStates(stateFilePath); err != nil {
 		return errors.New("[Run] load file state failed : " + err.Error())
 	}
 
