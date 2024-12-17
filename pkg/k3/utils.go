@@ -245,3 +245,15 @@ func GetRootPath() string {
 	}
 
 }
+
+// GetMapKeys 获取map中的所有key，并返回数组
+func GetMapKeys(m map[string]interface{}) []string {
+	var (
+		keys []string
+	)
+
+	for k, _ := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
