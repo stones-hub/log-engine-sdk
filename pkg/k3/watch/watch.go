@@ -191,7 +191,7 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 	return nil
 }
 
-// WatchGoRoutine 每个indexName 开一个协程
+// WatchGoRoutine  TODO 每个indexName 开一个协程
 func WatchGoRoutine(directory map[string][]string, filePath string) {
 
 }
