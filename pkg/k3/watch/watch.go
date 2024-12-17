@@ -27,14 +27,21 @@ func (f *FileState) String() string {
 }
 
 var (
-	FileStateLock       sync.Mutex                    // 控制GlobalFileStates的锁
-	GlobalFileStates    = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
-	DefaultMaxReadCount = 200                         // 每次读取日志文件的最大次数
+	ClockWG *sync.WaitGroup // 定时器协程的等待退出
+	WatchWG *sync.WaitGroup // Watch协程的等待退出
+)
 
+var (
+	FileStateLock sync.Mutex // 控制GlobalFileStates的锁
+)
+
+var (
+	GlobalFileStates = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
 	// DefaultSyncInterval 单位秒, 默认为60s
 	// 将硬盘上最新的文件列表同步到GlobalFileStates，并将GlobalFileStates数据同步到Disk硬盘存储
 	DefaultSyncInterval = 60
 
+	DefaultMaxReadCount = 200 // 每次读取日志文件的最大次数
 	// DefaultObsoleteInterval  单位小时，默认1.
 	//  会员卡每小时检查GlobalFileStates中所有文件，如果超过DefaultObsoleteDate天没有读写，就检查文件是否已经读取完，如果没有读取完就读取一次文件，一次最多读取DefaultObsoleteMaxReadCount次
 	DefaultObsoleteInterval     = 1
@@ -43,7 +50,6 @@ var (
 
 	GlobalWatchContextCancel context.CancelFunc // 每个indexName都对应一批目录，被一个单独的watch监控。用于取消watch的协程
 	GlobalWatchContext       context.Context    // 控制watch协程主动退出
-	GlobalWatchWG            *sync.WaitGroup    // 控制watch级别协程的等待退出
 	GlobalWatchMutex         sync.Mutex         // 控制watch级别的并发操作的锁
 
 	GlobalDataAnalytics k3.DataAnalytics // 日志接收器
@@ -185,8 +191,8 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 	return nil
 }
 
-// Watch File
-func WatchFile() {
+// WatchGoRoutine 每个indexName 开一个协程
+func WatchGoRoutine(directory map[string][]string, filePath string) {
 
 }
 
@@ -205,7 +211,13 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 
 	t = time.NewTicker(time.Duration(syncInterval) * time.Second)
 
+	ClockWG.Add(1)
 	go func() {
+		ClockWG.Done()
+		defer func() {
+			t.Stop()
+		}()
+
 		for {
 			select {
 			case <-t.C:
