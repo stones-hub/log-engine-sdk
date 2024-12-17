@@ -127,14 +127,14 @@ func SaveGlobalFileStatesToDiskFile(filePath string) error {
 	return nil
 }
 
-// ScanDiskLogFileToGlobalFileStatesAndSaveToDiskFile  保证硬盘文件和FileState一致，并同步到硬盘状态文件
-func ScanDiskLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]string, filePath string) error {
+// ScanLogFileToGlobalFileStatesAndSaveToDiskFile  保证硬盘文件和FileState一致，并同步到硬盘状态文件
+func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]string, filePath string) error {
 	var (
-		totalFiles     map[string][]string
-		err            error
-		files          []string
-		fileStatesKeys []string
-		tempDiskFiles  []string
+		totalFiles           = make(map[string][]string)
+		err                  error
+		files                []string
+		globalFileStatesKeys []string
+		tempDiskFiles        []string
 	)
 
 	globalFileStatesInterface := make(map[string]interface{})
@@ -142,7 +142,7 @@ func ScanDiskLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]s
 		globalFileStatesInterface[k] = fileState
 	}
 	// 获取GlobalFileStates的key
-	fileStatesKeys = k3.GetMapKeys(globalFileStatesInterface)
+	globalFileStatesKeys = k3.GetMapKeys(globalFileStatesInterface)
 
 	for indexName, dirs := range directory {
 
@@ -154,11 +154,11 @@ func ScanDiskLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]s
 		}
 	}
 
-	// 检查totalFiles是否存在在fileStateKeys 中， 如果不存在就给GlobalFileState add
+	// 检查硬盘上的日志文件是否存在GlobalFileStates中，如果不存在就ADD
 	for indexName, diskFiles := range totalFiles {
 		tempDiskFiles = append(tempDiskFiles, diskFiles...)
 		for _, diskFile := range diskFiles {
-			if k3.InSlice(diskFile, fileStatesKeys) == false {
+			if k3.InSlice(diskFile, globalFileStatesKeys) == false {
 				GlobalFileStates[diskFile] = &FileState{
 					Path:          diskFile,
 					Offset:        0,
@@ -170,8 +170,8 @@ func ScanDiskLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]s
 		}
 	}
 
-	// 检查fileStateKeys中的文件是不是在totalFiles中，如果不存在就给GlobalFileState delete
-	for _, fileStateKey := range fileStatesKeys {
+	// 检查GlobalFileStates中是否真实存在于硬盘上，如果不存在就DELETE
+	for _, fileStateKey := range globalFileStatesKeys {
 		if k3.InSlice(fileStateKey, tempDiskFiles) == false {
 			delete(GlobalFileStates, fileStateKey)
 		}
@@ -211,12 +211,14 @@ func Run(directory map[string][]string) error {
 		return errors.New("[Run] load file state failed : " + err.Error())
 	}
 
-	fmt.Println("GlobalFileStates:", GlobalFileStates)
-
 	// TODO 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
-
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
 	// 2.4. 将FileState数据写入硬盘
+	if err = ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, stateFilePath); err != nil {
+		return errors.New("[Run] scan log file state failed: " + err.Error())
+	}
+
+	fmt.Println("GlobalFileStates:", GlobalFileStates)
 
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
 
