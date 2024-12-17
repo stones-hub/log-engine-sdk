@@ -82,6 +82,9 @@ func LoadFileState(filePath string) error {
 		err     error
 	)
 
+	FileStateLock.Lock()
+	defer FileStateLock.Unlock()
+
 	// 打开文件
 	if fd, err = os.OpenFile(filePath, os.O_RDWR, os.ModePerm); err != nil {
 		return errors.New("[Run] open state file failed: " + err.Error())
@@ -157,6 +160,8 @@ func ScanDiskLogAddFileState(directory map[string][]string) error {
 
 // SaveFileStateToDisk 保存GlobalFileState的数据到硬盘
 func SaveFileStateToDisk() error {
+	FileStateLock.Lock()
+	FileStateLock.Unlock()
 
 	return nil
 }
