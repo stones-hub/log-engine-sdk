@@ -101,8 +101,8 @@ func LoadDiskFileToGlobalFileStates(filePath string) error {
 	return nil
 }
 
-// SaveFileStateToDiskFile 保存GlobalFileState的数据到硬盘
-func SaveFileStateToDiskFile(filePath string) error {
+// SaveGlobalFileStatesToDiskFile 保存GlobalFileState的数据到硬盘
+func SaveGlobalFileStatesToDiskFile(filePath string) error {
 	var (
 		fd      *os.File
 		encoder *json.Encoder
@@ -127,8 +127,8 @@ func SaveFileStateToDiskFile(filePath string) error {
 	return nil
 }
 
-// ScanDiskLogFileAddFileState  保证硬盘文件和FileState一致，并同步到硬盘状态文件
-func ScanDiskLogFileAddFileState(directory map[string][]string, filePath string) error {
+// ScanDiskLogFileToGlobalFileStatesAndSaveToDiskFile  保证硬盘文件和FileState一致，并同步到硬盘状态文件
+func ScanDiskLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]string, filePath string) error {
 	var (
 		totalFiles     map[string][]string
 		err            error
@@ -177,7 +177,7 @@ func ScanDiskLogFileAddFileState(directory map[string][]string, filePath string)
 		}
 	}
 
-	if err = SaveFileStateToDiskFile(filePath); err != nil {
+	if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
 		return errors.New("[ScanDiskLogAddFileState] save file state to disk failed: " + err.Error())
 	}
 
