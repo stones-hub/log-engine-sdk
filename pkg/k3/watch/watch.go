@@ -11,6 +11,7 @@ import (
 	"log-engine-sdk/pkg/k3/sender"
 	"os"
 	"sync"
+	"time"
 )
 
 type FileState struct {
@@ -182,6 +183,40 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 	}
 
 	return nil
+}
+
+// Watch File
+func WatchFile() {
+
+}
+
+// ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
+func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
+	// 创建定时器
+	var (
+		syncInterval = config.GlobalConfig.Watch.SyncInterval
+		t            *time.Ticker
+		err          error
+	)
+
+	if syncInterval < 0 || syncInterval > DefaultSyncInterval {
+		syncInterval = DefaultSyncInterval
+	}
+
+	t = time.NewTicker(time.Duration(syncInterval) * time.Second)
+
+	go func() {
+		for {
+			select {
+			case <-t.C:
+				if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
+					k3.K3LogError("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk failed: %v\n", err)
+				}
+			case <-GlobalWatchContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
+				return
+			}
+		}
+	}()
 }
 
 // Run 启动监听
