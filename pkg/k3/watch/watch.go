@@ -142,6 +142,8 @@ func SaveGlobalFileStatesToDiskFile(filePath string) error {
 		return errors.New("[SaveFileStateToDiskFile] json encode failed: " + err.Error())
 	}
 
+	fmt.Println("SaveGlobalFileStatesToDiskFile Success !")
+
 	return nil
 }
 

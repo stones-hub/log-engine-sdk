@@ -182,6 +182,8 @@ EXIT:
 	watch.Closed()
 
 	// TODO 退出前全量更新一次state file文件内容
+	statFilePath := k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath
+	watch.SaveGlobalFileStatesToDiskFile(statFilePath)
 
 	// 清理各种资源
 	for _, cleanFunc := range cleans {
