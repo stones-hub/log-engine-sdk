@@ -30,7 +30,6 @@ func main() {
 		err       error
 		configs   []string
 		configDir string // 配置文件目录
-		ctx       context.Context
 	)
 
 	k3.K3LogInfo("Start with arguments Version: %s, BuildTime: %s, Tag: %s, ConfigPath: %s\n", Version, BuildTime, Tag, ConfigPath)
@@ -117,15 +116,16 @@ func main() {
 
 	k3.K3LogDebug("需要监控的目录列表: %v", watchDirectory)
 
+	var (
+		httpClean  func()
+		watchClean func()
+	)
+
 	// 8. 将需要监控的目录，放入监控器中，跑起来
-	if ctx, err = watch.Run(watchDirectory); err != nil {
+	if watchClean, err = watch.Run(watchDirectory); err != nil {
 		k3.K3LogError("[main] watch error: %s", err)
 		return
 	}
-
-	var (
-		httpClean func()
-	)
 
 	if config.GlobalConfig.Http.Enable == true {
 		// 启动http服务器
@@ -133,7 +133,7 @@ func main() {
 	}
 
 	pprof()
-	graceExit(ctx, httpClean)
+	graceExit(watch.WatcherContext, httpClean, watchClean)
 
 }
 
@@ -178,10 +178,6 @@ EXIT:
 		k3.K3LogError("[graceExit] context done")
 	}
 
-	// TODO 注意回收资源
-	watch.Closed()
-
-	// TODO 退出前全量更新一次state file文件内容
 	statFilePath := k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath
 	watch.SaveGlobalFileStatesToDiskFile(statFilePath)
 

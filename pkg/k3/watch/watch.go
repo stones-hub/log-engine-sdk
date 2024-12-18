@@ -330,7 +330,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 }
 
 // Run 启动监听
-func Run(directory map[string][]string) (context.Context, error) {
+func Run(directory map[string][]string) (func(), error) {
 	var (
 		err           error
 		stateFilePath string // state file 文件的绝对路径
@@ -340,7 +340,7 @@ func Run(directory map[string][]string) (context.Context, error) {
 
 	// 1. 初始化批量日志写入, 引入elk
 	if err = InitConsumerBatchLog(); err != nil {
-		return WatcherContext, errors.New("[Run] InitConsumerBatchLog failed: " + err.Error())
+		return nil, errors.New("[Run] InitConsumerBatchLog failed: " + err.Error())
 	}
 
 	// 2. 初始化FileState 文件, state file 文件是以工作根目录为基准的相对目录
@@ -349,20 +349,20 @@ func Run(directory map[string][]string) (context.Context, error) {
 	if !k3.FileExists(stateFilePath) {
 		// 创建文件
 		if _, err = os.OpenFile(stateFilePath, os.O_CREATE, os.ModePerm); err != nil {
-			return WatcherContext, errors.New("[Run] create state file failed: " + err.Error())
+			return nil, errors.New("[Run] create state file failed: " + err.Error())
 		}
 	}
 
 	// 打开文件state file, 并将数据load到GlobalFileStates变量中
 	if err = LoadDiskFileToGlobalFileStates(stateFilePath); err != nil {
-		return WatcherContext, errors.New("[Run] load file state failed : " + err.Error())
+		return nil, errors.New("[Run] load file state failed : " + err.Error())
 	}
 
 	// 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
 	// 2.4. 将FileState数据写入硬盘
 	if err = ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, stateFilePath); err != nil {
-		return WatcherContext, errors.New("[Run] scan log file state failed: " + err.Error())
+		return nil, errors.New("[Run] scan log file state failed: " + err.Error())
 	}
 
 	fmt.Println("GlobalFileStates:", GlobalFileStates)
@@ -373,10 +373,11 @@ func Run(directory map[string][]string) (context.Context, error) {
 	// 4. 定时更新 FileState 数据到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(stateFilePath)
 
-	return WatcherContext, nil
+	return Closed, nil
 }
 
 func Closed() {
+	k3.K3LogDebug("[Closed] closed watch.")
 	// 回收定时器协程和监听协程
 	WatcherContextCancel()
 	// 回收批量写入日志的协程
