@@ -196,6 +196,7 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 func WatchGoRoutine(directory map[string][]string, filePath string) {
 
 	for indexName, dirs := range directory {
+		WatchWG.Add(1)
 		go forkWatcher(indexName, dirs)
 	}
 }
@@ -207,11 +208,11 @@ func forkWatcher(indexName string, dirs []string) {
 		watcher *fsnotify.Watcher
 		err     error
 	)
+	defer WatchWG.Done()
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
 		k3.K3LogError("[WatchGoRoutine] create fsnotify watcher failed: %v\n", err)
-
 	}
-
+	defer watcher.Close()
 }
 
 // ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
