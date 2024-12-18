@@ -219,16 +219,22 @@ func forkWatcher(indexName string, dirs []string) {
 		err     error
 	)
 	defer WatcherWG.Done()
+
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
-		// TODO 处理错误，让所有的Watcher协程退出
+		// 处理错误，让所有的Watcher协程退出
+		k3.K3LogError("[forkWatcher] new watcher failed: %s", err.Error())
+		WatcherContextCancel()
+		return
 	}
 	defer watcher.Close()
 
 	// 将所有的目录都加入监听
 	for _, dir := range dirs {
 		if err = watcher.Add(dir); err != nil {
-			// TODO 处理错误， 让所有的Watcher协程退出
-			WatcherContext.Done()
+			// 处理错误， 让所有的Watcher协程退出
+			k3.K3LogError("[forkWatcher] add dir to watcher failed: %s", err.Error())
+			WatcherContextCancel()
+			return
 		}
 	}
 
@@ -236,12 +242,33 @@ func forkWatcher(indexName string, dirs []string) {
 		select {
 
 		case event, ok := <-watcher.Events:
+			if !ok {
+				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher event channel closed.", indexName)
+				WatcherContextCancel()
+				return
+			}
+			// 处理Event
+			handlerEvent(event)
+
 		case err, ok := <-watcher.Errors:
+			if !ok {
+				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher error channel closed.", indexName)
+				WatcherContextCancel()
+				return
+			}
+			k3.K3LogError("[forkWatcher] index_name[%s] watcher error: %s", indexName, err)
+			WatcherContextCancel()
+			return
 		case <-WatcherContext.Done():
 			k3.K3LogWarn("[forkWatcher] index_name[%s] watcher exit with by globalWatchContext. ", indexName)
 			return
 		}
 	}
+
+}
+
+// TODO 处理EVENT事件
+func handlerEvent(event fsnotify.Event) {
 
 }
 
