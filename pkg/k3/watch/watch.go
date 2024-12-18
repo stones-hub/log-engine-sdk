@@ -282,6 +282,11 @@ func forkWatcher(indexName string, dirs []string) {
 // TODO 处理EVENT事件
 func handlerEvent(indexName string, event fsnotify.Event) {
 	fmt.Println("收到变更", indexName, event.Name)
+	// 删除 -> 删除GlobalFileState的内容
+
+	// 新增 -> 目录就add监听
+
+	// 修改 -> 读取文件，更新GlobalFileState, 并把数据发送给elk
 }
 
 // ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
