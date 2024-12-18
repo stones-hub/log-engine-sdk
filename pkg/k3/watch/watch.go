@@ -278,7 +278,7 @@ func forkWatcher(indexName string, dirs []string) {
 
 // TODO 处理EVENT事件
 func handlerEvent(indexName string, event fsnotify.Event) {
-
+	fmt.Println("收到变更", indexName, event.Name)
 }
 
 // ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
@@ -369,4 +369,11 @@ func Run(directory map[string][]string) error {
 	ClockSyncGlobalFileStatesToDiskFile(stateFilePath)
 
 	return nil
+}
+
+func Closed() {
+	// 回收定时器协程和监听协程
+	WatcherContextCancel()
+	// 回收批量写入日志的协程
+	GlobalDataAnalytics.Close()
 }

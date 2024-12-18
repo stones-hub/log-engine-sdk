@@ -179,6 +179,7 @@ func graceExit(cleans ...func()) {
 	}
 
 	// TODO 注意回收资源
+	watch.Closed()
 
 	// TODO 退出前全量更新一次state file文件内容
 
