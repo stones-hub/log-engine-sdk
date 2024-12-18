@@ -29,20 +29,20 @@ func (f *FileState) String() string {
 
 // 处理不同类型的协程回收工作
 var (
-	ClockWG *sync.WaitGroup // 定时器协程的等待退出
-	WatchWG *sync.WaitGroup // Watch协程的等待退出
+	ClockWG   *sync.WaitGroup // 定时器协程的等待退出
+	WatcherWG *sync.WaitGroup // Watch协程的等待退出
 )
 
 // 处理全局资源的并发问题
 
 var (
-	FileStateLock *sync.Mutex // 控制GlobalFileStates的锁
+	GlobalFileStatesLock *sync.Mutex // 控制GlobalFileStates的锁
 )
 
 // 处理不同类型的协程主动退出的问题
 var (
-	WatchContext       context.Context    // 控制watch协程主动退出
-	WatchContextCancel context.CancelFunc // 每个indexName都对应一批目录，被一个单独的watch监控。用于取消watch的协程
+	WatcherContext       context.Context    // 控制watcher协程主动退出
+	WatcherContextCancel context.CancelFunc // 用于主动取消watcher的协程
 )
 
 var (
@@ -61,9 +61,9 @@ var (
 
 func InitVars() {
 	ClockWG = &sync.WaitGroup{}
-	WatchWG = &sync.WaitGroup{}
-	FileStateLock = &sync.Mutex{}
-	WatchContext, WatchContextCancel = context.WithCancel(context.Background())
+	WatcherWG = &sync.WaitGroup{}
+	GlobalFileStatesLock = &sync.Mutex{}
+	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background())
 }
 
 func InitConsumerBatchLog() error {
@@ -100,8 +100,8 @@ func LoadDiskFileToGlobalFileStates(filePath string) error {
 		err     error
 	)
 
-	FileStateLock.Lock()
-	defer FileStateLock.Unlock()
+	GlobalFileStatesLock.Lock()
+	defer GlobalFileStatesLock.Unlock()
 
 	// 打开文件
 	if fd, err = os.OpenFile(filePath, os.O_RDWR, os.ModePerm); err != nil {
@@ -127,8 +127,8 @@ func SaveGlobalFileStatesToDiskFile(filePath string) error {
 		err     error
 	)
 
-	FileStateLock.Lock()
-	defer FileStateLock.Unlock()
+	GlobalFileStatesLock.Lock()
+	defer GlobalFileStatesLock.Unlock()
 
 	// 打开文件, 并清空
 	if fd, err = os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, os.ModePerm); err != nil {
@@ -206,7 +206,7 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 func InitWatcher(directory map[string][]string, filePath string) {
 
 	for indexName, dirs := range directory {
-		WatchWG.Add(1)
+		WatcherWG.Add(1)
 		go forkWatcher(indexName, dirs)
 	}
 }
@@ -218,7 +218,7 @@ func forkWatcher(indexName string, dirs []string) {
 		watcher *fsnotify.Watcher
 		err     error
 	)
-	defer WatchWG.Done()
+	defer WatcherWG.Done()
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
 		// TODO 处理错误，让所有的Watcher协程退出
 	}
@@ -228,7 +228,7 @@ func forkWatcher(indexName string, dirs []string) {
 	for _, dir := range dirs {
 		if err = watcher.Add(dir); err != nil {
 			// TODO 处理错误， 让所有的Watcher协程退出
-			WatchContext.Done()
+			WatcherContext.Done()
 		}
 	}
 
@@ -237,7 +237,7 @@ func forkWatcher(indexName string, dirs []string) {
 
 		case event, ok := <-watcher.Events:
 		case err, ok := <-watcher.Errors:
-		case <-WatchContext.Done():
+		case <-WatcherContext.Done():
 			k3.K3LogWarn("[forkWatcher] index_name[%s] watcher exit with by globalWatchContext. ", indexName)
 			return
 		}
@@ -273,7 +273,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 				if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
 					k3.K3LogError("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk failed: %v\n", err)
 				}
-			case <-WatchContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
+			case <-WatcherContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
 				return
 			}
 		}
