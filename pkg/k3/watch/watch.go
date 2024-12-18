@@ -27,34 +27,44 @@ func (f *FileState) String() string {
 	return fmt.Sprintf("Path: %s, Offset: %d, StartReadTime: %d, LastReadTime: %d, IndexName: %s", f.Path, f.Offset, f.StartReadTime, f.LastReadTime, f.IndexName)
 }
 
+// 处理不同类型的协程回收工作
 var (
 	ClockWG *sync.WaitGroup // 定时器协程的等待退出
 	WatchWG *sync.WaitGroup // Watch协程的等待退出
 )
 
+// 处理全局资源的并发问题
+
 var (
-	FileStateLock sync.Mutex // 控制GlobalFileStates的锁
+	FileStateLock *sync.Mutex // 控制GlobalFileStates的锁
+)
+
+// 处理不同类型的协程主动退出的问题
+var (
+	WatchContext       context.Context    // 控制watch协程主动退出
+	WatchContextCancel context.CancelFunc // 每个indexName都对应一批目录，被一个单独的watch监控。用于取消watch的协程
 )
 
 var (
-	GlobalFileStates = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
+	GlobalDataAnalytics k3.DataAnalytics              // 日志接收器
+	GlobalFileStates    = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
 	// DefaultSyncInterval 单位秒, 默认为60s
 	// 将硬盘上最新的文件列表同步到GlobalFileStates，并将GlobalFileStates数据同步到Disk硬盘存储
 	DefaultSyncInterval = 60
-
 	DefaultMaxReadCount = 200 // 每次读取日志文件的最大次数
 	// DefaultObsoleteInterval  单位小时，默认1.
 	//  会员卡每小时检查GlobalFileStates中所有文件，如果超过DefaultObsoleteDate天没有读写，就检查文件是否已经读取完，如果没有读取完就读取一次文件，一次最多读取DefaultObsoleteMaxReadCount次
 	DefaultObsoleteInterval     = 1
 	DefaultObsoleteDate         = 1    // 单位天， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
 	DefaultObsoleteMaxReadCount = 5000 // 对于长时间没有读写的文件， 一次最大读取次数
-
-	GlobalWatchContextCancel context.CancelFunc // 每个indexName都对应一批目录，被一个单独的watch监控。用于取消watch的协程
-	GlobalWatchContext       context.Context    // 控制watch协程主动退出
-	GlobalWatchMutex         sync.Mutex         // 控制watch级别的并发操作的锁
-
-	GlobalDataAnalytics k3.DataAnalytics // 日志接收器
 )
+
+func InitVars() {
+	ClockWG = &sync.WaitGroup{}
+	WatchWG = &sync.WaitGroup{}
+	FileStateLock = &sync.Mutex{}
+	WatchContext, WatchContextCancel = context.WithCancel(context.Background())
+}
 
 func InitConsumerBatchLog() error {
 	var (
@@ -192,8 +202,8 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 	return nil
 }
 
-// WatchGoRoutine  TODO 每个indexName 开一个协程
-func WatchGoRoutine(directory map[string][]string, filePath string) {
+// InitWatcher 每个indexName 开一个协程
+func InitWatcher(directory map[string][]string, filePath string) {
 
 	for indexName, dirs := range directory {
 		WatchWG.Add(1)
@@ -201,7 +211,7 @@ func WatchGoRoutine(directory map[string][]string, filePath string) {
 	}
 }
 
-// forkWatcher 开单一协程来处理监听， 每个indexName开一个协程
+// forkWatcher 开单一协程来处理监听， 每个indexName开一个协程, 当前看上处于协程中
 func forkWatcher(indexName string, dirs []string) {
 
 	var (
@@ -210,9 +220,29 @@ func forkWatcher(indexName string, dirs []string) {
 	)
 	defer WatchWG.Done()
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
-		k3.K3LogError("[WatchGoRoutine] create fsnotify watcher failed: %v\n", err)
+		// TODO 处理错误，让所有的Watcher协程退出
 	}
 	defer watcher.Close()
+
+	// 将所有的目录都加入监听
+	for _, dir := range dirs {
+		if err = watcher.Add(dir); err != nil {
+			// TODO 处理错误， 让所有的Watcher协程退出
+			WatchContext.Done()
+		}
+	}
+
+	for {
+		select {
+
+		case event, ok := <-watcher.Events:
+		case err, ok := <-watcher.Errors:
+		case <-WatchContext.Done():
+			k3.K3LogWarn("[forkWatcher] index_name[%s] watcher exit with by globalWatchContext. ", indexName)
+			return
+		}
+	}
+
 }
 
 // ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
@@ -243,7 +273,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 				if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
 					k3.K3LogError("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk failed: %v\n", err)
 				}
-			case <-GlobalWatchContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
+			case <-WatchContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
 				return
 			}
 		}
@@ -256,6 +286,8 @@ func Run(directory map[string][]string) error {
 		err           error
 		stateFilePath string // state file 文件的绝对路径
 	)
+	// 初始化用到的所有全局变量
+	InitVars()
 
 	// 1. 初始化批量日志写入, 引入elk
 	if err = InitConsumerBatchLog(); err != nil {
