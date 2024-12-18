@@ -142,7 +142,7 @@ func SaveGlobalFileStatesToDiskFile(filePath string) error {
 		return errors.New("[SaveFileStateToDiskFile] json encode failed: " + err.Error())
 	}
 
-	fmt.Println("SaveGlobalFileStatesToDiskFile Success !")
+	// fmt.Println("SaveGlobalFileStatesToDiskFile Success !")
 
 	return nil
 }
@@ -218,7 +218,7 @@ func InitWatcher(directory map[string][]string) {
 		WatcherWG.Wait() // 阻塞函数
 		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
 		WatcherContextCancel()
-		fmt.Println("watcher goroutine exited.")
+		// fmt.Println("watcher goroutine exited.")
 	}()
 }
 
@@ -281,7 +281,7 @@ func forkWatcher(indexName string, dirs []string) {
 
 // TODO 处理EVENT事件
 func handlerEvent(indexName string, event fsnotify.Event) {
-	fmt.Println("收到变更", indexName, event.Name)
+	// fmt.Println("收到变更", indexName, event.Name)
 	// 删除 -> 删除GlobalFileState的内容
 
 	// 新增 -> 目录就add监听
@@ -330,7 +330,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 		ClockWG.Wait() // 阻塞等待Clock定时器协程协程退出
 		k3.K3LogInfo("[ClockSyncGlobalFileStatesToDiskFile]  All clock goroutine  exit.")
 		WatcherContextCancel()
-		fmt.Println("clock goroutine exited !")
+		// fmt.Println("clock goroutine exited !")
 	}()
 }
 
@@ -370,7 +370,7 @@ func Run(directory map[string][]string) (func(), error) {
 		return nil, errors.New("[Run] scan log file state failed: " + err.Error())
 	}
 
-	fmt.Println("GlobalFileStates:", GlobalFileStates)
+	// fmt.Println("GlobalFileStates:", GlobalFileStates)
 
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
 	InitWatcher(directory)
