@@ -196,17 +196,19 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 func WatchGoRoutine(directory map[string][]string, filePath string) {
 
 	for indexName, dirs := range directory {
+		go forkWatcher(indexName, dirs)
+	}
+}
 
-		go func() {
-			var (
-				watcher *fsnotify.Watcher
-				err     error
-			)
-			if watcher, err = fsnotify.NewWatcher(); err != nil {
-				k3.K3LogError("[WatchGoRoutine] create fsnotify watcher failed: %v\n", err)
+// forkWatcher 开单一协程来处理监听， 每个indexName开一个协程
+func forkWatcher(indexName string, dirs []string) {
 
-			}
-		}()
+	var (
+		watcher *fsnotify.Watcher
+		err     error
+	)
+	if watcher, err = fsnotify.NewWatcher(); err != nil {
+		k3.K3LogError("[WatchGoRoutine] create fsnotify watcher failed: %v\n", err)
 
 	}
 
