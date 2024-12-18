@@ -203,12 +203,18 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 }
 
 // InitWatcher 每个indexName 开一个协程
-func InitWatcher(directory map[string][]string, filePath string) {
+func InitWatcher(directory map[string][]string) {
 
 	for indexName, dirs := range directory {
 		WatcherWG.Add(1)
 		go forkWatcher(indexName, dirs)
 	}
+
+	go func() {
+		WatcherWG.Wait()
+		k3.K3LogInfo("All watcher goroutine exit.")
+		WatcherContextCancel()
+	}()
 }
 
 // forkWatcher 开单一协程来处理监听， 每个indexName开一个协程, 当前看上处于协程中
@@ -248,7 +254,7 @@ func forkWatcher(indexName string, dirs []string) {
 				return
 			}
 			// 处理Event
-			handlerEvent(event)
+			handlerEvent(indexName, event)
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -268,7 +274,7 @@ func forkWatcher(indexName string, dirs []string) {
 }
 
 // TODO 处理EVENT事件
-func handlerEvent(event fsnotify.Event) {
+func handlerEvent(indexName string, event fsnotify.Event) {
 
 }
 
@@ -345,9 +351,16 @@ func Run(directory map[string][]string) error {
 
 	fmt.Println("GlobalFileStates:", GlobalFileStates)
 
-	// TODO 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
+	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
+	InitWatcher(directory)
 
 	// 4. 定时更新 FileState 数据到硬盘
 
 	return nil
+}
+
+func Closed() {
+	WatcherWG.Wait()
+	k3.K3LogInfo("All watcher goroutine exit.")
+	WatcherContextCancel()
 }
