@@ -30,6 +30,7 @@ func main() {
 		err       error
 		configs   []string
 		configDir string // 配置文件目录
+		ctx       context.Context
 	)
 
 	k3.K3LogInfo("Start with arguments Version: %s, BuildTime: %s, Tag: %s, ConfigPath: %s\n", Version, BuildTime, Tag, ConfigPath)
@@ -117,7 +118,7 @@ func main() {
 	k3.K3LogDebug("需要监控的目录列表: %v", watchDirectory)
 
 	// 8. 将需要监控的目录，放入监控器中，跑起来
-	if err = watch.Run(watchDirectory); err != nil {
+	if ctx, err = watch.Run(watchDirectory); err != nil {
 		k3.K3LogError("[main] watch error: %s", err)
 		return
 	}
@@ -132,7 +133,7 @@ func main() {
 	}
 
 	pprof()
-	graceExit(httpClean)
+	graceExit(ctx, httpClean)
 
 }
 
@@ -149,33 +150,32 @@ func pprof() {
 	}()
 }
 
-// GraceExit 保持进程常驻， 等待信号在退出
-func graceExit(cleans ...func()) {
+// GraceExit 保持进程常驻， 一是收到退出信号要退出， 二是协程异常退出时要退出
+func graceExit(ctx context.Context, cleans ...func()) {
 	var (
 		state      = -1
 		signalChan = make(chan os.Signal, 1)
 	)
-
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 
-	{
-	EXIT:
-		select {
-		case sig, ok := <-signalChan:
-			if !ok {
-				// 直接退出，关闭
-				break EXIT
-			}
-			switch sig {
-			case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-				state = 0
-				break EXIT
-			case syscall.SIGHUP:
-			default:
-				state = -1
-				break EXIT
-			}
+EXIT:
+	select {
+	case sig, ok := <-signalChan:
+		if !ok {
+			k3.K3LogError("[graceExit] signal chan closed")
+			break EXIT
 		}
+		switch sig {
+		case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
+			state = 0
+			break EXIT
+		case syscall.SIGHUP:
+		default:
+			state = 1
+			break EXIT
+		}
+	case <-ctx.Done():
+		k3.K3LogError("[graceExit] context done")
 	}
 
 	// TODO 注意回收资源
@@ -189,7 +189,6 @@ func graceExit(cleans ...func()) {
 			cleanFunc()
 		}
 	}
-
 	time.Sleep(1 * time.Second)
 	os.Exit(state)
 }

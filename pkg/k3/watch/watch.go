@@ -228,6 +228,7 @@ func forkWatcher(indexName string, dirs []string) {
 	)
 
 	defer WatcherWG.Done()
+	defer WatcherContextCancel()
 
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
 		// 处理错误，让所有的Watcher协程退出
@@ -302,10 +303,12 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 		defer func() {
 			t.Stop()
 		}()
+		defer WatcherContextCancel()
 
 		for {
 			select {
 			case <-t.C:
+				// TODO 如果只是保持失败，没必要让整个程序退出
 				if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
 					k3.K3LogError("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk failed: %v\n", err)
 				}
@@ -318,14 +321,14 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 
 	go func() {
 		ClockWG.Wait() // 阻塞等待Clock定时器协程协程退出
-		k3.K3LogInfo("[ClockSyncGlobalFileStatesToDiskFile] ClockSyncGlobalFileStatesToDiskFile exit.")
+		k3.K3LogInfo("[ClockSyncGlobalFileStatesToDiskFile]  All clock goroutine  exit.")
 		WatcherContextCancel()
 		fmt.Println("clock goroutine exited !")
 	}()
 }
 
 // Run 启动监听
-func Run(directory map[string][]string) error {
+func Run(directory map[string][]string) (context.Context, error) {
 	var (
 		err           error
 		stateFilePath string // state file 文件的绝对路径
@@ -335,7 +338,7 @@ func Run(directory map[string][]string) error {
 
 	// 1. 初始化批量日志写入, 引入elk
 	if err = InitConsumerBatchLog(); err != nil {
-		return errors.New("[Run] InitConsumerBatchLog failed: " + err.Error())
+		return WatcherContext, errors.New("[Run] InitConsumerBatchLog failed: " + err.Error())
 	}
 
 	// 2. 初始化FileState 文件, state file 文件是以工作根目录为基准的相对目录
@@ -344,20 +347,20 @@ func Run(directory map[string][]string) error {
 	if !k3.FileExists(stateFilePath) {
 		// 创建文件
 		if _, err = os.OpenFile(stateFilePath, os.O_CREATE, os.ModePerm); err != nil {
-			return errors.New("[Run] create state file failed: " + err.Error())
+			return WatcherContext, errors.New("[Run] create state file failed: " + err.Error())
 		}
 	}
 
 	// 打开文件state file, 并将数据load到GlobalFileStates变量中
 	if err = LoadDiskFileToGlobalFileStates(stateFilePath); err != nil {
-		return errors.New("[Run] load file state failed : " + err.Error())
+		return WatcherContext, errors.New("[Run] load file state failed : " + err.Error())
 	}
 
 	// 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
 	// 2.4. 将FileState数据写入硬盘
 	if err = ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, stateFilePath); err != nil {
-		return errors.New("[Run] scan log file state failed: " + err.Error())
+		return WatcherContext, errors.New("[Run] scan log file state failed: " + err.Error())
 	}
 
 	fmt.Println("GlobalFileStates:", GlobalFileStates)
@@ -368,7 +371,7 @@ func Run(directory map[string][]string) error {
 	// 4. 定时更新 FileState 数据到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(stateFilePath)
 
-	return nil
+	return WatcherContext, nil
 }
 
 func Closed() {
