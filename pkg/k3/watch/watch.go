@@ -41,8 +41,8 @@ var (
 
 // 处理不同类型的协程主动退出的问题
 var (
-	WatcherContext       context.Context    // 控制watcher协程主动退出
-	WatcherContextCancel context.CancelFunc // 用于主动取消watcher的协程
+	WatcherContext       context.Context    // 控制watcher相关所有协程退出
+	WatcherContextCancel context.CancelFunc // 用于主动取消watcher相关的所有协程
 )
 
 var (
@@ -205,15 +205,18 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 // InitWatcher 每个indexName 开一个协程
 func InitWatcher(directory map[string][]string) {
 
+	// 每个index name 开一个协程来处理监听事件
 	for indexName, dirs := range directory {
 		WatcherWG.Add(1)
 		go forkWatcher(indexName, dirs)
 	}
 
+	// 等待所有的协程退出
 	go func() {
-		WatcherWG.Wait()
-		k3.K3LogInfo("All watcher goroutine exit.")
+		WatcherWG.Wait() // 阻塞函数
+		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
 		WatcherContextCancel()
+		fmt.Println("watcher goroutine exited.")
 	}()
 }
 
@@ -244,7 +247,7 @@ func forkWatcher(indexName string, dirs []string) {
 		}
 	}
 
-	for {
+	for { //  阻塞函数块
 		select {
 
 		case event, ok := <-watcher.Events:
@@ -295,7 +298,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 
 	ClockWG.Add(1)
 	go func() {
-		ClockWG.Done()
+		defer ClockWG.Done()
 		defer func() {
 			t.Stop()
 		}()
@@ -306,10 +309,18 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 				if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
 					k3.K3LogError("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk failed: %v\n", err)
 				}
+				k3.K3LogDebug("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk success.")
 			case <-WatcherContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
 				return
 			}
 		}
+	}()
+
+	go func() {
+		ClockWG.Wait() // 阻塞等待Clock定时器协程协程退出
+		k3.K3LogInfo("[ClockSyncGlobalFileStatesToDiskFile] ClockSyncGlobalFileStatesToDiskFile exit.")
+		WatcherContextCancel()
+		fmt.Println("clock goroutine exited !")
 	}()
 }
 
@@ -355,12 +366,7 @@ func Run(directory map[string][]string) error {
 	InitWatcher(directory)
 
 	// 4. 定时更新 FileState 数据到硬盘
+	ClockSyncGlobalFileStatesToDiskFile(stateFilePath)
 
 	return nil
-}
-
-func Closed() {
-	WatcherWG.Wait()
-	k3.K3LogInfo("All watcher goroutine exit.")
-	WatcherContextCancel()
 }

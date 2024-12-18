@@ -1,14 +1,21 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/watch"
+	"net"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 )
 
 var (
@@ -115,31 +122,38 @@ func main() {
 		return
 	}
 
-	os.Exit(0)
+	var (
+		httpClean func()
+	)
 
-	/*
-		if config.GlobalConfig.Http.Enable == true {
-			// 启动http服务器
-			httpClean, _ = k3.HttpServer(context.Background())
-		}
+	if config.GlobalConfig.Http.Enable == true {
+		// 启动http服务器
+		httpClean, _ = k3.HttpServer(context.Background())
+	}
 
-		pprof()
+	pprof()
+	graceExit(httpClean)
 
-		var (
-			httpClean func()
-		)
-		graceExit(dir+config.GlobalConfig.Watch.StateFilePath, httpClean)
-
-	*/
 }
 
-/*
+func pprof() {
+
+	go func() {
+
+		listener, err := net.Listen("tcp", ":6060")
+		if err != nil {
+			log.Fatalf("Failed to start pprof server: %v", err)
+		}
+		log.Println(http.Serve(listener, nil))
+
+	}()
+}
+
 // GraceExit 保持进程常驻， 等待信号在退出
-func graceExit(stateFile string, cleanFuncs ...func()) {
+func graceExit(cleans ...func()) {
 	var (
 		state      = -1
 		signalChan = make(chan os.Signal, 1)
-		err        error
 	)
 
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
@@ -164,16 +178,12 @@ func graceExit(stateFile string, cleanFuncs ...func()) {
 		}
 	}
 
-	// 关闭资源退出, 清理 watch 和 batch 日志提交资源
-	watch.Close()
+	// TODO 注意回收资源
 
-	// 退出前全量更新一次state file文件内容
-	if err = watch.ForceSyncFileState(); err != nil {
-		k3.K3LogError("Closed watcher run save stateFile error: %s", err)
-	}
+	// TODO 退出前全量更新一次state file文件内容
 
 	// 清理各种资源
-	for _, cleanFunc := range cleanFuncs {
+	for _, cleanFunc := range cleans {
 		if cleanFunc != nil {
 			cleanFunc()
 		}
@@ -182,19 +192,3 @@ func graceExit(stateFile string, cleanFuncs ...func()) {
 	time.Sleep(1 * time.Second)
 	os.Exit(state)
 }
-
-func pprof() {
-
-	go func() {
-
-		listener, err := net.Listen("tcp", ":6060")
-		if err != nil {
-			log.Fatalf("Failed to start pprof server: %v", err)
-		}
-		log.Println(http.Serve(listener, nil))
-
-	}()
-}
-
-
-*/
