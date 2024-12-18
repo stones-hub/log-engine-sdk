@@ -381,6 +381,7 @@ func Run(directory map[string][]string) (func(), error) {
 	return Closed, nil
 }
 
+// Closed 清理协程，并关闭资源
 func Closed() {
 	k3.K3LogDebug("[Closed] closed watch.")
 	// 回收定时器协程和监听协程
