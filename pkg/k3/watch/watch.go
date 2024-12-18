@@ -222,11 +222,11 @@ func InitWatcher(directory map[string][]string) {
 
 // forkWatcher 开单一协程来处理监听， 每个indexName开一个协程, 当前看上处于协程中
 func forkWatcher(indexName string, dirs []string) {
-
 	var (
 		watcher *fsnotify.Watcher
 		err     error
 	)
+
 	defer WatcherWG.Done()
 
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
