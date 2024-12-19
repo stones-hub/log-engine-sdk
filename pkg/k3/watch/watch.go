@@ -305,8 +305,15 @@ func writeEvent(indexName string, event fsnotify.Event) {
 
 // 文件或目录创建
 func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watcher) {
+	var (
+		err error
+		ok  bool
+	)
 	// 如果是目录就添加监听， 如果是文件就将文件写入FileStates中，并强制更新一次硬盘
-	
+	if ok, err = k3.IsDirectory(event.Name); err != nil {
+		// 如果这里报错，很可能导致
+		k3.K3LogError("[createEvent] check file type failed: %s", err.Error())
+	}
 }
 
 // 文件或目录删除
