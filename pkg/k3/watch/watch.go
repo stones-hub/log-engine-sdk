@@ -205,12 +205,12 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 }
 
 // InitWatcher 每个indexName 开一个协程
-func InitWatcher(directory map[string][]string) {
+func InitWatcher(directory map[string][]string, fileStatePath string) {
 
 	// 每个index name 开一个协程来处理监听事件
 	for indexName, dirs := range directory {
 		WatcherWG.Add(1)
-		go forkWatcher(indexName, dirs)
+		go forkWatcher(indexName, dirs, fileStatePath)
 	}
 
 	// 等待所有的协程退出
@@ -223,7 +223,7 @@ func InitWatcher(directory map[string][]string) {
 }
 
 // forkWatcher 开单一协程来处理监听， 每个indexName开一个协程, 当前看上处于协程中
-func forkWatcher(indexName string, dirs []string) {
+func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 	var (
 		watcher *fsnotify.Watcher
 		err     error
@@ -260,7 +260,7 @@ func forkWatcher(indexName string, dirs []string) {
 				return
 			}
 			// 处理Event
-			handlerEvent(indexName, event)
+			handlerEvent(indexName, event, fileStatePath)
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -280,7 +280,7 @@ func forkWatcher(indexName string, dirs []string) {
 }
 
 // TODO 处理EVENT事件
-func handlerEvent(indexName string, event fsnotify.Event) {
+func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string) {
 	// fmt.Println("收到变更", indexName, event.Name)
 	// 删除 -> 删除GlobalFileState的内容
 
@@ -373,7 +373,7 @@ func Run(directory map[string][]string) (func(), error) {
 	// fmt.Println("GlobalFileStates:", GlobalFileStates)
 
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
-	InitWatcher(directory)
+	InitWatcher(directory, stateFilePath)
 
 	// 4. 定时更新 FileState 数据到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(stateFilePath)
