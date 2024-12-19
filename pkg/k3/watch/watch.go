@@ -260,7 +260,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 				return
 			}
 			// 处理Event
-			handlerEvent(indexName, event, fileStatePath)
+			handlerEvent(indexName, event, fileStatePath, watcher)
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -280,13 +280,39 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 }
 
 // TODO 处理EVENT事件
-func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string) {
-	// fmt.Println("收到变更", indexName, event.Name)
+func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, watcher *fsnotify.Watcher) {
 	// 删除 -> 删除GlobalFileState的内容
 
 	// 新增 -> 目录就add监听
 
 	// 修改 -> 读取文件，更新GlobalFileState, 并把数据发送给elk
+	if event.Op&fsnotify.Write == fsnotify.Write {
+		fmt.Println("收到变更", indexName, event.Name)
+		writeEvent(indexName, event)
+	} else if event.Op&fsnotify.Create == fsnotify.Create {
+		fmt.Println("收到新增", indexName, event.Name)
+		createEvent(indexName, event, watcher)
+	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename {
+		fmt.Println("收到删除或修改文件名称", indexName, event.Name)
+		removeEvent(indexName, event, watcher)
+	}
+}
+
+// 日志写入
+func writeEvent(indexName string, event fsnotify.Event) {
+
+}
+
+// 文件或目录创建
+func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watcher) {
+	// 如果是目录就添加监听， 如果是文件就将文件写入FileStates中，并强制更新一次硬盘
+	
+}
+
+// 文件或目录删除
+func removeEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watcher) {
+	// 如果是目录，删除watcher的监听， 如果是文件，删除文件FileStates中的记录, 并更新一次硬盘文件
+
 }
 
 // ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
@@ -315,7 +341,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 		for {
 			select {
 			case <-t.C:
-				// TODO 如果只是保持失败，没必要让整个程序退出
+				// 如果只是保持失败，没必要让整个程序退出
 				if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
 					k3.K3LogError("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk failed: %v\n", err)
 				}
