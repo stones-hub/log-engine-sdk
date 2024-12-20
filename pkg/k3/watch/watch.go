@@ -300,7 +300,7 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 
 // 日志写入
 func writeEvent(indexName string, event fsnotify.Event) {
-
+	fmt.Println("收到日志写入事件", indexName, event.Name)
 }
 
 // 文件或目录创建
@@ -360,6 +360,8 @@ func removeEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watch
 				k3.K3LogError("[removeEvent] index_name[%s] event[%s] path[%s] remove watcher failed: %s", indexName, event.Op, event.Name, err.Error)
 				return
 			}
+
+			// TODO event.Name目录下的所有子目录和文件都应该被做相应处理
 		}
 	}
 }
