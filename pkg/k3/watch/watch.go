@@ -340,17 +340,28 @@ func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watch
 func removeEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watcher) {
 	// 如果是目录，删除watcher的监听， 如果是文件，删除文件FileStates中的记录
 
-	if k3.IsDirectory(event.Name) {
-		// 如果是文件，删除文件FileStates中的记录
-		GlobalFileStatesLock.Lock()
-		delete(GlobalFileStates, event.Name)
-		GlobalFileStatesLock.Unlock()
+	var (
+		ok  bool
+		err error
+	)
+
+	if ok, err = k3.IsDirectory(event.Name); err != nil {
+		k3.K3LogError("[removeEvent] index_name[%s] event[%s] path[%s] failed : %s", indexName, event.Op, event.Name, err.Error())
+		return
 	} else {
-		// 如果是目录，删除watcher的监听
-		if err := watcher.Remove(event.Name); err != nil {
+		if !ok {
+			// 如果是文件，删除文件FileStates中的记录
+			GlobalFileStatesLock.Lock()
+			delete(GlobalFileStates, event.Name)
+			GlobalFileStatesLock.Unlock()
+		} else {
+			// 如果是目录，删除watcher的监听
+			if err = watcher.Remove(event.Name); err != nil {
+				k3.K3LogError("[removeEvent] index_name[%s] event[%s] path[%s] remove watcher failed: %s", indexName, event.Op, event.Name, err.Error)
+				return
+			}
 		}
 	}
-
 }
 
 // ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
