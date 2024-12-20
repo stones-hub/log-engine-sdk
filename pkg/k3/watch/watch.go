@@ -147,7 +147,7 @@ func SaveGlobalFileStatesToDiskFile(filePath string) error {
 	return nil
 }
 
-// ScanLogFileToGlobalFileStatesAndSaveToDiskFile  保证硬盘文件和FileState一致，并同步到硬盘状态文件
+// ScanLogFileToGlobalFileStatesAndSaveToDiskFile  保证硬盘文件和FileState一致，并同步到硬盘状态文件, 项目启动的时候使用此函数，未加锁
 func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]string, filePath string) error {
 	var (
 		totalFiles           = make(map[string][]string)
@@ -311,8 +311,28 @@ func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watch
 	)
 	// 如果是目录就添加监听， 如果是文件就将文件写入FileStates中，并强制更新一次硬盘
 	if ok, err = k3.IsDirectory(event.Name); err != nil {
-		// 如果这里报错，很可能导致
-		k3.K3LogError("[createEvent] check file type failed: %s", err.Error())
+		// 如果这里报错，有可能会导致文件或者目录不会被监听，记录下日志
+		k3.K3LogError("[createEvent] index_name[%s] event[%s] path[%s] failed : %s", indexName, event.Op, event.Name, err.Error())
+		return
+	} else {
+		if ok {
+			// 将目录加入到监听
+			if err = watcher.Add(event.Name); err != nil {
+				k3.K3LogError("[createEvent] index_name[%s] event[%s] path[%s] add watcher failed: %s", indexName, event.Op, event.Name, err.Error())
+				return
+			}
+		} else {
+			// 将文件写入到GlobalFileStates中, 无需同步给硬盘，交给定时器处理同步工作
+			GlobalFileStatesLock.Lock()
+			GlobalFileStates[event.Name] = &FileState{
+				Path:          event.Name,
+				Offset:        0,
+				StartReadTime: 0,
+				LastReadTime:  0,
+				IndexName:     indexName,
+			}
+			GlobalFileStatesLock.Unlock()
+		}
 	}
 }
 
