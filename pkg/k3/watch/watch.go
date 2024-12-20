@@ -301,9 +301,8 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 }
 
 // ReadFileByOffset 读取文件
-func ReadFileByOffset(fileName string) error {
+func ReadFileByOffset(indexName string, event fsnotify.Event) error {
 	var (
-		err              error
 		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
 		currentReadCount int
 		currentOffset    int64
@@ -315,50 +314,71 @@ func ReadFileByOffset(fileName string) error {
 		maxReadCount = DefaultMaxReadCount
 	}
 
-	reader = bufio.NewReader(fd)
-	currentReadCount = 0
-	currentOffset = fileState.Offset
-
-	for currentReadCount < maxReadCount {
-		currentReadCount++
-
-		_, err := fd.Seek(currentOffset, 0)
-		if err != nil {
-			k3.K3LogError("[ReadFileByOffset] seek error: %s", err)
-			break
+	// 1. 读取监听到的文件, 如果文件不在GlobalFileStates中，添加
+	if _, exists := GlobalFileStates[event.Name]; !exists {
+		GlobalFileStatesLock.Lock()
+		GlobalFileStates[event.Name] = &FileState{
+			Path:          event.Name,
+			Offset:        0,
+			StartReadTime: 0,
+			LastReadTime:  0,
+			IndexName:     indexName,
 		}
+		GlobalFileStatesLock.Unlock()
+	}
 
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				k3.K3LogDebug("[ReadFileByOffset] read file end: %s", err)
-			} else {
-				k3.K3LogError("[ReadFileByOffset] read file error: %s", err)
+	// 2. 打开文件
+	if fd, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
+		return errors.New("[ReadFileByOffset] open file failed: " + err.Error())
+	} else {
+
+		reader = bufio.NewReader(fd)
+		currentReadCount = 0
+		currentOffset = fileState.Offset
+
+		for currentReadCount < maxReadCount {
+			currentReadCount++
+
+			_, err := fd.Seek(currentOffset, 0)
+			if err != nil {
+				k3.K3LogError("[ReadFileByOffset] seek error: %s", err)
+				break
 			}
-			break
+
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				if err == io.EOF {
+					k3.K3LogDebug("[ReadFileByOffset] read file end: %s", err)
+				} else {
+					k3.K3LogError("[ReadFileByOffset] read file error: %s", err)
+				}
+				break
+			}
+
+			k3.K3LogDebug("[ReadFileByOffset] ReadLine : %s", line)
+			currentOffset += int64(len(line))
+			content += line
 		}
 
-		k3.K3LogDebug("[ReadFileByOffset] ReadLine : %s", line)
-		currentOffset += int64(len(line))
-		content += line
-	}
-
-	if len(content) > 0 {
-		if err := SendData2Consumer(content, fileState); err != nil {
-			return err
+		if len(content) > 0 {
+			if err := SendData2Consumer(content, fileState); err != nil {
+				return err
+			}
 		}
+
+		// 将最新的文件数据，同步给内存
+		FileStateLock.Lock()
+		GlobalFileStates[fileState.Path].Offset = currentOffset
+		if GlobalFileStates[fileState.Path].StartReadTime == 0 {
+			GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
+		}
+		GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
+		FileStateLock.Unlock()
+
+		return nil
+
 	}
 
-	// 将最新的文件数据，同步给内存
-	FileStateLock.Lock()
-	GlobalFileStates[fileState.Path].Offset = currentOffset
-	if GlobalFileStates[fileState.Path].StartReadTime == 0 {
-		GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
-	}
-	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
-	FileStateLock.Unlock()
-
-	return nil
 }
 
 // 日志写入
@@ -369,7 +389,7 @@ func writeEvent(indexName string, event fsnotify.Event) {
 	)
 
 	// 监测到某个文件有写入，循环读取
-	if err = ReadFileByOffset(event.Name); err != nil {
+	if err = ReadFileByOffset(indexName, event); err != nil {
 		k3.K3LogError("[WriterEvent] ReadFileByOffset error: %s", err)
 	}
 }
