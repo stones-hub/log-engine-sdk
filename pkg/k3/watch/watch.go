@@ -1,11 +1,13 @@
 package watch
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"io"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
@@ -301,8 +303,60 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 // ReadFileByOffset 读取文件
 func ReadFileByOffset(fileName string) error {
 	var (
-		err error
+		err              error
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
+		currentReadCount int
+		currentOffset    int64
+		reader           *bufio.Reader
+		content          string
 	)
+
+	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
+		maxReadCount = DefaultMaxReadCount
+	}
+
+	reader = bufio.NewReader(fd)
+	currentReadCount = 0
+	currentOffset = fileState.Offset
+
+	for currentReadCount < maxReadCount {
+		currentReadCount++
+
+		_, err := fd.Seek(currentOffset, 0)
+		if err != nil {
+			k3.K3LogError("[ReadFileByOffset] seek error: %s", err)
+			break
+		}
+
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				k3.K3LogDebug("[ReadFileByOffset] read file end: %s", err)
+			} else {
+				k3.K3LogError("[ReadFileByOffset] read file error: %s", err)
+			}
+			break
+		}
+
+		k3.K3LogDebug("[ReadFileByOffset] ReadLine : %s", line)
+		currentOffset += int64(len(line))
+		content += line
+	}
+
+	if len(content) > 0 {
+		if err := SendData2Consumer(content, fileState); err != nil {
+			return err
+		}
+	}
+
+	// 将最新的文件数据，同步给内存
+	FileStateLock.Lock()
+	GlobalFileStates[fileState.Path].Offset = currentOffset
+	if GlobalFileStates[fileState.Path].StartReadTime == 0 {
+		GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
+	}
+	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
+	FileStateLock.Unlock()
 
 	return nil
 }
