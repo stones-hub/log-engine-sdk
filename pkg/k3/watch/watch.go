@@ -338,7 +338,18 @@ func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watch
 
 // 文件或目录删除
 func removeEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watcher) {
-	// 如果是目录，删除watcher的监听， 如果是文件，删除文件FileStates中的记录, 并更新一次硬盘文件
+	// 如果是目录，删除watcher的监听， 如果是文件，删除文件FileStates中的记录
+
+	if k3.IsDirectory(event.Name) {
+		// 如果是文件，删除文件FileStates中的记录
+		GlobalFileStatesLock.Lock()
+		delete(GlobalFileStates, event.Name)
+		GlobalFileStatesLock.Unlock()
+	} else {
+		// 如果是目录，删除watcher的监听
+		if err := watcher.Remove(event.Name); err != nil {
+		}
+	}
 
 }
 
