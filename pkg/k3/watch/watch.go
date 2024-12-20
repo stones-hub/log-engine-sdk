@@ -287,13 +287,13 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 
 	// 修改 -> 读取文件，更新GlobalFileState, 并把数据发送给elk
 	if event.Op&fsnotify.Write == fsnotify.Write {
-		fmt.Println("收到变更", indexName, event.Name)
+		// fmt.Println("收到变更", indexName, event.Name)
 		writeEvent(indexName, event)
 	} else if event.Op&fsnotify.Create == fsnotify.Create {
-		fmt.Println("收到新增", indexName, event.Name)
+		// fmt.Println("收到新增", indexName, event.Name)
 		createEvent(indexName, event, watcher)
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename {
-		fmt.Println("收到删除或修改文件名称", indexName, event.Name)
+		// fmt.Println("收到删除或修改文件名称", indexName, event.Name)
 		removeEvent(indexName, event, watcher)
 	}
 }
@@ -339,31 +339,12 @@ func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watch
 // 文件或目录删除
 func removeEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watcher) {
 	// 如果是目录，删除watcher的监听， 如果是文件，删除文件FileStates中的记录
-
-	var (
-		ok  bool
-		err error
-	)
-
-	if ok, err = k3.IsDirectory(event.Name); err != nil {
-		k3.K3LogError("[removeEvent] index_name[%s] event[%s] path[%s] failed : %s", indexName, event.Op, event.Name, err.Error())
-		return
-	} else {
-		if !ok {
-			// 如果是文件，删除文件FileStates中的记录
-			GlobalFileStatesLock.Lock()
-			delete(GlobalFileStates, event.Name)
-			GlobalFileStatesLock.Unlock()
-		} else {
-			// 如果是目录，删除watcher的监听
-			if err = watcher.Remove(event.Name); err != nil {
-				k3.K3LogError("[removeEvent] index_name[%s] event[%s] path[%s] remove watcher failed: %s", indexName, event.Op, event.Name, err.Error)
-				return
-			}
-
-			// TODO event.Name目录下的所有子目录和文件都应该被做相应处理
-		}
-	}
+	// 注意， 当文件被删除或者改名，原来的文件其实已经被删除了, 那再去判断文件是什么类型已经没有意义了，所以需要直接处理
+	GlobalFileStatesLock.Lock()
+	delete(GlobalFileStates, event.Name)
+	GlobalFileStatesLock.Unlock()
+	_ = watcher.Remove(event.Name)
+	// fmt.Println(watcher.WatchList())
 }
 
 // ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
