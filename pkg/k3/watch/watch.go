@@ -294,13 +294,30 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 		createEvent(indexName, event, watcher)
 	} else if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename {
 		// fmt.Println("收到删除或修改文件名称", indexName, event.Name)
-		removeEvent(indexName, event, watcher)
+		removeEvent(event, watcher)
 	}
+}
+
+// ReadFileByOffset 读取文件
+func ReadFileByOffset(fileName string) error {
+	var (
+		err error
+	)
+
+	return nil
 }
 
 // 日志写入
 func writeEvent(indexName string, event fsnotify.Event) {
-	fmt.Println("收到日志写入事件", indexName, event.Name)
+	// fmt.Println("收到日志写入事件", indexName, event.Name)
+	var (
+		err error
+	)
+
+	// 监测到某个文件有写入，循环读取
+	if err = ReadFileByOffset(event.Name); err != nil {
+		k3.K3LogError("[WriterEvent] ReadFileByOffset error: %s", err)
+	}
 }
 
 // 文件或目录创建
@@ -337,7 +354,7 @@ func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watch
 }
 
 // 文件或目录删除
-func removeEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watcher) {
+func removeEvent(event fsnotify.Event, watcher *fsnotify.Watcher) {
 	// 如果是目录，删除watcher的监听， 如果是文件，删除文件FileStates中的记录
 	// 注意， 当文件被删除或者改名，原来的文件其实已经被删除了, 那再去判断文件是什么类型已经没有意义了，所以需要直接处理
 	GlobalFileStatesLock.Lock()
