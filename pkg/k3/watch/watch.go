@@ -314,7 +314,7 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) error {
 		maxReadCount = DefaultMaxReadCount
 	}
 
-	// 1. 读取监听到的文件, 如果文件不在GlobalFileStates中，添加
+	// 1. 读取监听到的文件, 如果文件不在GlobalFileStates中，添加, 同步到硬盘交给定时器
 	if _, exists := GlobalFileStates[event.Name]; !exists {
 		GlobalFileStatesLock.Lock()
 		GlobalFileStates[event.Name] = &FileState{
@@ -334,7 +334,7 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) error {
 
 		reader = bufio.NewReader(fd)
 		currentReadCount = 0
-		currentOffset = fileState.Offset
+		currentOffset = GlobalFileStates[event.Name].Offset
 
 		for currentReadCount < maxReadCount {
 			currentReadCount++
@@ -351,6 +351,7 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) error {
 					k3.K3LogDebug("[ReadFileByOffset] read file end: %s", err)
 				} else {
 					k3.K3LogError("[ReadFileByOffset] read file error: %s", err)
+
 				}
 				break
 			}
@@ -367,13 +368,14 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) error {
 		}
 
 		// 将最新的文件数据，同步给内存
-		FileStateLock.Lock()
-		GlobalFileStates[fileState.Path].Offset = currentOffset
+		GlobalFileStatesLock.Lock()
+	
+		GlobalFileStates[event.Name].Offset = currentOffset
 		if GlobalFileStates[fileState.Path].StartReadTime == 0 {
 			GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
 		}
 		GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
-		FileStateLock.Unlock()
+		GlobalFileStatesLock.Unlock()
 
 		return nil
 
