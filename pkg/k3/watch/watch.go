@@ -365,13 +365,15 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) error {
 			if err := SendData2Consumer(content, fileState); err != nil {
 				return err
 			}
+
 		}
 
 		// 将最新的文件数据，同步给内存
 		GlobalFileStatesLock.Lock()
-	
+
 		GlobalFileStates[event.Name].Offset = currentOffset
 		if GlobalFileStates[fileState.Path].StartReadTime == 0 {
+
 			GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
 		}
 		GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
