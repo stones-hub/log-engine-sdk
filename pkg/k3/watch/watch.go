@@ -395,6 +395,7 @@ func writeEvent(indexName string, event fsnotify.Event) {
 	// 监测到某个文件有写入，循环读取
 	if err = ReadFileByOffset(indexName, event); err != nil {
 		k3.K3LogError("[WriterEvent] ReadFileByOffset error: %s", err)
+
 	}
 }
 
