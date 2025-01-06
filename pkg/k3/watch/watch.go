@@ -525,8 +525,6 @@ func Run(directory map[string][]string) (func(), error) {
 		return nil, errors.New("[Run] scan log file state failed: " + err.Error())
 	}
 
-	// fmt.Println("GlobalFileStates:", GlobalFileStates)
-
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
 	InitWatcher(directory, stateFilePath)
 
