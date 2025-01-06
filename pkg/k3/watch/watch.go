@@ -256,6 +256,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 		select {
 
 		case event, ok := <-watcher.Events:
+
 			if !ok {
 				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher event channel closed.", indexName)
 				WatcherContextCancel()
