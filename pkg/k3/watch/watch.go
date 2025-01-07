@@ -488,7 +488,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 	}()
 }
 
-// Run 启动监听
+// Run 启动监听, directory 是一个map，key是索引名称，value是索引对应的目录列表, 所有的子目录也包含
 func Run(directory map[string][]string) (func(), error) {
 	var (
 		err           error
