@@ -514,7 +514,7 @@ func Run(directory map[string][]string) (func(), error) {
 		}
 	}
 
-	// 打开文件state file, 并将数据load到GlobalFileStates变量中
+	// 打开文件state file, 并将FileStateFilePath的数据load到GlobalFileStates变量中(内存)
 	if err = LoadDiskFileToGlobalFileStates(FileStateFilePath); err != nil {
 		return nil, errors.New("[Run] load file state failed : " + err.Error())
 	}
