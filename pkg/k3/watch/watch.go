@@ -144,8 +144,7 @@ func SaveGlobalFileStatesToDiskFile(filePath string) error {
 		return errors.New("[SaveFileStateToDiskFile] json encode failed: " + err.Error())
 	}
 
-	// fmt.Println("SaveGlobalFileStatesToDiskFile Success !")
-
+	k3.K3LogDebug("[SaveFileStateToDiskFile] save file state to disk file success .")
 	return nil
 }
 
