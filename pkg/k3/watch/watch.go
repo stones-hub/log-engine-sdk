@@ -212,7 +212,7 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 // InitWatcher 每个indexName 开一个协程
 // directory: map[indexName][]dir 每个索引对应的需要监控的所有目录
 // fileStatePath: GlobalFileStates状态文件路径
-func InitWatcher(directory map[string][]string, fileStatePath string) {
+func InitWatcher(directory map[string][]string, fileStatePath string) error {
 
 	// 每个index name 开一个协程来处理监听事件
 	for indexName, dirs := range directory {
@@ -243,7 +243,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
 		// 处理错误，让所有的Watcher协程退出
 		k3.K3LogError("[forkWatcher] new watcher failed: %s", err.Error())
 		WatcherContextCancel()
-		return
+		return err
 	}
 	defer watcher.Close()
 
@@ -253,7 +253,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
 			// 处理错误， 让所有的Watcher协程退出
 			k3.K3LogError("[forkWatcher] add dir to watcher failed: %s", err.Error())
 			WatcherContextCancel()
-			return
+			return err
 		}
 	}
 
