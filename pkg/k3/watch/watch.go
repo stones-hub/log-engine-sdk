@@ -228,7 +228,7 @@ func InitWatcher(directory map[string][]string, fileStatePath string) {
 	}()
 }
 
-// forkWatcher 开单一协程来处理监听， 每个indexName开一个协程, 当前看上处于协程中
+// forkWatcher 开单一协程来处理监听，每个indexName开一个协程
 func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 	var (
 		watcher *fsnotify.Watcher
