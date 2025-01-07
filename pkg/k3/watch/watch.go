@@ -257,6 +257,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 		}
 	}
 
+EXIT:
 	for { //  阻塞函数块
 		select {
 
@@ -265,7 +266,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 			if !ok {
 				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher event channel closed.", indexName)
 				WatcherContextCancel()
-				return
+				break EXIT
 			}
 			// 处理Event
 			handlerEvent(indexName, event, fileStatePath, watcher)
@@ -274,14 +275,14 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 			if !ok {
 				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher error channel closed.", indexName)
 				WatcherContextCancel()
-				return
+				break EXIT
 			}
 			k3.K3LogError("[forkWatcher] index_name[%s] watcher error: %s", indexName, err)
 			WatcherContextCancel()
-			return
+			break EXIT
 		case <-WatcherContext.Done():
 			k3.K3LogWarn("[forkWatcher] index_name[%s] watcher exit with by globalWatchContext. ", indexName)
-			return
+			break EXIT
 		}
 	}
 
