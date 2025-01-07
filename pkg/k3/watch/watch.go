@@ -224,7 +224,7 @@ func InitWatcher(directory map[string][]string, fileStatePath string) {
 	go func() {
 		WatcherWG.Wait() // 阻塞函数
 		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
-		WatcherContextCancel()
+		WatcherContextCancel() // TODO 考虑下为啥
 	}()
 }
 
@@ -238,6 +238,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 	defer WatcherWG.Done()
 	defer WatcherContextCancel()
 
+	// 每个indexName 创建一个Watcher
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
 		// 处理错误，让所有的Watcher协程退出
 		k3.K3LogError("[forkWatcher] new watcher failed: %s", err.Error())
