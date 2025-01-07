@@ -210,6 +210,8 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 }
 
 // InitWatcher 每个indexName 开一个协程
+// directory: map[indexName][]dir 每个索引对应的需要监控的所有目录
+// fileStatePath: GlobalFileStates状态文件路径
 func InitWatcher(directory map[string][]string, fileStatePath string) {
 
 	// 每个index name 开一个协程来处理监听事件
@@ -223,7 +225,6 @@ func InitWatcher(directory map[string][]string, fileStatePath string) {
 		WatcherWG.Wait() // 阻塞函数
 		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
 		WatcherContextCancel()
-		// fmt.Println("watcher goroutine exited.")
 	}()
 }
 
