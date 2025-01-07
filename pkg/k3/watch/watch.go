@@ -35,7 +35,7 @@ var (
 	WatcherWG *sync.WaitGroup // Watch协程的等待退出
 )
 
-// 处理全局资源的并发问题
+// 处理全局资源的并发问题, 确保GlobalFileStates数据的变更是原子的
 
 var (
 	GlobalFileStatesLock *sync.Mutex // 控制GlobalFileStates的锁
@@ -48,7 +48,8 @@ var (
 )
 
 var (
-	GlobalDataAnalytics k3.DataAnalytics              // 日志接收器
+	GlobalDataAnalytics k3.DataAnalytics // 日志接收器
+	FileStateFilePath   string
 	GlobalFileStates    = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
 	// DefaultSyncInterval 单位秒, 默认为60s
 	// 将硬盘上最新的文件列表同步到GlobalFileStates，并将GlobalFileStates数据同步到Disk硬盘存储
@@ -62,10 +63,11 @@ var (
 )
 
 func InitVars() {
-	ClockWG = &sync.WaitGroup{}                                                     // 定时器协程锁
-	WatcherWG = &sync.WaitGroup{}                                                   // Watcher协程锁
-	GlobalFileStatesLock = &sync.Mutex{}                                            // 全局FileStates锁
-	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background()) // Watcher取消上下文
+	ClockWG = &sync.WaitGroup{}                                                          // 定时器协程锁
+	WatcherWG = &sync.WaitGroup{}                                                        // Watcher协程锁
+	GlobalFileStatesLock = &sync.Mutex{}                                                 // 全局FileStates锁
+	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background())      // Watcher取消上下文
+	FileStateFilePath = k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath // Watcher读写硬盘的状态文件记录地址
 }
 
 func InitConsumerBatchLog() error {
@@ -491,8 +493,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 // Run 启动监听, directory 是一个map，key是索引名称，value是索引对应的目录列表, 所有的子目录也包含
 func Run(directory map[string][]string) (func(), error) {
 	var (
-		err           error
-		stateFilePath string // state file 文件的绝对路径
+		err error
 	)
 	// 初始化用到的所有全局变量
 	InitVars()
@@ -503,32 +504,31 @@ func Run(directory map[string][]string) (func(), error) {
 	}
 
 	// 2. 初始化FileState 文件, state file 文件是以工作根目录为基准的相对目录
-	stateFilePath = k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath
 	// 2.1. 检查core.json是否存在，不存在就创建，并且load到FileState变量中
-	if !k3.FileExists(stateFilePath) {
+	if !k3.FileExists(FileStateFilePath) {
 		// 创建文件
-		if _, err = os.OpenFile(stateFilePath, os.O_CREATE, os.ModePerm); err != nil {
+		if _, err = os.OpenFile(FileStateFilePath, os.O_CREATE, os.ModePerm); err != nil {
 			return nil, errors.New("[Run] create state file failed: " + err.Error())
 		}
 	}
 
 	// 打开文件state file, 并将数据load到GlobalFileStates变量中
-	if err = LoadDiskFileToGlobalFileStates(stateFilePath); err != nil {
+	if err = LoadDiskFileToGlobalFileStates(FileStateFilePath); err != nil {
 		return nil, errors.New("[Run] load file state failed : " + err.Error())
 	}
 
 	// 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
 	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
 	// 2.4. 将FileState数据写入硬盘
-	if err = ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, stateFilePath); err != nil {
+	if err = ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, FileStateFilePath); err != nil {
 		return nil, errors.New("[Run] scan log file state failed: " + err.Error())
 	}
 
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
-	InitWatcher(directory, stateFilePath)
+	InitWatcher(directory, FileStateFilePath)
 
 	// 4. 定时更新 FileState 数据到硬盘
-	ClockSyncGlobalFileStatesToDiskFile(stateFilePath)
+	ClockSyncGlobalFileStatesToDiskFile(FileStateFilePath)
 
 	return Closed, nil
 }

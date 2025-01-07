@@ -179,7 +179,7 @@ EXIT:
 	}
 
 	// 程序退出之前，做一次FileState文件的保存
-	_ = watch.SaveGlobalFileStatesToDiskFile(k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath)
+	_ = watch.SaveGlobalFileStatesToDiskFile(watch.FileStateFilePath)
 
 	// 清理各种资源
 	for _, cleanFunc := range cleans {
