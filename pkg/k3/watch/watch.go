@@ -38,7 +38,9 @@ var (
 // 处理全局资源的并发问题, 确保GlobalFileStates数据的变更是原子的
 
 var (
-	GlobalFileStatesLock *sync.Mutex // 控制GlobalFileStates的锁
+	GlobalFileStatesLock *sync.Mutex           // 控制GlobalFileStates的锁
+	FileStateFilePath    string                // GlobalFileStates 硬盘存储状态文件路径
+	GlobalFileStates     map[string]*FileState // 对应监控的所有文件的状态，映射 core.json文件
 )
 
 // 处理不同类型的协程主动退出的问题
@@ -49,8 +51,6 @@ var (
 
 var (
 	GlobalDataAnalytics k3.DataAnalytics // 日志接收器
-	FileStateFilePath   string
-	GlobalFileStates    = make(map[string]*FileState) // 对应监控的所有文件的状态，映射 core.json文件
 	// DefaultSyncInterval 单位秒, 默认为60s
 	// 将硬盘上最新的文件列表同步到GlobalFileStates，并将GlobalFileStates数据同步到Disk硬盘存储
 	DefaultSyncInterval = 60
@@ -68,6 +68,7 @@ func InitVars() {
 	GlobalFileStatesLock = &sync.Mutex{}                                                 // 全局FileStates锁
 	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background())      // Watcher取消上下文
 	FileStateFilePath = k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath // Watcher读写硬盘的状态文件记录地址
+	GlobalFileStates = make(map[string]*FileState)                                       // 初始化全局FileStates
 }
 
 func InitConsumerBatchLog() error {
