@@ -514,14 +514,14 @@ func Run(directory map[string][]string) (func(), error) {
 		}
 	}
 
-	// 打开文件state file, 并将FileStateFilePath的数据load到GlobalFileStates变量中(内存)
+	// 打开文件FileStateFilePath, 并将FileStateFilePath的数据load到GlobalFileStates变量中(内存)
 	if err = LoadDiskFileToGlobalFileStates(FileStateFilePath); err != nil {
 		return nil, errors.New("[Run] load file state failed : " + err.Error())
 	}
 
-	// 2.2. 遍历硬盘上的所有文件，如果FileState中没有，就add
-	// 2.3. 检查FileState中的文件是否存在，不存在就delete掉
-	// 2.4. 将FileState数据写入硬盘
+	// 2.2. 遍历硬盘上的所有文件，如果GlobalFileStates中没有，就add
+	// 2.3. 检查GlobalFileStates中的文件是否存在，不存在就delete掉
+	// 2.4. 将GlobalFileStates最新数据更新到FileStateFilePath
 	if err = ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, FileStateFilePath); err != nil {
 		return nil, errors.New("[Run] scan log file state failed: " + err.Error())
 	}
