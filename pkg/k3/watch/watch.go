@@ -66,9 +66,10 @@ func InitVars() {
 	ClockWG = &sync.WaitGroup{}                                                          // 定时器协程锁
 	WatcherWG = &sync.WaitGroup{}                                                        // Watcher协程锁
 	GlobalFileStatesLock = &sync.Mutex{}                                                 // 全局FileStates锁
-	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background())      // Watcher取消上下文
 	FileStateFilePath = k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath // Watcher读写硬盘的状态文件记录地址
 	GlobalFileStates = make(map[string]*FileState)                                       // 初始化全局FileStates
+
+	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background()) // Watcher取消上下文
 }
 
 func InitConsumerBatchLog() error {
