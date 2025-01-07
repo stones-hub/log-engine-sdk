@@ -224,7 +224,7 @@ func InitWatcher(directory map[string][]string, fileStatePath string) {
 	go func() {
 		WatcherWG.Wait() // 阻塞函数
 		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
-		WatcherContextCancel() // TODO 考虑下为啥
+		WatcherContextCancel() // 考虑到所有的Watcher的协程都退出了， 保险起见再次发一个退出信号
 	}()
 }
 
