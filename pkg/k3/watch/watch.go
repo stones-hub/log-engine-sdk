@@ -1,7 +1,6 @@
 package watch
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -246,6 +245,8 @@ func InitWatcher(directory map[string][]string, fileStatePath string) error {
 	go func() {
 		WatcherWG.Wait() // 阻塞函数
 		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
+		processingWg.Wait() // 阻塞函数, 回收每次读取文件时开的所有协程
+		k3.K3LogInfo("[InitWatcher] All processing goroutine exit.")
 		WatcherContextCancel() // 考虑到所有的Watcher的协程都退出了， 保险起见再次发一个退出信号
 	}()
 
@@ -348,11 +349,11 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 	}
 }
 
-// ReadFileByOffset 读取文件
+// TODO ReadFileByOffset 读取文件
 func ReadFileByOffset(indexName string, event fsnotify.Event) {
 	defer processingWg.Done()
 
-	// 1. 判断当前协程数量是否负载, 如果负载， processingSem会阻塞，等待其他协程处理完
+	// 1. 判断当前协程数量是否负载, 如果负载processingSem会阻塞，等待其他协程处理完
 	processingSem <- struct{}{}
 	defer func() {
 		<-processingSem
@@ -366,17 +367,15 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) {
 
 	// 3. 开始处理读取发送问题
 	var (
-		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
-		currentReadCount int
-		currentOffset    int64
-		reader           *bufio.Reader
-		content          string
+		maxReadCount = config.GlobalConfig.Watch.MaxReadCount
 	)
 
 	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
 		maxReadCount = DefaultMaxReadCount
 	}
 	// 3.1. 打开文件
+
+	fmt.Println("aaaaaaaaaaaaaaaaaaa")
 
 	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
 
@@ -387,9 +386,9 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) {
 
 // 日志写入的监听
 func writeEvent(indexName string, event fsnotify.Event) {
-	// TODO 文件写入被监听到，如果文件在GlobalFileState中，就读取文件，如果不存在，就优先将文件写入到GlobalFileStates中，并强制同步到硬盘
-
+	// 判断当前文件是否已经存在，不存在就创建
 	if _, exists := GlobalFileStates[event.Name]; !exists {
+		fmt.Println("123123123132113131")
 		GlobalFileStatesLock.Lock()
 		GlobalFileStates[event.Name] = &FileState{
 			Path:          event.Name,
