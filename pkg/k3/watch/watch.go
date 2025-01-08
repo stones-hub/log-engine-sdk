@@ -55,6 +55,7 @@ var (
 	DefaultMaxReadCount = 200            // 默认每次读取日志文件的最大次数
 )
 
+// 用于处理读取文件的协程， 控制协程的数量即可，多个文件可以同时读取发送
 var (
 	processingSem chan struct{} // 可开启的最大协程数量
 	processingWg  *sync.WaitGroup
