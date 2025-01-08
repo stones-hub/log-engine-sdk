@@ -384,7 +384,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 
 	currentReadCount = 0                            // 当前文件被读取次数
 	currentFileState = GlobalFileStates[event.Name] // 当前文件信息
-	currentOffset = currentFileState.Offset
+	currentOffset = currentFileState.Offset         // 当前文件读取位置
 
 	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
 		maxReadCount = DefaultMaxReadCount
@@ -395,7 +395,15 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 		return
 	}
 	reader = bufio.NewReader(fd)
+
 	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
+	for currentReadCount < maxReadCount {
+		currentReadCount++
+		if _, err = fd.Seek(currentOffset, 0); err != nil {
+			k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] seek file failed: %s", indexName, event.Op, event.Name, err.Error())
+			return
+		}
+	}
 
 	// 3.3. 将读取的数据，发送给ELK
 }
