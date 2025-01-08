@@ -330,7 +330,6 @@ EXIT:
 	return
 }
 
-// TODO 处理EVENT事件
 func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, watcher *fsnotify.Watcher) {
 	// 删除 -> 删除GlobalFileState的内容
 
@@ -349,8 +348,7 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 	}
 }
 
-// TODO ReadFileByOffset 读取文件
-func ReadFileByOffset(indexName string, event fsnotify.Event) {
+func processing(indexName string, event fsnotify.Event) {
 	defer processingWg.Done()
 
 	// 1. 判断当前协程数量是否负载, 如果负载processingSem会阻塞，等待其他协程处理完
@@ -366,6 +364,13 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) {
 	}
 
 	// 3. 开始处理读取发送问题
+	readEventNameByOffset(indexName, event)
+
+	// 4. 协程结束，将当前文件的协程移除
+	processingMap.Delete(event.Name)
+}
+
+func readEventNameByOffset(indexName string, event fsnotify.Event) {
 	var (
 		maxReadCount = config.GlobalConfig.Watch.MaxReadCount
 	)
@@ -375,13 +380,9 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) {
 	}
 	// 3.1. 打开文件
 
-	fmt.Println("aaaaaaaaaaaaaaaaaaa")
-
 	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
 
 	// 3.3. 将读取的数据，发送给ELK
-	// 3.4. 协程结束，将当前文件的协程移除
-	processingMap.Delete(event.Name)
 }
 
 // 日志写入的监听
@@ -405,7 +406,7 @@ func writeEvent(indexName string, event fsnotify.Event) {
 
 	processingWg.Add(1)
 	// 监测到某个文件有写入，循环读取
-	go ReadFileByOffset(indexName, event)
+	go processing(indexName, event)
 }
 
 // 文件或目录创建
