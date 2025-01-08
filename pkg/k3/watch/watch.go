@@ -561,14 +561,13 @@ func Run(directory map[string][]string) (func(), error) {
 	}
 
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
-	if err := InitWatcher(directory, FileStateFilePath); err != nil {
-		return Closed, nil
+	if err = InitWatcher(directory, FileStateFilePath); err != nil {
+		return Closed, err
 	}
 
 	// 4. TODO 需要检查代码 -> 定时更新 FileState 数据到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(FileStateFilePath)
 
-	fmt.Println("aaaaaaaaa===>")
 	return Closed, nil
 }
 
