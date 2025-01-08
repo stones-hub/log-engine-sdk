@@ -44,7 +44,7 @@ var (
 // 处理不同类型的协程主动退出的问题
 var (
 	WatcherContext       context.Context    // 控制watcher相关所有协程退出
-	WatcherContextCancel context.CancelFunc // 用于主动取消watcher相关的所有协程
+	WatcherContextCancel context.CancelFunc // 用于主动取消watcher相关的所有协程（含Clock协程）
 )
 
 var (
