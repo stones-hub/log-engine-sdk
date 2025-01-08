@@ -53,6 +53,12 @@ var (
 	DefaultMaxReadCount = 200            // 默认每次读取日志文件的最大次数
 )
 
+var (
+	processingSem chan struct{} // 可开启的最大协程数量
+	processingWg  *sync.WaitGroup
+	processingMap *sync.Map
+)
+
 // TODO 定时处理文件已经读完，或者长时间为读取的情况, 考虑如果文件长时间为读取，读取完以后，是否要删除GlobalFileState中文件的问题, 还是说删除工作一句硬盘文件真实被删除来处理
 var (
 	// obsolete_interval : 1 # 单位小时, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
@@ -72,6 +78,10 @@ func InitVars() {
 	GlobalFileStates = make(map[string]*FileState)                                       // 初始化全局FileStates
 
 	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background()) // Watcher取消上下文
+
+	processingMap = &sync.Map{}
+	processingWg = &sync.WaitGroup{}
+	processingSem = make(chan struct{}, 100) // 控制最大协程数量为100
 }
 
 func InitConsumerBatchLog() error {
@@ -340,6 +350,21 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 
 // ReadFileByOffset 读取文件
 func ReadFileByOffset(indexName string, event fsnotify.Event) {
+	defer processingWg.Done()
+
+	// 1. 判断当前协程数量是否负载, 如果负载， processingSem会阻塞，等待其他协程处理完
+	processingSem <- struct{}{}
+	defer func() {
+		<-processingSem
+	}()
+
+	// 2. 判断当前文件是不是已经在协程中
+	if _, loading := processingMap.LoadOrStore(event.Name, true); loading {
+		k3.K3LogWarn("[ReadFileOffset] %s is already being processed, skipping .", event.Name)
+		return
+	}
+
+	// 3. 开始处理读取发送问题
 	var (
 		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
 		currentReadCount int
@@ -351,17 +376,18 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) {
 	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
 		maxReadCount = DefaultMaxReadCount
 	}
+	// 3.1. 打开文件
 
-	// 1. 打开文件
+	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
 
-	// 2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
-
-	// 3. 将读取的数据，发送给ELK
+	// 3.3. 将读取的数据，发送给ELK
+	// 3.4. 协程结束，将当前文件的协程移除
+	processingMap.Delete(event.Name)
 }
 
 // 日志写入的监听
 func writeEvent(indexName string, event fsnotify.Event) {
-	// 1. 文件写入被监听到，如果文件在GlobalFileState中，就读取文件，如果不存在，就优先将文件写入到GlobalFileStates中，并强制同步到硬盘
+	// TODO 文件写入被监听到，如果文件在GlobalFileState中，就读取文件，如果不存在，就优先将文件写入到GlobalFileStates中，并强制同步到硬盘
 
 	if _, exists := GlobalFileStates[event.Name]; !exists {
 		GlobalFileStatesLock.Lock()
@@ -378,8 +404,9 @@ func writeEvent(indexName string, event fsnotify.Event) {
 		GlobalFileStatesLock.Unlock()
 	}
 
+	processingWg.Add(1)
 	// 监测到某个文件有写入，循环读取
-	ReadFileByOffset(indexName, event)
+	go ReadFileByOffset(indexName, event)
 }
 
 // 文件或目录创建
