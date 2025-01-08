@@ -216,10 +216,14 @@ func InitWatcher(directory map[string][]string, fileStatePath string) {
 	// TODO 1. watcher协程在初始化的时候, 并不是所有的协程都创建成功，这样就需要终止后面所有的协程创建，并让已经创建的协程回收，且终止主程序
 	// TODO 2. 如果所有的协程创建成功， 一旦某个协程出现异常，需要让所有的协程退出，并回收，且终止主程序
 
+	var (
+		isSuccess = make(chan error, len(directory))
+	)
+
 	// 每个index name 开一个协程来处理监听事件
 	for indexName, dirs := range directory {
 		WatcherWG.Add(1)
-		go forkWatcher(indexName, dirs, fileStatePath)
+		go forkWatcher(indexName, dirs, fileStatePath, isSuccess)
 	}
 
 	// 等待所有的协程退出
@@ -228,16 +232,10 @@ func InitWatcher(directory map[string][]string, fileStatePath string) {
 		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
 		WatcherContextCancel() // 考虑到所有的Watcher的协程都退出了， 保险起见再次发一个退出信号
 	}()
-
-	select {
-	case <-WatcherContext.Done():
-		fmt.Println("[InitWatcher] All watcher goroutine exit.")
-		os.Exit(1)
-	}
 }
 
 // forkWatcher 开单一协程来处理监听，每个indexName开一个协程
-func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
+func forkWatcher(indexName string, dirs []string, fileStatePath string, isSuccess chan error) {
 	var (
 		watcher *fsnotify.Watcher
 		err     error
@@ -251,7 +249,8 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
 		// 处理错误，让所有的Watcher协程退出
 		k3.K3LogError("[forkWatcher] new watcher failed: %s", err.Error())
 		WatcherContextCancel()
-		return err
+		isSuccess <- err
+		return
 	}
 	defer watcher.Close()
 
@@ -261,7 +260,8 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
 			// 处理错误， 让所有的Watcher协程退出
 			k3.K3LogError("[forkWatcher] add dir to watcher failed: %s", err.Error())
 			WatcherContextCancel()
-			return err
+			isSuccess <- err
+			return
 		}
 	}
 
@@ -273,6 +273,7 @@ EXIT:
 			if !ok {
 				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher event channel closed.", indexName)
 				WatcherContextCancel()
+				isSuccess <- errors.New("[forkWatcher] index_name[" + indexName + "] watcher event channel closed.")
 				break EXIT
 			}
 			// 处理Event
@@ -282,13 +283,16 @@ EXIT:
 			if !ok {
 				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher error channel closed.", indexName)
 				WatcherContextCancel()
+				isSuccess <- errors.New("[forkWatcher] index_name[" + indexName + "] watcher error channel closed.")
 				break EXIT
 			}
 			k3.K3LogError("[forkWatcher] index_name[%s] watcher error: %s", indexName, err)
+			isSuccess <- errors.New("[forkWatcher] index_name[" + indexName + "] watcher error: " + err.Error())
 			WatcherContextCancel()
 			break EXIT
 		case <-WatcherContext.Done():
 			k3.K3LogWarn("[forkWatcher] index_name[%s] watcher exit with by globalWatchContext. ", indexName)
+			isSuccess <- errors.New("[forkWatcher] index_name[" + indexName + "] watcher exit with by globalWatchContext. ")
 			break EXIT
 		}
 	}
