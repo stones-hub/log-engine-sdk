@@ -233,7 +233,7 @@ func InitWatcher(directory map[string][]string, fileStatePath string) error {
 }
 
 // forkWatcher 开单一协程来处理监听，每个indexName开一个协程
-func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
+func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 	var (
 		watcher *fsnotify.Watcher
 		err     error
@@ -247,7 +247,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
 		// 处理错误，让所有的Watcher协程退出
 		k3.K3LogError("[forkWatcher] new watcher failed: %s", err.Error())
 		WatcherContextCancel()
-		return err
+		return
 	}
 	defer watcher.Close()
 
@@ -257,7 +257,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
 			// 处理错误， 让所有的Watcher协程退出
 			k3.K3LogError("[forkWatcher] add dir to watcher failed: %s", err.Error())
 			WatcherContextCancel()
-			return err
+			return
 		}
 	}
 
@@ -289,7 +289,6 @@ EXIT:
 			break EXIT
 		}
 	}
-
 }
 
 // TODO 处理EVENT事件
