@@ -425,7 +425,7 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) error {
 
 // 日志写入
 func writeEvent(indexName string, event fsnotify.Event) {
-	// fmt.Println("收到日志写入事件", indexName, event.Name)
+	fmt.Println("收到日志写入事件", indexName, event.Name)
 	var (
 		err error
 	)
@@ -433,7 +433,6 @@ func writeEvent(indexName string, event fsnotify.Event) {
 	// 监测到某个文件有写入，循环读取
 	if err = ReadFileByOffset(indexName, event); err != nil {
 		k3.K3LogError("[WriterEvent] ReadFileByOffset error: %s", err)
-
 	}
 }
 
@@ -449,6 +448,7 @@ func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watch
 		k3.K3LogError("[createEvent] index_name[%s] event[%s] path[%s] failed : %s", indexName, event.Op, event.Name, err.Error())
 		return
 	} else {
+		// fmt.Println("WRITE", "==>", event.Name)
 		if ok {
 			// 将目录加入到监听
 			if err = watcher.Add(event.Name); err != nil {
@@ -477,8 +477,9 @@ func removeEvent(event fsnotify.Event, watcher *fsnotify.Watcher) {
 	GlobalFileStatesLock.Lock()
 	delete(GlobalFileStates, event.Name)
 	GlobalFileStatesLock.Unlock()
+	// 这里没有判断是不是目录了， 无所谓，直接删了就行了
 	_ = watcher.Remove(event.Name)
-	// fmt.Println(watcher.WatchList())
+	// fmt.Println(event.Name, "------>", watcher.WatchList())
 }
 
 // ClockSyncGlobalFileStatesToDiskFile 定时将GlobalFileStates数据同步到硬盘
@@ -522,7 +523,6 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 		ClockWG.Wait() // 阻塞等待Clock定时器协程协程退出
 		k3.K3LogInfo("[ClockSyncGlobalFileStatesToDiskFile]  All clock goroutine  exit.")
 		WatcherContextCancel()
-		// fmt.Println("clock goroutine exited !")
 	}()
 }
 
@@ -576,6 +576,7 @@ func Closed() {
 	k3.K3LogDebug("[Closed] closed watch.")
 	// 回收定时器协程和监听协程
 	WatcherContextCancel()
+	time.Sleep(time.Second * 1) // 留1s的时间给协程来回收资源
 	// 回收批量写入日志的协程
 	GlobalDataAnalytics.Close()
 }

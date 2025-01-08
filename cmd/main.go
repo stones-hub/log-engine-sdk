@@ -176,6 +176,7 @@ EXIT:
 		}
 	case <-ctx.Done():
 		k3.K3LogError("[graceExit] context done")
+		break EXIT
 	}
 
 	// 程序退出之前，做一次FileState文件的保存
