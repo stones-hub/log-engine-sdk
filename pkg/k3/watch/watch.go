@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -372,14 +373,28 @@ func processing(indexName string, event fsnotify.Event) {
 
 func readEventNameByOffset(indexName string, event fsnotify.Event) {
 	var (
-		maxReadCount = config.GlobalConfig.Watch.MaxReadCount
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
+		err              error
+		fd               *os.File
+		reader           *bufio.Reader
+		currentReadCount int
+		currentFileState *FileState
+		currentOffset    int64
 	)
+
+	currentReadCount = 0                            // 当前文件被读取次数
+	currentFileState = GlobalFileStates[event.Name] // 当前文件信息
+	currentOffset = currentFileState.Offset
 
 	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
 		maxReadCount = DefaultMaxReadCount
 	}
 	// 3.1. 打开文件
-
+	if fd, err = os.OpenFile(event.Name, os.O_RDONLY, 0666); err != nil {
+		k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] open file failed: %s", indexName, event.Op, event.Name, err.Error())
+		return
+	}
+	reader = bufio.NewReader(fd)
 	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
 
 	// 3.3. 将读取的数据，发送给ELK
@@ -389,7 +404,6 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 func writeEvent(indexName string, event fsnotify.Event) {
 	// 判断当前文件是否已经存在，不存在就创建
 	if _, exists := GlobalFileStates[event.Name]; !exists {
-		fmt.Println("123123123132113131")
 		GlobalFileStatesLock.Lock()
 		GlobalFileStates[event.Name] = &FileState{
 			Path:          event.Name,
