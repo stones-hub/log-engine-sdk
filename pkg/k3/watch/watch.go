@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -34,7 +35,6 @@ var (
 )
 
 // 处理全局资源的并发问题, 确保GlobalFileStates数据的变更是原子的
-
 var (
 	GlobalFileStatesLock *sync.Mutex           // 控制GlobalFileStates的锁
 	FileStateFilePath    string                // GlobalFileStates 硬盘存储状态文件路径
@@ -49,12 +49,16 @@ var (
 
 var (
 	GlobalDataAnalytics k3.DataAnalytics // 日志接收器
-	// DefaultSyncInterval 单位秒, 默认为60s
-	// 将硬盘上最新的文件列表同步到GlobalFileStates，并将GlobalFileStates数据同步到Disk硬盘存储
-	DefaultSyncInterval = 60
-	DefaultMaxReadCount = 200 // 每次读取日志文件的最大次数
-	// DefaultObsoleteInterval  单位小时，默认1.
-	//  会员卡每小时检查GlobalFileStates中所有文件，如果超过DefaultObsoleteDate天没有读写，就检查文件是否已经读取完，如果没有读取完就读取一次文件，一次最多读取DefaultObsoleteMaxReadCount次
+	DefaultSyncInterval = 60             // 单位秒, 默认为60s, 默认定时60秒将GlobalFileStates的状态同步到硬盘
+	DefaultMaxReadCount = 200            // 默认每次读取日志文件的最大次数
+)
+
+// TODO 定时处理文件已经读完，或者长时间为读取的情况, 考虑如果文件长时间为读取，读取完以后，是否要删除GlobalFileState中文件的问题, 还是说删除工作一句硬盘文件真实被删除来处理
+var (
+	// obsolete_interval : 1 # 单位小时, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
+	// obsolete_date : 1 	 # 单位天，  默认1， 表示如果文件一天都没有读写，表示已经没有写入了
+	// obsolete_max_read_count : 1000  # 对于长时间没有读写的文件， 一次最大读取次数
+
 	DefaultObsoleteInterval     = 1
 	DefaultObsoleteDate         = 1    // 单位天， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
 	DefaultObsoleteMaxReadCount = 5000 // 对于长时间没有读写的文件， 一次最大读取次数
@@ -123,7 +127,7 @@ func LoadDiskFileToGlobalFileStates(filePath string) error {
 	return nil
 }
 
-// SaveGlobalFileStatesToDiskFile 保存GlobalFileState的数据到硬盘
+// SaveGlobalFileStatesToDiskFile 保存GlobalFileState的数据到硬盘目录filePath
 func SaveGlobalFileStatesToDiskFile(filePath string) error {
 	var (
 		fd      *os.File
@@ -335,105 +339,46 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 }
 
 // ReadFileByOffset 读取文件
-func ReadFileByOffset(indexName string, event fsnotify.Event) error {
-	return nil
-	/*
-		var (
-			maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
-			currentReadCount int
-			currentOffset    int64
-			reader           *bufio.Reader
-			content          string
-		)
+func ReadFileByOffset(indexName string, event fsnotify.Event) {
+	var (
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
+		currentReadCount int
+		currentOffset    int64
+		reader           *bufio.Reader
+		content          string
+	)
 
-		if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
-			maxReadCount = DefaultMaxReadCount
-		}
+	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
+		maxReadCount = DefaultMaxReadCount
+	}
 
-		// 1. 读取监听到的文件, 如果文件不在GlobalFileStates中，添加, 同步到硬盘交给定时器
-		if _, exists := GlobalFileStates[event.Name]; !exists {
-			GlobalFileStatesLock.Lock()
-			GlobalFileStates[event.Name] = &FileState{
-				Path:          event.Name,
-				Offset:        0,
-				StartReadTime: 0,
-				LastReadTime:  0,
-				IndexName:     indexName,
-			}
-			GlobalFileStatesLock.Unlock()
-		}
+	// 1. 打开文件
 
-		// 2. 打开文件
-		if fd, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
-			return errors.New("[ReadFileByOffset] open file failed: " + err.Error())
-		} else {
-
-			reader = bufio.NewReader(fd)
-			currentReadCount = 0
-			currentOffset = GlobalFileStates[event.Name].Offset
-
-			for currentReadCount < maxReadCount {
-				currentReadCount++
-
-				_, err := fd.Seek(currentOffset, 0)
-				if err != nil {
-					k3.K3LogError("[ReadFileByOffset] seek error: %s", err)
-					break
-				}
-
-				line, err := reader.ReadString('\n')
-				if err != nil {
-					if err == io.EOF {
-						k3.K3LogDebug("[ReadFileByOffset] read file end: %s", err)
-					} else {
-						k3.K3LogError("[ReadFileByOffset] read file error: %s", err)
-
-					}
-					break
-				}
-
-				k3.K3LogDebug("[ReadFileByOffset] ReadLine : %s", line)
-				currentOffset += int64(len(line))
-				content += line
-			}
-
-			if len(content) > 0 {
-				if err := SendData2Consumer(content, fileState); err != nil {
-					return err
-				}
-
-			}
-
-			// 将最新的文件数据，同步给内存
-			GlobalFileStatesLock.Lock()
-
-			GlobalFileStates[event.Name].Offset = currentOffset
-			if GlobalFileStates[fileState.Path].StartReadTime == 0 {
-
-				GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
-			}
-			GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
-			GlobalFileStatesLock.Unlock()
-
-			return nil
-
-		}
-
-	*/
+	// 2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
 
 }
 
-// 日志写入
+// 日志写入的监听
 func writeEvent(indexName string, event fsnotify.Event) {
-	fmt.Println("收到日志写入事件", indexName, event.Name)
-	var (
-		err error
-	)
+	// 1. 文件写入被监听到，如果文件在GlobalFileState中，就读取文件，如果不存在，就优先将文件写入到GlobalFileStates中，并强制同步到硬盘
+
+	if _, exists := GlobalFileStates[event.Name]; !exists {
+		GlobalFileStatesLock.Lock()
+		GlobalFileStates[event.Name] = &FileState{
+			Path:          event.Name,
+			Offset:        0,
+			StartReadTime: time.Now().Unix(),
+			LastReadTime:  time.Now().Unix(),
+			IndexName:     indexName,
+		}
+		if err := SaveGlobalFileStatesToDiskFile(FileStateFilePath); err != nil {
+			k3.K3LogError("[writeEvent] index_name[%s] event[%s] path[%s] save to disk file failed: %s", indexName, event.Op, event.Name, err.Error())
+		}
+		GlobalFileStatesLock.Unlock()
+	}
 
 	// 监测到某个文件有写入，循环读取
-	if err = ReadFileByOffset(indexName, event); err != nil {
-		k3.K3LogError("[WriterEvent] ReadFileByOffset error: %s", err)
-	}
+	ReadFileByOffset(indexName, event)
 }
 
 // 文件或目录创建
