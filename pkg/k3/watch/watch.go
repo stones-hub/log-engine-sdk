@@ -210,7 +210,7 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 // InitWatcher 每个indexName 开一个协程
 // directory: map[indexName][]dir 每个索引对应的需要监控的所有目录
 // fileStatePath: GlobalFileStates状态文件路径
-func InitWatcher(directory map[string][]string, fileStatePath string) {
+func InitWatcher(directory map[string][]string, fileStatePath string) error {
 
 	// TODO 这里要考虑2个问题，
 	// TODO 1. watcher协程在初始化的时候, 并不是所有的协程都创建成功，这样就需要终止后面所有的协程创建，并让已经创建的协程回收，且终止主程序
@@ -219,6 +219,7 @@ func InitWatcher(directory map[string][]string, fileStatePath string) {
 	var (
 		// 定义检查所有协程是否创建成功的chan
 		isSuccess = make(chan error, len(directory))
+		err       error
 	)
 
 	// 每个index name 开一个协程来处理监听事件
@@ -233,6 +234,18 @@ func InitWatcher(directory map[string][]string, fileStatePath string) {
 		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
 		WatcherContextCancel() // 考虑到所有的Watcher的协程都退出了， 保险起见再次发一个退出信号
 	}()
+
+	// 判断协程开启的协程是否都创建成功， 如果有一个不成功就直接 退出主程序
+	for i := 0; i < len(directory); i++ {
+		if err = <-isSuccess; err != nil {
+			k3.K3LogError("[InitWatcher] watcher goroutine exit: %s", err.Error())
+			WatcherContextCancel()
+			break
+		}
+	}
+	close(isSuccess)
+
+	return err
 }
 
 // forkWatcher 开单一协程来处理监听，每个indexName开一个协程
@@ -265,6 +278,9 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string, isSucces
 			return
 		}
 	}
+
+	// 证明协程已经创建成功，将成功信号返回
+	isSuccess <- nil
 
 EXIT:
 	for { //  阻塞函数块
@@ -545,11 +561,14 @@ func Run(directory map[string][]string) (func(), error) {
 	}
 
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
-	InitWatcher(directory, FileStateFilePath)
+	if err := InitWatcher(directory, FileStateFilePath); err != nil {
+		return Closed, nil
+	}
 
 	// 4. TODO 需要检查代码 -> 定时更新 FileState 数据到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(FileStateFilePath)
 
+	fmt.Println("aaaaaaaaa===>")
 	return Closed, nil
 }
 
