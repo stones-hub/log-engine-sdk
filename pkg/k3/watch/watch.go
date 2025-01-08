@@ -214,6 +214,10 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 // fileStatePath: GlobalFileStates状态文件路径
 func InitWatcher(directory map[string][]string, fileStatePath string) error {
 
+	// TODO 这里要考虑2个问题，
+	// TODO 1. watcher协程在初始化的时候, 并不是所有的协程都创建成功，这样就需要终止后面所有的协程创建，并让已经创建的协程回收，且终止主程序
+	// TODO 2. 如果所有的协程创建成功， 一旦某个协程出现异常，需要让所有的协程退出，并回收，且终止主程序
+
 	// 每个index name 开一个协程来处理监听事件
 	for indexName, dirs := range directory {
 		WatcherWG.Add(1)
@@ -531,10 +535,6 @@ func Run(directory map[string][]string) (func(), error) {
 
 	// 3. 初始化watcher，每个index_name 创建一个协程来监听, 如果有协程创建不成功，或者意外退出，则程序终止
 	InitWatcher(directory, FileStateFilePath)
-
-	// TODO 这里要考虑2个问题，
-	// 1. watcher协程在初始化的时候, 并不是所有的协程都创建成功，这样就需要终止后面所有的协程创建，并让已经创建的协程回收，且终止主程序
-	// 2. 如果所有的协程创建成功， 一旦某个协程出现异常，需要让所有的协程退出，并回收，且终止主程序
 
 	// 4. TODO 需要检查代码 -> 定时更新 FileState 数据到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(FileStateFilePath)
