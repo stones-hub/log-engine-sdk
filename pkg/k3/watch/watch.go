@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"io"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -371,6 +373,7 @@ func processing(indexName string, event fsnotify.Event) {
 	processingMap.Delete(event.Name)
 }
 
+// TODO 需要检查当前函数
 func readEventNameByOffset(indexName string, event fsnotify.Event) {
 	var (
 		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
@@ -380,6 +383,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 		currentReadCount int
 		currentFileState *FileState
 		currentOffset    int64
+		content          string
 	)
 
 	currentReadCount = 0                            // 当前文件被读取次数
@@ -401,11 +405,72 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 		currentReadCount++
 		if _, err = fd.Seek(currentOffset, 0); err != nil {
 			k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] seek file failed: %s", indexName, event.Op, event.Name, err.Error())
-			return
+			break
 		}
+
+		line, err := reader.ReadString('\n')
+
+		if err != nil {
+			if err == io.EOF {
+				k3.K3LogDebug("[readEventNameByOffset] read file over.")
+			} else {
+				k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] read file failed: %s", indexName, event.Op, event.Name, err.Error())
+			}
+			break
+		}
+
+		currentOffset += int64(len(line))
+		content += line
 	}
 
 	// 3.3. 将读取的数据，发送给ELK
+	if len(content) > 0 {
+		SendData2Consumer(content, currentFileState)
+	}
+
+	// 将最新的文件数据，同步给内存
+	GlobalFileStatesLock.Lock()
+	GlobalFileStates[currentFileState.Path].Offset = currentOffset
+	if GlobalFileStates[currentFileState.Path].StartReadTime == 0 {
+		GlobalFileStates[currentFileState.Path].StartReadTime = time.Now().Unix()
+	}
+	GlobalFileStates[currentFileState.Path].LastReadTime = time.Now().Unix()
+	GlobalFileStatesLock.Unlock()
+}
+
+// SendData2Consumer  将数据发送给 consumer
+func SendData2Consumer(content string, fileState *FileState) {
+
+	var (
+		ip    string
+		ips   []string
+		datas []string
+		err   error
+	)
+
+	if ips, err = k3.GetLocalIPs(); err != nil {
+		k3.K3LogWarn("get local ips error: %s", err)
+		ip = "127.0.0.1"
+	} else {
+		ip = ips[0]
+	}
+
+	datas = strings.Split(content, "\n")
+	for _, data := range datas {
+		data = strings.TrimSpace(data)
+		data = strings.Trim(data, "\n")
+		if len(data) == 0 {
+			continue
+		}
+
+		if err = GlobalDataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, fileState.IndexName,
+			map[string]interface{}{
+				"_data": data,
+				"_path": fileState.Path,
+			}); err != nil {
+			k3.K3LogError("Track: %s", err.Error())
+		}
+	}
 }
 
 // 日志写入的监听
