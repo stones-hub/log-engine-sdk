@@ -356,6 +356,7 @@ func ReadFileByOffset(indexName string, event fsnotify.Event) {
 
 	// 2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
 
+	// 3. 将读取的数据，发送给ELK
 }
 
 // 日志写入的监听
