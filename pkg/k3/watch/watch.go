@@ -1,13 +1,11 @@
 package watch
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
-	"io"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
@@ -212,7 +210,7 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 // InitWatcher 每个indexName 开一个协程
 // directory: map[indexName][]dir 每个索引对应的需要监控的所有目录
 // fileStatePath: GlobalFileStates状态文件路径
-func InitWatcher(directory map[string][]string, fileStatePath string) error {
+func InitWatcher(directory map[string][]string, fileStatePath string) {
 
 	// TODO 这里要考虑2个问题，
 	// TODO 1. watcher协程在初始化的时候, 并不是所有的协程都创建成功，这样就需要终止后面所有的协程创建，并让已经创建的协程回收，且终止主程序
@@ -230,10 +228,16 @@ func InitWatcher(directory map[string][]string, fileStatePath string) error {
 		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
 		WatcherContextCancel() // 考虑到所有的Watcher的协程都退出了， 保险起见再次发一个退出信号
 	}()
+
+	select {
+	case <-WatcherContext.Done():
+		fmt.Println("[InitWatcher] All watcher goroutine exit.")
+		os.Exit(1)
+	}
 }
 
 // forkWatcher 开单一协程来处理监听，每个indexName开一个协程
-func forkWatcher(indexName string, dirs []string, fileStatePath string) {
+func forkWatcher(indexName string, dirs []string, fileStatePath string) error {
 	var (
 		watcher *fsnotify.Watcher
 		err     error
@@ -247,7 +251,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 		// 处理错误，让所有的Watcher协程退出
 		k3.K3LogError("[forkWatcher] new watcher failed: %s", err.Error())
 		WatcherContextCancel()
-		return
+		return err
 	}
 	defer watcher.Close()
 
@@ -257,7 +261,7 @@ func forkWatcher(indexName string, dirs []string, fileStatePath string) {
 			// 处理错误， 让所有的Watcher协程退出
 			k3.K3LogError("[forkWatcher] add dir to watcher failed: %s", err.Error())
 			WatcherContextCancel()
-			return
+			return err
 		}
 	}
 
@@ -266,7 +270,6 @@ EXIT:
 		select {
 
 		case event, ok := <-watcher.Events:
-
 			if !ok {
 				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher event channel closed.", indexName)
 				WatcherContextCancel()
@@ -312,86 +315,90 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 
 // ReadFileByOffset 读取文件
 func ReadFileByOffset(indexName string, event fsnotify.Event) error {
-	var (
-		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
-		currentReadCount int
-		currentOffset    int64
-		reader           *bufio.Reader
-		content          string
-	)
+	return nil
+	/*
+		var (
+			maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
+			currentReadCount int
+			currentOffset    int64
+			reader           *bufio.Reader
+			content          string
+		)
 
-	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
-		maxReadCount = DefaultMaxReadCount
-	}
-
-	// 1. 读取监听到的文件, 如果文件不在GlobalFileStates中，添加, 同步到硬盘交给定时器
-	if _, exists := GlobalFileStates[event.Name]; !exists {
-		GlobalFileStatesLock.Lock()
-		GlobalFileStates[event.Name] = &FileState{
-			Path:          event.Name,
-			Offset:        0,
-			StartReadTime: 0,
-			LastReadTime:  0,
-			IndexName:     indexName,
+		if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
+			maxReadCount = DefaultMaxReadCount
 		}
-		GlobalFileStatesLock.Unlock()
-	}
 
-	// 2. 打开文件
-	if fd, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
-		return errors.New("[ReadFileByOffset] open file failed: " + err.Error())
-	} else {
-
-		reader = bufio.NewReader(fd)
-		currentReadCount = 0
-		currentOffset = GlobalFileStates[event.Name].Offset
-
-		for currentReadCount < maxReadCount {
-			currentReadCount++
-
-			_, err := fd.Seek(currentOffset, 0)
-			if err != nil {
-				k3.K3LogError("[ReadFileByOffset] seek error: %s", err)
-				break
+		// 1. 读取监听到的文件, 如果文件不在GlobalFileStates中，添加, 同步到硬盘交给定时器
+		if _, exists := GlobalFileStates[event.Name]; !exists {
+			GlobalFileStatesLock.Lock()
+			GlobalFileStates[event.Name] = &FileState{
+				Path:          event.Name,
+				Offset:        0,
+				StartReadTime: 0,
+				LastReadTime:  0,
+				IndexName:     indexName,
 			}
+			GlobalFileStatesLock.Unlock()
+		}
 
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				if err == io.EOF {
-					k3.K3LogDebug("[ReadFileByOffset] read file end: %s", err)
-				} else {
-					k3.K3LogError("[ReadFileByOffset] read file error: %s", err)
+		// 2. 打开文件
+		if fd, err := os.OpenFile(event.Name, os.O_RDONLY, 0644); err != nil {
+			return errors.New("[ReadFileByOffset] open file failed: " + err.Error())
+		} else {
 
+			reader = bufio.NewReader(fd)
+			currentReadCount = 0
+			currentOffset = GlobalFileStates[event.Name].Offset
+
+			for currentReadCount < maxReadCount {
+				currentReadCount++
+
+				_, err := fd.Seek(currentOffset, 0)
+				if err != nil {
+					k3.K3LogError("[ReadFileByOffset] seek error: %s", err)
+					break
 				}
-				break
+
+				line, err := reader.ReadString('\n')
+				if err != nil {
+					if err == io.EOF {
+						k3.K3LogDebug("[ReadFileByOffset] read file end: %s", err)
+					} else {
+						k3.K3LogError("[ReadFileByOffset] read file error: %s", err)
+
+					}
+					break
+				}
+
+				k3.K3LogDebug("[ReadFileByOffset] ReadLine : %s", line)
+				currentOffset += int64(len(line))
+				content += line
 			}
 
-			k3.K3LogDebug("[ReadFileByOffset] ReadLine : %s", line)
-			currentOffset += int64(len(line))
-			content += line
-		}
+			if len(content) > 0 {
+				if err := SendData2Consumer(content, fileState); err != nil {
+					return err
+				}
 
-		if len(content) > 0 {
-			if err := SendData2Consumer(content, fileState); err != nil {
-				return err
 			}
 
+			// 将最新的文件数据，同步给内存
+			GlobalFileStatesLock.Lock()
+
+			GlobalFileStates[event.Name].Offset = currentOffset
+			if GlobalFileStates[fileState.Path].StartReadTime == 0 {
+
+				GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
+			}
+			GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
+			GlobalFileStatesLock.Unlock()
+
+			return nil
+
 		}
 
-		// 将最新的文件数据，同步给内存
-		GlobalFileStatesLock.Lock()
-
-		GlobalFileStates[event.Name].Offset = currentOffset
-		if GlobalFileStates[fileState.Path].StartReadTime == 0 {
-
-			GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
-		}
-		GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
-		GlobalFileStatesLock.Unlock()
-
-		return nil
-
-	}
+	*/
 
 }
 
