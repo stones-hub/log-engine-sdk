@@ -668,6 +668,7 @@ func ClockSyncObsoleteFile() {
 				// 1. 解决长时间未读取的文件，读取完整的问题
 				// 2. 解决硬盘已经将文件删除了，但是GlobalFileState或硬盘还存在的问题
 			case <-WatcherContext.Done():
+				k3.K3LogInfo("[ClockSyncObsoleteFile] .")
 				return
 			}
 		}
