@@ -365,11 +365,11 @@ func processing(indexName string, event fsnotify.Event) {
 		return
 	}
 
+	// 4. 协程结束，将当前event.Name标记的协程，移除掉
+	defer processingMap.Delete(event.Name)
+
 	// 3. 开始处理读取发送问题
 	readEventNameByOffset(indexName, event)
-
-	// 4. 协程结束，将当前event.Name标记的协程，移除掉
-	processingMap.Delete(event.Name)
 }
 
 // readEventNameByOffset 读取文件，更新GlobalFileState, 并把数据发送给elk
@@ -397,6 +397,8 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 		k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] open file failed: %s", indexName, event.Op, event.Name, err.Error())
 		return
 	}
+	defer fd.Close()
+
 	reader = bufio.NewReader(fd)
 
 	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
@@ -424,7 +426,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 
 	// 3.3. 将读取的数据，发送给ELK
 	if len(content) > 0 {
-		fmt.Println("send data to elk : ", content)
+		fmt.Println("[readEventNameByOffset] send data to elk : ", content)
 		SendData2Consumer(content, currentFileState)
 	}
 
@@ -707,6 +709,8 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 		processingWg.Add(1)
 		go processReadObsoleteFile(GlobalFileStates[readFile], obsoleteMaxReadCount)
 	}
+
+	go processingWg.Wait()
 }
 
 func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
@@ -718,19 +722,61 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 
 	// 已经有协程在处理这个文件，跳过
 	if _, ok := processingMap.LoadOrStore(fileState.Path, true); ok {
-		k3.K3LogWarn("[processReadFile] %s is already being processed, skipping .", filePath)
+		k3.K3LogWarn("[processReadFile] %s is already being processed, skipping .", fileState.Path)
 		return
 	}
-
-	// 证明文件没有被处理，开始读取
+	defer processingMap.Delete(fileState.Path)
 
 	var (
-		currentReadCount = 0
+		fd     *os.File
+		err    error
+		reader *bufio.Reader
 	)
 
+	// 打开待读取的文件
+	if fd, err = os.OpenFile(fileState.Path, os.O_RDONLY, os.ModePerm); err != nil {
+		k3.K3LogWarn("[processReadFile] open file error: %s", err.Error())
+		return
+	}
+	defer fd.Close()
+
+	reader = bufio.NewReader(fd)
+
+	// 证明文件没有被处理，开始读取
+	var (
+		currentReadCount = 0
+		currentOffset    = fileState.Offset
+		content          = ""
+	)
+
+	// 循环读取
 	for currentReadCount < maxReadCount {
 		currentReadCount++
 
+		if _, err = fd.Seek(currentOffset, 0); err != nil {
+			k3.K3LogError("[processReadObsoleteFile] seek file error: %s", err.Error())
+			break
+		}
+
+		line, err := reader.ReadString('\n')
+
+		if err != nil {
+			if err == io.EOF {
+				k3.K3LogDebug("[processReadObsoleteFile] read file over.")
+			} else {
+				k3.K3LogError("[processReadObsoleteFile] read file error: %s", err.Error())
+			}
+			break
+		}
+
+		currentOffset += int64(len(line))
+		content += line
+
+	}
+
+	if len(content) > 0 {
+		fmt.Println("[processReadObsoleteFile] send data to elk : ", content)
+		SendData2Consumer(content, fileState)
 	}
 
 	// 注意，每次读取完，GlobalFileState的数据已经得到了更新，并没有及时更新到硬盘，用定时器来处理即可
@@ -742,5 +788,4 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
 	GlobalFileStatesLock.Unlock()
 
-	processingMap.Delete(fileState.Path)
 }
