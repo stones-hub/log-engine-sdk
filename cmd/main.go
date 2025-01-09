@@ -59,7 +59,7 @@ func main() {
 			k3.K3LogError("[main] get current work dir error: %s", err)
 			return
 		} else {
-			config.GlobalConfig.System.LogPath = currentDir + "/log"
+			config.GlobalConfig.System.LogPath = currentDir + "/logs"
 		}
 	}
 
