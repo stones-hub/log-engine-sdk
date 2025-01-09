@@ -658,7 +658,7 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 
 		t *time.Ticker
 	)
-	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Second)
+	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Hour)
 
 	ClockObsoleteWG.Add(1)
 	go func() {
