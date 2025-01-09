@@ -26,7 +26,7 @@ CONFIG_PATH = "/Users/yelei/data/code/go-projects/log-engine-sdk/configs"
 # ldflags 参数 , -X 命令可以用于往main包传入参数这里传入了 version, tag, build 3个参数值
 GO_LDFLAGS = -X main.Version=$(RELEASE_VERSION) -X main.Tag=$(RELEASE_TAG) -X main.BuildTime=$(NOW) -X main.ConfigPath=$(CONFIG_PATH)
 
-DIRS = log scripts state
+DIRS = logs scripts state
 
 # 命令名称
 all: pack
@@ -35,7 +35,7 @@ test:
 	@go test -v ./pkg/...
 
 build:
-	@mkdir -p log
+	@mkdir -p logs
 	@go build -ldflags "-w -s $(GO_LDFLAGS)" -x -a -o $(SERVER_BIN) ./cmd/main.go
 
 clean:
