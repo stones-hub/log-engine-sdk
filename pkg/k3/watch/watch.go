@@ -226,9 +226,9 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 // fileStatePath: GlobalFileStates状态文件路径
 func InitWatcher(directory map[string][]string, fileStatePath string) error {
 
-	// TODO 这里要考虑2个问题，
-	// TODO 1. watcher协程在初始化的时候, 并不是所有的协程都创建成功，这样就需要终止后面所有的协程创建，并让已经创建的协程回收，且终止主程序
-	// TODO 2. 如果所有的协程创建成功， 一旦某个协程出现异常，需要让所有的协程退出，并回收，且终止主程序
+	//  这里要考虑2个问题，
+	//  1. watcher协程在初始化的时候, 并不是所有的协程都创建成功，这样就需要终止后面所有的协程创建，并让已经创建的协程回收，且终止主程序
+	//  2. 如果所有的协程创建成功， 一旦某个协程出现异常，需要让所有的协程退出，并回收，且终止主程序
 
 	var (
 		// 定义检查所有协程是否创建成功的chan
@@ -426,7 +426,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 
 	// 3.3. 将读取的数据，发送给ELK
 	if len(content) > 0 {
-		fmt.Println("[readEventNameByOffset] send data to elk : ", content)
+		k3.K3LogDebug("[readEventNameByOffset] send data to elk : ", content)
 		SendData2Consumer(content, currentFileState)
 	}
 
@@ -702,7 +702,6 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 			readFilePath = append(readFilePath, fileName)
 		}
 	}
-	// fmt.Println(readFilePath)
 
 	// 2. 开协程挨个读写
 	for _, readFile := range readFilePath {
@@ -775,7 +774,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 	}
 
 	if len(content) > 0 {
-		fmt.Println("[processReadObsoleteFile] send data to elk : ", content)
+		k3.K3LogDebug("[processReadObsoleteFile] send data to elk : ", content)
 		SendData2Consumer(content, fileState)
 	}
 
