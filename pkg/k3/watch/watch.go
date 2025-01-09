@@ -352,6 +352,7 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 	}
 }
 
+// processing 协程中处理
 func processing(indexName string, event fsnotify.Event) {
 	defer processingWg.Done()
 
@@ -361,7 +362,7 @@ func processing(indexName string, event fsnotify.Event) {
 		<-processingSem
 	}()
 
-	// 2. 判断当前文件是不是已经在协程中
+	// 2. 判断当前文件是不是已经在协程中，如果,event.Name标记的协程已经存在，就直接返回, 协程结束
 	if _, loading := processingMap.LoadOrStore(event.Name, true); loading {
 		k3.K3LogWarn("[ReadFileOffset] %s is already being processed, skipping .", event.Name)
 		return
@@ -370,7 +371,7 @@ func processing(indexName string, event fsnotify.Event) {
 	// 3. 开始处理读取发送问题
 	readEventNameByOffset(indexName, event)
 
-	// 4. 协程结束，将当前文件的协程移除
+	// 4. 协程结束，将当前event.Name标记的协程，移除掉
 	processingMap.Delete(event.Name)
 }
 
@@ -486,12 +487,14 @@ func writeEvent(indexName string, event fsnotify.Event) {
 			LastReadTime:  time.Now().Unix(),
 			IndexName:     indexName,
 		}
+		// GlobalFileState发生了变化，需要强制同步一次到硬盘
 		if err := SaveGlobalFileStatesToDiskFile(FileStateFilePath); err != nil {
 			k3.K3LogError("[writeEvent] index_name[%s] event[%s] path[%s] save to disk file failed: %s", indexName, event.Op, event.Name, err.Error())
 		}
 		GlobalFileStatesLock.Unlock()
 	}
 
+	// 每次监听到文件变化，需要开一个协程
 	processingWg.Add(1)
 	// 监测到某个文件有写入，循环读取
 	go processing(indexName, event)
