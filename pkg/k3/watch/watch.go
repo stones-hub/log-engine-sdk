@@ -162,7 +162,7 @@ func SaveGlobalFileStatesToDiskFile(filePath string) error {
 	return nil
 }
 
-// ScanLogFileToGlobalFileStatesAndSaveToDiskFile  保证硬盘文件和FileState一致，并同步到硬盘状态文件, 项目启动的时候使用此函数，未加锁
+// ScanLogFileToGlobalFileStatesAndSaveToDiskFile  保证硬盘文件和FileState一致，并同步到硬盘状态文件, 项目启动的时候使用此函数
 func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]string, filePath string) error {
 	var (
 		totalFiles           = make(map[string][]string)
@@ -189,6 +189,7 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 		}
 	}
 
+	GlobalFileStatesLock.Lock()
 	// 检查硬盘上的日志文件是否存在GlobalFileStates中，如果不存在就ADD
 	for indexName, diskFiles := range totalFiles {
 		tempDiskFiles = append(tempDiskFiles, diskFiles...)
@@ -197,8 +198,8 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 				GlobalFileStates[diskFile] = &FileState{
 					Path:          diskFile,
 					Offset:        0,
-					StartReadTime: 0,
-					LastReadTime:  0,
+					StartReadTime: time.Now().Unix(),
+					LastReadTime:  time.Now().Unix(),
 					IndexName:     indexName,
 				}
 			}
@@ -211,6 +212,7 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 			delete(GlobalFileStates, fileStateKey)
 		}
 	}
+	GlobalFileStatesLock.Unlock()
 
 	if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
 		return errors.New("[ScanDiskLogAddFileState] save file state to disk failed: " + err.Error())
@@ -624,7 +626,7 @@ func Run(directory map[string][]string) (func(), error) {
 
 	// 4. TODO 需要检查代码 -> 定时更新 FileState 数据到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(FileStateFilePath)
-	ClockSyncObsoleteFile()
+	ClockSyncObsoleteFile(directory, FileStateFilePath)
 
 	return Closed, nil
 }
@@ -644,7 +646,7 @@ func Closed() {
 // obsolete_max_read_count : 1000  #
 
 // ClockSyncObsoleteFile  定时长时间未读取的文件
-func ClockSyncObsoleteFile() {
+func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 	// 创建定时器
 	var (
 		obsoleteInterval     = config.GlobalConfig.Watch.ObsoleteInterval     // 单位小时, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
@@ -665,10 +667,11 @@ func ClockSyncObsoleteFile() {
 			select {
 			case <-t.C:
 				// 定时信号来了
-				// 1. 解决长时间未读取的文件，读取完整的问题
-				// 2. 解决硬盘已经将文件删除了，但是GlobalFileState或硬盘还存在的问题
+				// 1. 解决硬盘已经将文件删除了，但是GlobalFileState或硬盘还存在的问题
+				ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, filePath)
+				// 2. 解决长时间未读取的文件，读取完整的问题
 			case <-WatcherContext.Done():
-				k3.K3LogInfo("[ClockSyncObsoleteFile] .")
+				k3.K3LogInfo("[ClockSyncObsoleteFile] Accept clock obsolete exit signal.")
 				return
 			}
 		}
@@ -676,7 +679,15 @@ func ClockSyncObsoleteFile() {
 
 	go func() {
 		ClockObsoleteWG.Wait()
-		k3.K3LogInfo("[ClockSyncObsoleteFile]  All clock obsolete goroutine  exit.")
+		k3.K3LogInfo("[ClockSyncObsoleteFile]  All clock obsolete goroutine exit.")
 		WatcherContextCancel()
 	}()
+}
+
+// readHistoryFiles 解决长时间未读取的文件，读取完整的问题
+func readHistoryFiles() {
+
+	// 1. 遍历GlobalFileStates中记录的文件，长时间未被操作
+
+	// 2. 开协程挨个读写
 }
