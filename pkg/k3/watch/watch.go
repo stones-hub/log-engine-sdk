@@ -643,7 +643,10 @@ var (
 )
 
 // ClockSyncObsoleteFile  定时长时间未读取的文件
-// TODO 定时处理文件已经读完，或者长时间为读取的情况, 考虑如果文件长时间为读取，读取完以后，是否要删除GlobalFileState中文件的问题, 还是说删除工作一句硬盘文件真实被删除来处理
 func ClockSyncObsoleteFile() {
+
+	// 1. 解决长时间未读取的文件，读取完整的问题
+
+	// 2. 解决硬盘已经将文件删除了，但是GlobalFileState或硬盘还存在的问题
 
 }
