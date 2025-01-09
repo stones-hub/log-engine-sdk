@@ -62,6 +62,10 @@ var (
 	processingMap *sync.Map
 )
 
+var (
+	ClockObsoleteWG *sync.WaitGroup
+)
+
 func InitVars() {
 	ClockWG = &sync.WaitGroup{}                                                          // 定时器协程锁
 	WatcherWG = &sync.WaitGroup{}                                                        // Watcher协程锁
@@ -74,6 +78,8 @@ func InitVars() {
 	processingMap = &sync.Map{}
 	processingWg = &sync.WaitGroup{}
 	processingSem = make(chan struct{}, 100) // 控制最大协程数量为100
+
+	ClockObsoleteWG = &sync.WaitGroup{}
 }
 
 func InitConsumerBatchLog() error {
@@ -632,21 +638,43 @@ func Closed() {
 	GlobalDataAnalytics.Close()
 }
 
-var (
-	// obsolete_interval : 1 # 单位小时, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
-	// obsolete_date : 1 	 # 单位天，  默认1， 表示如果文件一天都没有读写，表示已经没有写入了
-	// obsolete_max_read_count : 1000  # 对于长时间没有读写的文件， 一次最大读取次数
-
-	DefaultObsoleteInterval     = 1
-	DefaultObsoleteDate         = 1    // 单位天， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
-	DefaultObsoleteMaxReadCount = 5000 // 对于长时间没有读写的文件， 一次最大读取次数
-)
+// obsolete_interval : 1
+// obsolete_date : 1 	 # 单位天，  默认1， 表示如果文件一天都没有读写，表示已经没有写入了
+// obsolete_max_read_count : 1000  #
 
 // ClockSyncObsoleteFile  定时长时间未读取的文件
 func ClockSyncObsoleteFile() {
+	// 创建定时器
+	var (
+		obsoleteInterval     = config.GlobalConfig.Watch.ObsoleteInterval     // 单位小时, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
+		obsoleteDate         = config.GlobalConfig.Watch.ObsoleteDate         // 单位天，  默认1，表示如果文件一天都没有读写，表示已经没有写入了
+		obsoleteMaxReadCount = config.GlobalConfig.Watch.ObsoleteMaxReadCount // 对于长时间没有读写的文件， 一次最大读取次数
 
-	// 1. 解决长时间未读取的文件，读取完整的问题
+		t *time.Ticker
+	)
+	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Hour)
 
-	// 2. 解决硬盘已经将文件删除了，但是GlobalFileState或硬盘还存在的问题
+	ClockObsoleteWG.Add(1)
+	go func() {
+		defer ClockWG.Done()
+		defer t.Stop()
+		defer WatcherContextCancel()
 
+		for {
+			select {
+			case <-t.C:
+				// 定时信号来了
+				// 1. 解决长时间未读取的文件，读取完整的问题
+				// 2. 解决硬盘已经将文件删除了，但是GlobalFileState或硬盘还存在的问题
+			case <-WatcherContext.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		ClockObsoleteWG.Wait()
+		k3.K3LogInfo("[ClockSyncObsoleteFile]  All clock obsolete goroutine  exit.")
+		WatcherContextCancel()
+	}()
 }
