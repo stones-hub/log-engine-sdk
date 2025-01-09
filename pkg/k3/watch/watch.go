@@ -62,17 +62,6 @@ var (
 	processingMap *sync.Map
 )
 
-// TODO 定时处理文件已经读完，或者长时间为读取的情况, 考虑如果文件长时间为读取，读取完以后，是否要删除GlobalFileState中文件的问题, 还是说删除工作一句硬盘文件真实被删除来处理
-var (
-	// obsolete_interval : 1 # 单位小时, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
-	// obsolete_date : 1 	 # 单位天，  默认1， 表示如果文件一天都没有读写，表示已经没有写入了
-	// obsolete_max_read_count : 1000  # 对于长时间没有读写的文件， 一次最大读取次数
-
-	DefaultObsoleteInterval     = 1
-	DefaultObsoleteDate         = 1    // 单位天， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
-	DefaultObsoleteMaxReadCount = 5000 // 对于长时间没有读写的文件， 一次最大读取次数
-)
-
 func InitVars() {
 	ClockWG = &sync.WaitGroup{}                                                          // 定时器协程锁
 	WatcherWG = &sync.WaitGroup{}                                                        // Watcher协程锁
@@ -133,7 +122,7 @@ func LoadDiskFileToGlobalFileStates(filePath string) error {
 	// 将文件映射到FileState
 	decoder = json.NewDecoder(fd)
 
-	if err = decoder.Decode(&GlobalFileStates); err != nil {
+	if err = decoder.Decode(&GlobalFileStates); err != nil && !errors.Is(err, io.EOF) {
 		return errors.New("[LoadDiskFileToGlobalFileStates] json decode failed: " + err.Error())
 	}
 
@@ -427,6 +416,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 
 	// 3.3. 将读取的数据，发送给ELK
 	if len(content) > 0 {
+		fmt.Println("send data to elk : ", content)
 		SendData2Consumer(content, currentFileState)
 	}
 
@@ -640,4 +630,20 @@ func Closed() {
 	time.Sleep(time.Second * 1) // 留1s的时间给协程来回收资源
 	// 回收批量写入日志的协程
 	GlobalDataAnalytics.Close()
+}
+
+var (
+	// obsolete_interval : 1 # 单位小时, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
+	// obsolete_date : 1 	 # 单位天，  默认1， 表示如果文件一天都没有读写，表示已经没有写入了
+	// obsolete_max_read_count : 1000  # 对于长时间没有读写的文件， 一次最大读取次数
+
+	DefaultObsoleteInterval     = 1
+	DefaultObsoleteDate         = 1    // 单位天， 默认1， 表示文件如果1天没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
+	DefaultObsoleteMaxReadCount = 5000 // 对于长时间没有读写的文件， 一次最大读取次数
+)
+
+// ClockSyncObsoleteFile  定时长时间未读取的文件
+// TODO 定时处理文件已经读完，或者长时间为读取的情况, 考虑如果文件长时间为读取，读取完以后，是否要删除GlobalFileState中文件的问题, 还是说删除工作一句硬盘文件真实被删除来处理
+func ClockSyncObsoleteFile() {
+
 }
