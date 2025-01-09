@@ -688,14 +688,20 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 
 // readHistoryFiles 解决长时间未读取的文件，读取完整的问题
 func readHistoryFiles(obsoleteDate, obsoleteMaxReadCount int) {
+	var (
+		// 满足需要读取的文件
+		readFilePath = make([]string, 0)
+	)
 
 	// 1. 遍历GlobalFileStates中记录的文件，长时间未被操作
-	fmt.Println("readHistoryFiles")
-
 	for fileName, fileState := range GlobalFileStates {
 		// 查看文件是否满足长时间未读取的条件
-	
+		if duration := time.Now().Unix() - fileState.LastReadTime; duration > int64(obsoleteDate*24*60*60) {
+			readFilePath = append(readFilePath, fileName)
+		}
 	}
+	fmt.Println(readFilePath)
 
 	// 2. 开协程挨个读写
+
 }
