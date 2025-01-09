@@ -55,7 +55,7 @@ run:
 	@go run -ldflags "-w -s $(GO_LDFLAGS)" ./cmd/main.go
 
 start:
-	./${APP} >> log/$(APP).log 2>&1 &
+	./${APP} >> logs/$(APP).log 2>&1 &
 
 stop:
 	./scripts/stop.sh $(APP)
