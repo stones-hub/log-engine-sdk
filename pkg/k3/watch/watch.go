@@ -669,9 +669,9 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 			case <-t.C:
 				// 定时信号来了
 				// 1. 解决硬盘已经将文件删除了，但是GlobalFileState或硬盘还存在的问题
-				ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, filePath)
+				_ = ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, filePath)
 				// 2. 解决长时间未读取的文件，读取完整的问题
-				readHistoryFiles(obsoleteDate, obsoleteMaxReadCount)
+				readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount)
 			case <-WatcherContext.Done():
 				k3.K3LogInfo("[ClockSyncObsoleteFile] Accept clock obsolete exit signal.")
 				return
@@ -687,7 +687,7 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 }
 
 // readHistoryFiles 解决长时间未读取的文件，读取完整的问题
-func readHistoryFiles(obsoleteDate, obsoleteMaxReadCount int) {
+func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	var (
 		// 满足需要读取的文件
 		readFilePath = make([]string, 0)
@@ -700,8 +700,34 @@ func readHistoryFiles(obsoleteDate, obsoleteMaxReadCount int) {
 			readFilePath = append(readFilePath, fileName)
 		}
 	}
-	fmt.Println(readFilePath)
+	// fmt.Println(readFilePath)
 
 	// 2. 开协程挨个读写
+	for _, readFile := range readFilePath {
+		processingWg.Add(1)
+		go processReadObsoleteFile(readFile, obsoleteMaxReadCount)
+	}
+}
 
+func processReadObsoleteFile(filePath string, maxReadCount int) {
+	defer processingWg.Done()
+	processingSem <- struct{}{}
+	defer func() {
+		<-processingSem
+	}()
+
+	// 已经有协程在处理这个文件，跳过
+	if _, ok := processingMap.LoadOrStore(filePath, true); ok {
+		k3.K3LogWarn("[processReadFile] %s is already being processed, skipping .", filePath)
+		return
+	}
+
+	// 证明文件没有被处理，开始读取
+
+	var (
+		currentReadCount int
+		current
+	)
+
+	processingMap.Delete(filePath)
 }
