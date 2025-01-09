@@ -705,11 +705,11 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	// 2. 开协程挨个读写
 	for _, readFile := range readFilePath {
 		processingWg.Add(1)
-		go processReadObsoleteFile(readFile, obsoleteMaxReadCount)
+		go processReadObsoleteFile(GlobalFileStates[readFile], obsoleteMaxReadCount)
 	}
 }
 
-func processReadObsoleteFile(filePath string, maxReadCount int) {
+func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 	defer processingWg.Done()
 	processingSem <- struct{}{}
 	defer func() {
@@ -717,7 +717,7 @@ func processReadObsoleteFile(filePath string, maxReadCount int) {
 	}()
 
 	// 已经有协程在处理这个文件，跳过
-	if _, ok := processingMap.LoadOrStore(filePath, true); ok {
+	if _, ok := processingMap.LoadOrStore(fileState.Path, true); ok {
 		k3.K3LogWarn("[processReadFile] %s is already being processed, skipping .", filePath)
 		return
 	}
@@ -725,9 +725,22 @@ func processReadObsoleteFile(filePath string, maxReadCount int) {
 	// 证明文件没有被处理，开始读取
 
 	var (
-		currentReadCount int
-		current
+		currentReadCount = 0
 	)
 
-	processingMap.Delete(filePath)
+	for currentReadCount < maxReadCount {
+		currentReadCount++
+
+	}
+
+	// 注意，每次读取完，GlobalFileState的数据已经得到了更新，并没有及时更新到硬盘，用定时器来处理即可
+	GlobalFileStatesLock.Lock()
+	GlobalFileStates[fileState.Path].Offset = currentOffset
+	if GlobalFileStates[fileState.Path].StartReadTime == 0 {
+		GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
+	}
+	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
+	GlobalFileStatesLock.Unlock()
+
+	processingMap.Delete(fileState.Path)
 }
