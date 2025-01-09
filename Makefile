@@ -35,11 +35,11 @@ test:
 	@go test -v ./pkg/...
 
 build:
-	@mkdir -p logs
+	@mkdir -p $(DIRS)
 	@go build -ldflags "-w -s $(GO_LDFLAGS)" -x -a -o $(SERVER_BIN) ./cmd/main.go
 
 clean:
-	@rm -rf $(SERVER_BIN) $(RELEASE_ROOT) log/*
+	@rm -rf $(SERVER_BIN) $(RELEASE_ROOT) logs/*
 
 pack: clean build
 	# 创建release/$(APP) 目录
