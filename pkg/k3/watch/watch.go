@@ -656,7 +656,7 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 
 		t *time.Ticker
 	)
-	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Hour)
+	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Second)
 
 	ClockObsoleteWG.Add(1)
 	go func() {
@@ -691,5 +691,11 @@ func readHistoryFiles(obsoleteDate, obsoleteMaxReadCount int) {
 
 	// 1. 遍历GlobalFileStates中记录的文件，长时间未被操作
 	fmt.Println("readHistoryFiles")
+
+	for fileName, fileState := range GlobalFileStates {
+		// 查看文件是否满足长时间未读取的条件
+	
+	}
+
 	// 2. 开协程挨个读写
 }
