@@ -356,7 +356,7 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 func processing(indexName string, event fsnotify.Event) {
 	defer processingWg.Done()
 
-	// 1. 判断当前协程数量是否负载, 如果负载processingSem会阻塞，等待其他协程处理完
+	// 1. 判断当前协程数量是否负载, 如果负载processingSem会阻塞，等待其他协程处理完, 队列如果一直是满状态的时候，这里会阻塞
 	processingSem <- struct{}{}
 	defer func() {
 		<-processingSem
@@ -375,10 +375,9 @@ func processing(indexName string, event fsnotify.Event) {
 	processingMap.Delete(event.Name)
 }
 
-// TODO 需要检查当前函数
+// readEventNameByOffset 读取文件，更新GlobalFileState, 并把数据发送给elk
 func readEventNameByOffset(indexName string, event fsnotify.Event) {
 	var (
-		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
 		err              error
 		fd               *os.File
 		reader           *bufio.Reader
@@ -386,6 +385,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 		currentFileState *FileState
 		currentOffset    int64
 		content          string
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
 	)
 
 	currentReadCount = 0                            // 当前文件被读取次数
@@ -430,7 +430,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 		SendData2Consumer(content, currentFileState)
 	}
 
-	// 将最新的文件数据，同步给内存
+	// 注意，每次读取完，GlobalFileState的数据已经得到了更新，并没有及时更新到硬盘，用定时器来处理即可
 	GlobalFileStatesLock.Lock()
 	GlobalFileStates[currentFileState.Path].Offset = currentOffset
 	if GlobalFileStates[currentFileState.Path].StartReadTime == 0 {
@@ -478,8 +478,9 @@ func SendData2Consumer(content string, fileState *FileState) {
 // 日志写入的监听
 func writeEvent(indexName string, event fsnotify.Event) {
 	// 判断当前文件是否已经存在，不存在就创建
+	GlobalFileStatesLock.Lock()
 	if _, exists := GlobalFileStates[event.Name]; !exists {
-		GlobalFileStatesLock.Lock()
+
 		GlobalFileStates[event.Name] = &FileState{
 			Path:          event.Name,
 			Offset:        0,
@@ -487,12 +488,8 @@ func writeEvent(indexName string, event fsnotify.Event) {
 			LastReadTime:  time.Now().Unix(),
 			IndexName:     indexName,
 		}
-		// GlobalFileState发生了变化，需要强制同步一次到硬盘
-		if err := SaveGlobalFileStatesToDiskFile(FileStateFilePath); err != nil {
-			k3.K3LogError("[writeEvent] index_name[%s] event[%s] path[%s] save to disk file failed: %s", indexName, event.Op, event.Name, err.Error())
-		}
-		GlobalFileStatesLock.Unlock()
 	}
+	GlobalFileStatesLock.Unlock()
 
 	// 每次监听到文件变化，需要开一个协程
 	processingWg.Add(1)
