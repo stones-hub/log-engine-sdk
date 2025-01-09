@@ -573,6 +573,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 				}
 				k3.K3LogDebug("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk success.")
 			case <-WatcherContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
+				k3.K3LogInfo("[ClockSyncGlobalFileStatesToDiskFile]  Accept clock goroutine exit singal.")
 				return
 			}
 		}
@@ -659,7 +660,7 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 
 	ClockObsoleteWG.Add(1)
 	go func() {
-		defer ClockWG.Done()
+		defer ClockObsoleteWG.Done()
 		defer t.Stop()
 		defer WatcherContextCancel()
 
@@ -670,6 +671,7 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 				// 1. 解决硬盘已经将文件删除了，但是GlobalFileState或硬盘还存在的问题
 				ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory, filePath)
 				// 2. 解决长时间未读取的文件，读取完整的问题
+				readHistoryFiles(obsoleteDate, obsoleteMaxReadCount)
 			case <-WatcherContext.Done():
 				k3.K3LogInfo("[ClockSyncObsoleteFile] Accept clock obsolete exit signal.")
 				return
@@ -685,9 +687,9 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 }
 
 // readHistoryFiles 解决长时间未读取的文件，读取完整的问题
-func readHistoryFiles() {
+func readHistoryFiles(obsoleteDate, obsoleteMaxReadCount int) {
 
 	// 1. 遍历GlobalFileStates中记录的文件，长时间未被操作
-
+	fmt.Println("readHistoryFiles")
 	// 2. 开协程挨个读写
 }
