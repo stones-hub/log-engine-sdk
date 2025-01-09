@@ -624,6 +624,7 @@ func Run(directory map[string][]string) (func(), error) {
 
 	// 4. TODO 需要检查代码 -> 定时更新 FileState 数据到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(FileStateFilePath)
+	ClockSyncObsoleteFile()
 
 	return Closed, nil
 }
