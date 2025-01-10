@@ -707,6 +707,16 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 
 	// 2. 开协程挨个读写
 	for _, readFile := range readFilePath {
+		// 如果文件已经读取完了，就不用再读取了
+		if fileInfo, err := os.Stat(readFile); err != nil {
+			k3.K3LogError("[readObsoleteFiles] stat file error: %s", err.Error())
+			continue
+		} else {
+			if fileInfo.Size() == GlobalFileStates[readFile].Offset {
+				continue
+			}
+		}
+
 		processingWg.Add(1)
 		go processReadObsoleteFile(GlobalFileStates[readFile], obsoleteMaxReadCount)
 	}
@@ -742,7 +752,6 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 	defer fd.Close()
 
 	reader = bufio.NewReader(fd)
-
 	// 证明文件没有被处理，开始读取
 	var (
 		currentReadCount = 0
