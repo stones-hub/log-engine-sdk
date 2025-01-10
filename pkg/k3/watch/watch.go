@@ -413,6 +413,8 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 
 		if err != nil {
 			if err == io.EOF {
+				currentOffset += int64(len(line))
+				content += line
 				k3.K3LogDebug("[readEventNameByOffset] read file over.")
 			} else {
 				k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] read file failed: %s", indexName, event.Op, event.Name, err.Error())
@@ -762,15 +764,15 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 		if err != nil {
 			if err == io.EOF {
 				k3.K3LogDebug("[processReadObsoleteFile] read file over.")
+				currentOffset += int64(len(line))
+				content += line
 			} else {
 				k3.K3LogError("[processReadObsoleteFile] read file error: %s", err.Error())
 			}
 			break
 		}
-
 		currentOffset += int64(len(line))
 		content += line
-
 	}
 
 	if len(content) > 0 {
