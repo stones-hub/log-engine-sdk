@@ -63,6 +63,7 @@ func FindStatusRouter(w http.ResponseWriter, r *http.Request) {
 	status.TotalAlloc = memStats.TotalAlloc / 1024 / 1024
 	status.Sys = memStats.Sys / 1024 / 1024
 	status.NumGC = memStats.NumGC
+	status.HeapAlloc = memStats.HeapAlloc / 1024 / 1024
 	status.WriteToChannelFailedCount = GlobalWriteToChannelFailedCount
 	status.WriteSuccessCount = GlobalWriteSuccessCount
 	status.WriteFailedCount = GlobalWriteFailedCount
@@ -83,6 +84,7 @@ var (
 type Status struct {
 	Alloc                     uint64 `json:"alloc"`                         // 当前已分配的内存 KB
 	TotalAlloc                uint64 `json:"total_alloc"`                   // 程序运行以来总共分配的内存字节数 KB。
+	HeapAlloc                 uint64 `json:"heap_alloc"`                    // 当前实际分配的堆内存大小，如果这个值持续增长，则可能存在内存泄漏。
 	Sys                       uint64 `json:"sys"`                           // 操作系统获取的总内存量 KB
 	NumGC                     uint32 `json:"num_gc"`                        // 表示垃圾回收的次
 	WriteFailedCount          int    `json:"write_failed_count"`            // 写入ELK失败条数

@@ -28,3 +28,5 @@ log/*
 example/*.log
 state/*
 cmd/log-engine-sdk/*
+logs/*
+release/*
