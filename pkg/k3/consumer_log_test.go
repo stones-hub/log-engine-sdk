@@ -43,7 +43,7 @@ func TestConsumerLog(t *testing.T) {
 					AppId:     "app_id_1001",
 					Ip:        ips[0],
 					Timestamp: time.Now(),
-					EventName: "",
+					IndexName: "",
 					Properties: map[string]interface{}{
 						"user_name": "stones",
 						"age":       18,
