@@ -1,8 +1,8 @@
 #elk configuration
 elk:
-  address: ["http://192.168.3.35:9200"]
-  username: "logstash_user_custom"
-  password: "BHYsvRU5JG-W0Ysvt+u"
+  address: ["https://elasticsearch-in.3k.com"]
+  username: "log_user"
+  password: "ZpYeLNfaGWMVe9K2G&Wv"
   max_channel_size: 5000 # 队列最大长度
   logstash: ["http://192.168.3.35:5044"]
   max_retries: 5 # 最大重试次数
