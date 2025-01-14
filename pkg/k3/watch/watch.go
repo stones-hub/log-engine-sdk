@@ -202,6 +202,10 @@ func ScanLogFileToGlobalFileStatesAndSaveToDiskFile(directory map[string][]strin
 					LastReadTime:  time.Now().Unix(),
 					IndexName:     indexName,
 				}
+			} else { // 如果存在，就检查是否需要更新index_name
+				if GlobalFileStates[diskFile].IndexName != indexName {
+					GlobalFileStates[diskFile].IndexName = indexName
+				}
 			}
 		}
 	}
