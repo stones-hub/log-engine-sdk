@@ -430,7 +430,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 		line := scanner.Text()
 		content.WriteString(line)
 		content.WriteString("\n")
-		currentOffset += int64(len(line) + len(scanner.Bytes()) - len(line))
+		currentOffset += int64(len(line) + 1)
 	}
 
 	if err = scanner.Err(); err != nil {
@@ -440,7 +440,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 
 	// 3.3. 将读取的数据，发送给ELK
 	if content.Len() > 0 {
-		k3.K3LogDebug("[readEventNameByOffset] send data to elk : ", content.String())
+		k3.K3LogDebug("[readEventNameByOffset] send data to elk : %s", content.String())
 		SendData2Consumer(content.String(), currentFileState)
 	}
 
@@ -548,6 +548,8 @@ func SendData2Consumer(content string, fileState *FileState) {
 		if len(data) == 0 {
 			continue
 		}
+
+		k3.K3LogDebug("[SendData2Consumer] 发送给Consumer的数据 : %s", data)
 
 		if err = GlobalDataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, fileState.IndexName,
 			map[string]interface{}{
@@ -850,7 +852,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 		line := scanner.Text()
 		content.WriteString(line)
 		content.WriteString("\n")
-		currentOffset += int64(len(line) + len(scanner.Bytes()) - len(line))
+		currentOffset += int64(len(line) + 1)
 	}
 
 	if err = scanner.Err(); err != nil {
@@ -859,7 +861,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 	}
 
 	if content.Len() > 0 {
-		k3.K3LogDebug("[processReadObsoleteFile] send data to elk : ", content)
+		k3.K3LogDebug("[processReadObsoleteFile] send data to elk : %s", content)
 		SendData2Consumer(content.String(), fileState)
 	}
 
