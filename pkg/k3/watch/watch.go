@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -376,8 +377,85 @@ func processing(indexName string, event fsnotify.Event) {
 	readEventNameByOffset(indexName, event)
 }
 
-// readEventNameByOffset 读取文件，更新GlobalFileState, 并把数据发送给elk
+// 文件读取，考虑边界问题， 毕竟有可能其他进程在读写文件，
+// 1. 文件锁(牺牲文件读写效率)，2. eof的重试(并不能完全保证), 3. 先将文件复制到临时文件，对临时文件读写（大文件不合适）
 func readEventNameByOffset(indexName string, event fsnotify.Event) {
+	var (
+		err              error
+		fd               *os.File
+		scanner          *bufio.Scanner
+		currentReadCount int
+		currentFileState *FileState
+		currentOffset    int64
+		content          strings.Builder
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
+	)
+
+	currentReadCount = 0                            // 当前文件被读取次数
+	currentFileState = GlobalFileStates[event.Name] // 当前文件信息
+	currentOffset = currentFileState.Offset         // 当前文件读取位置
+
+	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
+		maxReadCount = DefaultMaxReadCount
+	}
+	// 3.1. 打开文件
+	if fd, err = os.OpenFile(event.Name, os.O_RDONLY, 0666); err != nil {
+		k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] open file failed: %s", indexName, event.Op, event.Name, err.Error())
+		return
+	}
+	defer fd.Close()
+
+	// 获取文件锁
+	if err = syscall.Flock(int(fd.Fd()), syscall.LOCK_SH); err != nil {
+		k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] flock file failed: %s", indexName, event.Op, event.Name, err.Error())
+		return
+	}
+	defer syscall.Flock(int(fd.Fd()), syscall.LOCK_UN)
+
+	// 移动到当前的偏移量
+	if _, err = fd.Seek(currentOffset, 0); err != nil {
+		k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] seek file failed: %s", indexName, event.Op, event.Name, err.Error())
+		return
+	}
+
+	scanner = bufio.NewScanner(fd)
+	// 日志文件比较大，缓存设置防止读取的内容过大，导致内存溢出
+	const maxCapacity = 1024 * 1024
+	buf := make([]byte, maxCapacity)
+	scanner.Buffer(buf, maxCapacity)
+
+	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
+	for currentReadCount < maxReadCount && scanner.Scan() {
+		currentReadCount++
+		line := scanner.Text()
+		content.WriteString(line)
+		content.WriteString("\n")
+		currentOffset += int64(len(line) + len(scanner.Bytes()) - len(line))
+	}
+
+	if err = scanner.Err(); err != nil {
+		k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] scan file failed: %s", indexName, event.Op, event.Name, err.Error())
+		return
+	}
+
+	// 3.3. 将读取的数据，发送给ELK
+	if content.Len() > 0 {
+		k3.K3LogDebug("[readEventNameByOffset] send data to elk : ", content.String())
+		SendData2Consumer(content.String(), currentFileState)
+	}
+
+	// 注意，每次读取完，GlobalFileState的数据已经得到了更新，并没有及时更新到硬盘，用定时器来处理即可
+	GlobalFileStatesLock.Lock()
+	GlobalFileStates[currentFileState.Path].Offset = currentOffset
+	if GlobalFileStates[currentFileState.Path].StartReadTime == 0 {
+		GlobalFileStates[currentFileState.Path].StartReadTime = time.Now().Unix()
+	}
+	GlobalFileStates[currentFileState.Path].LastReadTime = time.Now().Unix()
+	GlobalFileStatesLock.Unlock()
+}
+
+// readEventNameByOffset 读取文件，更新GlobalFileState, 并把数据发送给elk
+func readEventNameByOffsetBak(indexName string, event fsnotify.Event) {
 	var (
 		err              error
 		fd               *os.File
@@ -412,13 +490,13 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 			k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] seek file failed: %s", indexName, event.Op, event.Name, err.Error())
 			break
 		}
-
 		line, err := reader.ReadString('\n')
-
 		if err != nil {
 			if err == io.EOF {
-				currentOffset += int64(len(line))
-				content += line
+				/*
+					currentOffset += int64(len(line))
+					content += line
+				*/
 				k3.K3LogDebug("[readEventNameByOffset] read file over.")
 			} else {
 				k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] read file failed: %s", indexName, event.Op, event.Name, err.Error())
@@ -658,8 +736,8 @@ func Closed() {
 func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 	// 创建定时器
 	var (
-		obsoleteInterval     = config.GlobalConfig.Watch.ObsoleteInterval     // 单位小时, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
-		obsoleteDate         = config.GlobalConfig.Watch.ObsoleteDate         // 单位天，  默认1，表示如果文件一天都没有读写，表示已经没有写入了
+		obsoleteInterval     = config.GlobalConfig.Watch.ObsoleteInterval     // 单位分钟, 默认1  定时1小时检查一下GlobalFileState中，是否文件是不是有已经读取完的
+		obsoleteDate         = config.GlobalConfig.Watch.ObsoleteDate         // 单位小时，  默认1，表示如果文件一天都没有读写，表示已经没有写入了
 		obsoleteMaxReadCount = config.GlobalConfig.Watch.ObsoleteMaxReadCount // 对于长时间没有读写的文件， 一次最大读取次数
 
 		t *time.Ticker
@@ -704,7 +782,7 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	// 1. 遍历GlobalFileStates中记录的文件，长时间未被操作
 	for fileName, fileState := range GlobalFileStates {
 		// 查看文件是否满足长时间未读取的条件
-		if duration := time.Now().Unix() - fileState.LastReadTime; duration > int64(obsoleteDate*24*60*60) {
+		if duration := time.Now().Unix() - fileState.LastReadTime; duration > int64(obsoleteDate*60*60) {
 			readFilePath = append(readFilePath, fileName)
 		}
 	}
@@ -728,7 +806,75 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	go processingWg.Wait()
 }
 
+// 毕竟是定时读取，而且是读取长时间未读取的文件，没必要加文件锁
 func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
+	defer processingWg.Done()
+	processingSem <- struct{}{}
+	defer func() {
+		<-processingSem
+	}()
+
+	// 已经有协程在处理这个文件，跳过
+	if _, ok := processingMap.LoadOrStore(fileState.Path, true); ok {
+		k3.K3LogWarn("[processReadFile] %s is already being processed, skipping .", fileState.Path)
+		return
+	}
+	defer processingMap.Delete(fileState.Path)
+
+	var (
+		fd               *os.File
+		err              error
+		scanner          *bufio.Scanner
+		currentReadCount = 0
+		currentOffset    = fileState.Offset
+		content          strings.Builder
+	)
+
+	// 打开待读取的文件
+	if fd, err = os.OpenFile(fileState.Path, os.O_RDONLY, os.ModePerm); err != nil {
+		k3.K3LogWarn("[processReadFile] open file error: %s", err.Error())
+		return
+	}
+	defer fd.Close()
+
+	// 设置文件偏移量
+	if _, err = fd.Seek(currentOffset, 0); err != nil {
+		k3.K3LogError("[processReadObsoleteFile] seek file error: %s", err.Error())
+		return
+	}
+	scanner = bufio.NewScanner(fd)
+
+	// 循环读取
+	for currentReadCount < maxReadCount && scanner.Scan() {
+		currentReadCount++
+		line := scanner.Text()
+		content.WriteString(line)
+		content.WriteString("\n")
+		currentOffset += int64(len(line) + len(scanner.Bytes()) - len(line))
+	}
+
+	if err = scanner.Err(); err != nil {
+		k3.K3LogError("[processReadObsoleteFile] read file error: %s", err.Error())
+		return
+	}
+
+	if content.Len() > 0 {
+		k3.K3LogDebug("[processReadObsoleteFile] send data to elk : ", content)
+		SendData2Consumer(content.String(), fileState)
+	}
+
+	// 注意，每次读取完，GlobalFileState的数据已经得到了更新，并没有及时更新到硬盘，用定时器来处理即可
+	GlobalFileStatesLock.Lock()
+	GlobalFileStates[fileState.Path].Offset = currentOffset
+	if GlobalFileStates[fileState.Path].StartReadTime == 0 {
+		GlobalFileStates[fileState.Path].StartReadTime = time.Now().Unix()
+	}
+	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
+	GlobalFileStatesLock.Unlock()
+
+}
+
+func processReadObsoleteFileBak(fileState *FileState, maxReadCount int) {
 	defer processingWg.Done()
 	processingSem <- struct{}{}
 	defer func() {
