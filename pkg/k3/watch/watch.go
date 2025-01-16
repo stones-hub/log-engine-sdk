@@ -366,7 +366,7 @@ func processing(indexName string, event fsnotify.Event) {
 
 	// 2. 判断当前文件是不是已经在协程中，如果,event.Name标记的协程已经存在，就直接返回, 协程结束
 	if _, loading := processingMap.LoadOrStore(event.Name, true); loading {
-		k3.K3LogWarn("[ReadFileOffset] %s is already being processed, skipping .", event.Name)
+		k3.K3LogDebug("[ReadFileOffset] %s is already being processed, skipping .", event.Name)
 		return
 	}
 
@@ -818,7 +818,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 
 	// 已经有协程在处理这个文件，跳过
 	if _, ok := processingMap.LoadOrStore(fileState.Path, true); ok {
-		k3.K3LogWarn("[processReadFile] %s is already being processed, skipping .", fileState.Path)
+		k3.K3LogDebug("[processReadFile] %s is already being processed, skipping .", fileState.Path)
 		return
 	}
 	defer processingMap.Delete(fileState.Path)
