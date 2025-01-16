@@ -549,7 +549,7 @@ func SendData2Consumer(content string, fileState *FileState) {
 			continue
 		}
 
-		k3.K3LogDebug("[SendData2Consumer] 发送给Consumer的数据 : %s", data)
+		k3.K3LogInfo("[SendData2Consumer] 发送给Consumer的数据 : %s", data)
 
 		if err = GlobalDataAnalytics.Track(config.GlobalConfig.Account.AccountId, config.GlobalConfig.Account.AppId, ip, fileState.IndexName,
 			map[string]interface{}{

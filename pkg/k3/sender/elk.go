@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"log"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/config"
 	"log-engine-sdk/pkg/k3/protocol"
@@ -187,7 +186,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 			buffer.WriteString("\n")
 		}
 
-		k3.K3LogDebug("[sendBulkElasticSearch] bulk_data:%s\n", buffer.String())
+		k3.K3LogInfo("[sendBulkElasticSearch] bulk_data:%s\n", buffer.String())
 
 		BulkData = make([]*Bulk, 0)
 
@@ -323,7 +322,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 func mustMarshal(v interface{}) string {
 	b, err := json.Marshal(v)
 	if err != nil {
-		log.Fatalf("Error marshaling JSON: %s", err)
+		k3.K3LogError("Error marshaling JSON: %s", err)
 	}
 	return string(b)
 }

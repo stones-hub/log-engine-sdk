@@ -17,11 +17,11 @@ func (d *Default) Send(data []protocol.Data) error {
 	if b, err = json.Marshal(data); err != nil {
 		return err
 	}
-	fmt.Println(string(b))
+	fmt.Println("default sender : ", string(b))
 	return nil
 }
 
 func (d *Default) Close() error {
-	fmt.Println("close default sender")
+	fmt.Println("default sender : ", "close default sender")
 	return nil
 }
