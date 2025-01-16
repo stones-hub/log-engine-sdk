@@ -454,76 +454,6 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 	GlobalFileStatesLock.Unlock()
 }
 
-// readEventNameByOffset 读取文件，更新GlobalFileState, 并把数据发送给elk
-func readEventNameByOffsetBak(indexName string, event fsnotify.Event) {
-	var (
-		err              error
-		fd               *os.File
-		reader           *bufio.Reader
-		currentReadCount int
-		currentFileState *FileState
-		currentOffset    int64
-		content          string
-		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
-	)
-
-	currentReadCount = 0                            // 当前文件被读取次数
-	currentFileState = GlobalFileStates[event.Name] // 当前文件信息
-	currentOffset = currentFileState.Offset         // 当前文件读取位置
-
-	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
-		maxReadCount = DefaultMaxReadCount
-	}
-	// 3.1. 打开文件
-	if fd, err = os.OpenFile(event.Name, os.O_RDONLY, 0666); err != nil {
-		k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] open file failed: %s", indexName, event.Op, event.Name, err.Error())
-		return
-	}
-	defer fd.Close()
-
-	reader = bufio.NewReader(fd)
-
-	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
-	for currentReadCount < maxReadCount {
-		currentReadCount++
-		if _, err = fd.Seek(currentOffset, 0); err != nil {
-			k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] seek file failed: %s", indexName, event.Op, event.Name, err.Error())
-			break
-		}
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				/*
-					currentOffset += int64(len(line))
-					content += line
-				*/
-				k3.K3LogDebug("[readEventNameByOffset] read file over.")
-			} else {
-				k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] read file failed: %s", indexName, event.Op, event.Name, err.Error())
-			}
-			break
-		}
-
-		currentOffset += int64(len(line))
-		content += line
-	}
-
-	// 3.3. 将读取的数据，发送给ELK
-	if len(content) > 0 {
-		k3.K3LogDebug("[readEventNameByOffset] send data to elk : ", content)
-		SendData2Consumer(content, currentFileState)
-	}
-
-	// 注意，每次读取完，GlobalFileState的数据已经得到了更新，并没有及时更新到硬盘，用定时器来处理即可
-	GlobalFileStatesLock.Lock()
-	GlobalFileStates[currentFileState.Path].Offset = currentOffset
-	if GlobalFileStates[currentFileState.Path].StartReadTime == 0 {
-		GlobalFileStates[currentFileState.Path].StartReadTime = time.Now().Unix()
-	}
-	GlobalFileStates[currentFileState.Path].LastReadTime = time.Now().Unix()
-	GlobalFileStatesLock.Unlock()
-}
-
 // SendData2Consumer  将数据发送给 consumer
 func SendData2Consumer(content string, fileState *FileState) {
 
@@ -556,7 +486,7 @@ func SendData2Consumer(content string, fileState *FileState) {
 				"_data": data,
 				"_path": fileState.Path,
 			}); err != nil {
-			k3.K3LogError("Track: %s", err.Error())
+			k3.K3LogError("[SendData2Consumer] Track: %s", err.Error())
 		}
 	}
 }
@@ -657,7 +587,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 			case <-t.C:
 				// 如果只是保持失败，没必要让整个程序退出
 				if err = SaveGlobalFileStatesToDiskFile(filePath); err != nil {
-					k3.K3LogError("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk failed: %v\n", err)
+					k3.K3LogWarn("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk failed: %v\n", err)
 				}
 				k3.K3LogDebug("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk success.")
 			case <-WatcherContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
@@ -793,7 +723,7 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	for _, readFile := range readFilePath {
 		// 如果文件已经读取完了，就不用再读取了
 		if fileInfo, err := os.Stat(readFile); err != nil {
-			k3.K3LogError("[readObsoleteFiles] stat file error: %s", err.Error())
+			k3.K3LogWarn("[readObsoleteFiles] stat file error: %s", err.Error())
 			continue
 		} else {
 			if fileInfo.Size() == GlobalFileStates[readFile].Offset {
@@ -876,6 +806,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 
 }
 
+// processReadObsoleteFileBak 废弃
 func processReadObsoleteFileBak(fileState *FileState, maxReadCount int) {
 	defer processingWg.Done()
 	processingSem <- struct{}{}
@@ -950,4 +881,74 @@ func processReadObsoleteFileBak(fileState *FileState, maxReadCount int) {
 	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
 	GlobalFileStatesLock.Unlock()
 
+}
+
+// readEventNameByOffsetBak 废弃
+func readEventNameByOffsetBak(indexName string, event fsnotify.Event) {
+	var (
+		err              error
+		fd               *os.File
+		reader           *bufio.Reader
+		currentReadCount int
+		currentFileState *FileState
+		currentOffset    int64
+		content          string
+		maxReadCount     = config.GlobalConfig.Watch.MaxReadCount
+	)
+
+	currentReadCount = 0                            // 当前文件被读取次数
+	currentFileState = GlobalFileStates[event.Name] // 当前文件信息
+	currentOffset = currentFileState.Offset         // 当前文件读取位置
+
+	if maxReadCount < 0 || maxReadCount > DefaultMaxReadCount {
+		maxReadCount = DefaultMaxReadCount
+	}
+	// 3.1. 打开文件
+	if fd, err = os.OpenFile(event.Name, os.O_RDONLY, 0666); err != nil {
+		k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] open file failed: %s", indexName, event.Op, event.Name, err.Error())
+		return
+	}
+	defer fd.Close()
+
+	reader = bufio.NewReader(fd)
+
+	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
+	for currentReadCount < maxReadCount {
+		currentReadCount++
+		if _, err = fd.Seek(currentOffset, 0); err != nil {
+			k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] seek file failed: %s", indexName, event.Op, event.Name, err.Error())
+			break
+		}
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				/*
+					currentOffset += int64(len(line))
+					content += line
+				*/
+				k3.K3LogDebug("[readEventNameByOffset] read file over.")
+			} else {
+				k3.K3LogError("[readEventNameByOffset] index_name[%s] event[%s] path[%s] read file failed: %s", indexName, event.Op, event.Name, err.Error())
+			}
+			break
+		}
+
+		currentOffset += int64(len(line))
+		content += line
+	}
+
+	// 3.3. 将读取的数据，发送给ELK
+	if len(content) > 0 {
+		k3.K3LogDebug("[readEventNameByOffset] send data to elk : ", content)
+		SendData2Consumer(content, currentFileState)
+	}
+
+	// 注意，每次读取完，GlobalFileState的数据已经得到了更新，并没有及时更新到硬盘，用定时器来处理即可
+	GlobalFileStatesLock.Lock()
+	GlobalFileStates[currentFileState.Path].Offset = currentOffset
+	if GlobalFileStates[currentFileState.Path].StartReadTime == 0 {
+		GlobalFileStates[currentFileState.Path].StartReadTime = time.Now().Unix()
+	}
+	GlobalFileStates[currentFileState.Path].LastReadTime = time.Now().Unix()
+	GlobalFileStatesLock.Unlock()
 }

@@ -47,7 +47,7 @@ func (k *K3LogConsumer) Add(data protocol.Data) error {
 
 	if k.sdkClose {
 		err = errors.New("add event failed, SDK has been closed ")
-		K3LogError(err.Error())
+		K3LogError("[consumer_log] Add event failed, sdk has been closed ")
 	} else {
 		if b, err = json.Marshal(data); err != nil {
 			return err
@@ -106,7 +106,7 @@ func (k *K3LogConsumer) init() error {
 		err error
 	)
 	if fd, err = k.initLogFile(); err != nil {
-		K3LogError("init log file error: %s", err.Error())
+		K3LogError("[consumer_log] init log file error: %s", err.Error())
 		return err
 	} else {
 		k.currentFile = fd
@@ -118,7 +118,7 @@ func (k *K3LogConsumer) init() error {
 	go func() {
 		defer func() {
 			if e := recover(); e != nil {
-				K3LogError("consumer log panic: %s", e)
+				K3LogError("[consumer_log] consumer log panic: %s", e)
 			}
 
 			k.wg.Done()
@@ -138,7 +138,7 @@ func (k *K3LogConsumer) init() error {
 		}
 	}()
 
-	K3LogInfo("log consumer init success, log path :", k.directory)
+	K3LogInfo("[[consumer_log] log consumer init success, log path :", k.directory)
 	return nil
 }
 
@@ -193,19 +193,19 @@ func (k *K3LogConsumer) rsyncFile(jsonStr string) {
 	if k.currentFile != nil && k.currentFile.Name() != fName {
 		_ = k.currentFile.Close()
 		if k.currentFile, err = os.OpenFile(fName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm); err != nil {
-			K3LogError("open file error: %s", err.Error())
+			K3LogError("[consumer_log] open file error: %s", err.Error())
 			return
 		}
 	} else if k.currentFile == nil {
 		if k.currentFile, err = os.OpenFile(fName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm); err != nil {
-			K3LogError("open file error: %s", err.Error())
+			K3LogError("[consumer_log] open file error: %s", err.Error())
 			return
 		}
 	}
 
 	if k.fileSize > 0 {
 		if stat, err = k.currentFile.Stat(); err != nil {
-			K3LogError("get file stat error: %s", err.Error())
+			K3LogError("[consumer_log] get file stat error: %s", err.Error())
 			return
 		}
 
@@ -214,7 +214,7 @@ func (k *K3LogConsumer) rsyncFile(jsonStr string) {
 			LogFileIndex++
 			fName = k.generateFileName(time.Now().Format(k.dateFormat), LogFileIndex)
 			if k.currentFile, err = os.OpenFile(fName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm); err != nil {
-				K3LogError("open file error: %s", err.Error())
+				K3LogError("[consumer_log] open file error: %s", err.Error())
 				return
 			}
 		}
@@ -222,7 +222,7 @@ func (k *K3LogConsumer) rsyncFile(jsonStr string) {
 
 	// 数据写入文件
 	if _, err = fmt.Fprint(k.currentFile, jsonStr+"\n"); err != nil {
-		K3LogError("write file error: %s", err.Error())
+		K3LogError("[consumer_log] write file error: %s", err.Error())
 		return
 	}
 }
@@ -260,7 +260,7 @@ func NewLogConsumerWithConfig(config K3LogConsumerConfig) (protocol.K3Consumer, 
 	case ROTATE_HOURLY:
 		dateFormat = "2006-01-02-15"
 	default:
-		K3LogError("unknown rotate mode")
+		K3LogError("[consumer_log] unknown rotate mode")
 		return nil, errors.New("rotate mode")
 	}
 

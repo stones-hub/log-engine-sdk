@@ -200,13 +200,13 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 
 		if err != nil {
 			k3.GlobalWriteFailedCount = k3.GlobalWriteFailedCount + currentBulkSize
-			k3.K3LogError("[sendBulkElasticSearch] Bulk send to elasticsearch failed: %v", err)
+			k3.K3LogWarn("[sendBulkElasticSearch] Bulk send to elasticsearch failed: %v", err)
 			return
 		}
 
 		if res.IsError() {
 			k3.GlobalWriteFailedCount = k3.GlobalWriteFailedCount + currentBulkSize
-			k3.K3LogError("[sendBulkElasticSearch] Bulk response from elasticsearch failed: %s", res.String())
+			k3.K3LogWarn("[sendBulkElasticSearch] Bulk response from elasticsearch failed: %s", res.String())
 			res.Body.Close()
 			return
 		}
@@ -223,7 +223,7 @@ func (e *ElasticSearchClient) Send(data []protocol.Data) error {
 	// 循环发送数据
 	for _, d := range data {
 		if err := e.sendWithRetries(&d); err != nil {
-			k3.K3LogError("[Send] data(%v) to elk's data-channel error : %v", d.UUID, err)
+			k3.K3LogWarn("[Send] data(%v) to elk's data-channel error : %v", d.UUID, err)
 		}
 	}
 	return nil
@@ -246,8 +246,7 @@ func (e *ElasticSearchClient) sendWithRetries(d *protocol.Data) error {
 	}
 
 	k3.GlobalWriteToChannelFailedCount++
-	// 记录丢弃日志
-
+	// 日志提交给ELK的管道失败，就记录丢弃日志, TODO 考虑真实提交给ELK的时候失败要记录
 	_ = config.GlobalConsumer.Add(*d)
 
 	return fmt.Errorf("[sendWithRetries] data-channel is full after retries")
@@ -268,7 +267,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 
 	// consumer的数据没有_data, 证明无需处理当前日志
 	if _data, ok = data.Properties["_data"]; !ok {
-		k3.K3LogError("[consumerDataToElkData] No _data field in data: %v", data)
+		k3.K3LogWarn("[consumerDataToElkData] No _data field in data: %v", data)
 		return ""
 	}
 
@@ -278,7 +277,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 
 	// host_ip 和 host_name 、uuid 需要生成，SubmitLog 中并没有这些数据
 	if hostName, err = os.Hostname(); err != nil {
-		k3.K3LogError("[consumerDataToElkData] Failed to get hostname: %v", err)
+		k3.K3LogWarn("[consumerDataToElkData] Failed to get hostname: %v", err)
 		hostName = "unknown"
 	}
 
@@ -322,7 +321,7 @@ func consumerDataToElkData(data *protocol.Data) string {
 func mustMarshal(v interface{}) string {
 	b, err := json.Marshal(v)
 	if err != nil {
-		k3.K3LogError("Error marshaling JSON: %s", err)
+		k3.K3LogWarn("Error marshaling JSON: %s", err)
 	}
 	return string(b)
 }

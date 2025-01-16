@@ -56,24 +56,24 @@ func (i *DataAnalytics) track(accountId, appId, indexName, ip string, properties
 	defer func() {
 		// 防止异常导致整个程序结束, 并不是协程的问题
 		if r := recover(); r != nil {
-			K3LogError("Recovered in track: %v", r)
+			K3LogError("[data_analytics] Recovered in track: %v", r)
 		}
 	}()
 
 	if len(accountId) == 0 {
-		msg = "invalid parameters: account_id cannot be empty "
+		msg = "[data_analytics] invalid parameters: account_id cannot be empty "
 		K3LogError(msg)
 		return errors.New(msg)
 	}
 
 	if len(appId) == 0 {
-		msg = "the app id must be provided "
+		msg = "[data_analytics] the app id must be provided "
 		K3LogError(msg)
 		return errors.New(msg)
 	}
 
 	if len(indexName) == 0 {
-		msg = "the event name must be provided "
+		msg = "[data_analytics] the event name must be provided "
 		K3LogError(msg)
 		return errors.New(msg)
 	}
