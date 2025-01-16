@@ -250,9 +250,9 @@ func InitWatcher(directory map[string][]string, fileStatePath string) error {
 	// 用于解决，主程序启动后，一旦有一个协程异常退出，用于回收协程，并让其他协程也退出
 	go func() {
 		WatcherWG.Wait() // 阻塞函数
-		k3.K3LogInfo("[InitWatcher] All watcher goroutine exit.")
+		k3.K3LogWarn("[InitWatcher] All watcher goroutine exit.")
 		processingWg.Wait() // 阻塞函数, 回收每次读取文件时开的所有协程
-		k3.K3LogInfo("[InitWatcher] All processing goroutine exit.")
+		k3.K3LogWarn("[InitWatcher] All processing goroutine exit.")
 		WatcherContextCancel() // 考虑到所有的Watcher的协程都退出了， 保险起见再次发一个退出信号
 	}()
 
@@ -643,8 +643,9 @@ func Run(directory map[string][]string) (func(), error) {
 		return Closed, err
 	}
 
-	// 4. TODO 需要检查代码 -> 定时更新 FileState 数据到硬盘
+	// 定时将内存状态更新到硬盘
 	ClockSyncGlobalFileStatesToDiskFile(FileStateFilePath)
+	// 定时将长时间没有写入的日志文件，且没有读取完的日志文件读取
 	ClockSyncObsoleteFile(directory, FileStateFilePath)
 
 	return Closed, nil
