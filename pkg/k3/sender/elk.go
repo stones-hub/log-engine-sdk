@@ -201,6 +201,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 		if err != nil {
 			k3.GlobalWriteFailedCount = k3.GlobalWriteFailedCount + currentBulkSize
 			k3.K3LogWarn("[sendBulkElasticSearch] Bulk send to elasticsearch failed: %v", err)
+			recordSendELKLoseLog(buffer)
 			return
 		}
 
@@ -208,6 +209,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 			k3.GlobalWriteFailedCount = k3.GlobalWriteFailedCount + currentBulkSize
 			k3.K3LogWarn("[sendBulkElasticSearch] Bulk response from elasticsearch failed: %s", res.String())
 			res.Body.Close()
+			recordSendELKLoseLog(buffer)
 			return
 		}
 
@@ -246,7 +248,7 @@ func (e *ElasticSearchClient) sendWithRetries(d *protocol.Data) error {
 	}
 
 	k3.GlobalWriteToChannelFailedCount++
-	// 日志提交给ELK的管道失败，就记录丢弃日志, TODO 考虑真实提交给ELK的时候失败要记录
+	// 日志提交给ELK的管道失败，就记录丢弃日志,
 	_ = config.GlobalConsumer.Add(*d)
 
 	return fmt.Errorf("[sendWithRetries] data-channel is full after retries")
@@ -326,4 +328,19 @@ func mustMarshal(v interface{}) string {
 		k3.K3LogWarn("Error marshaling JSON: %s", err)
 	}
 	return string(b)
+}
+
+// TODO 考虑真实提交给ELK的时候失败要记录, 后续需要扩展一下哈
+func recordSendELKLoseLog(s strings.Builder) {
+	_ = config.GlobalConsumer.Add(protocol.Data{
+		UUID:      "",
+		AccountId: "",
+		AppId:     "",
+		Ip:        "",
+		Timestamp: time.Now(),
+		IndexName: "",
+		Properties: map[string]interface{}{
+			"text": s.String(),
+		},
+	})
 }
