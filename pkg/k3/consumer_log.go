@@ -138,7 +138,7 @@ func (k *K3LogConsumer) init() error {
 		}
 	}()
 
-	K3LogInfo("[[consumer_log] log consumer init success, log path :", k.directory)
+	K3LogInfo("[consumer_log] log consumer init success, log path :", k.directory)
 	return nil
 }
 
