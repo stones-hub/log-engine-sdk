@@ -309,7 +309,7 @@ EXIT:
 
 		case event, ok := <-watcher.Events:
 			if !ok {
-				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher event channel closed.", indexName)
+				k3.K3LogError("[forkWatcher] index_name[%s] watcher event channel closed.", indexName)
 				WatcherContextCancel()
 				break EXIT
 			}
@@ -318,7 +318,7 @@ EXIT:
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
-				k3.K3LogWarn("[forkWatcher] index_name[%s] watcher error channel closed.", indexName)
+				k3.K3LogError("[forkWatcher] index_name[%s] watcher error channel closed.", indexName)
 				WatcherContextCancel()
 				break EXIT
 			}
@@ -486,7 +486,7 @@ func SendData2Consumer(content string, fileState *FileState) {
 				"_data": data,
 				"_path": fileState.Path,
 			}); err != nil {
-			k3.K3LogError("[SendData2Consumer] Track: %s", err.Error())
+			k3.K3LogError("[SendData2Consumer] GlobalDataAnalytics.Track: %s", err.Error())
 		}
 	}
 }
@@ -522,14 +522,14 @@ func createEvent(indexName string, event fsnotify.Event, watcher *fsnotify.Watch
 	// 如果是目录就添加监听， 如果是文件就将文件写入FileStates中，并强制更新一次硬盘
 	if ok, err = k3.IsDirectory(event.Name); err != nil {
 		// 如果这里报错，有可能会导致文件或者目录不会被监听，记录下日志
-		k3.K3LogError("[createEvent] index_name[%s] event[%s] path[%s] failed : %s", indexName, event.Op, event.Name, err.Error())
+		k3.K3LogWarn("[createEvent] index_name[%s] event[%s] path[%s] failed : %s", indexName, event.Op, event.Name, err.Error())
 		return
 	} else {
 		// fmt.Println("WRITE", "==>", event.Name)
 		if ok {
 			// 将目录加入到监听
 			if err = watcher.Add(event.Name); err != nil {
-				k3.K3LogError("[createEvent] index_name[%s] event[%s] path[%s] add watcher failed: %s", indexName, event.Op, event.Name, err.Error())
+				k3.K3LogWarn("[createEvent] index_name[%s] event[%s] path[%s] add watcher failed: %s", indexName, event.Op, event.Name, err.Error())
 				return
 			}
 		} else {
@@ -591,7 +591,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 				}
 				k3.K3LogDebug("[ClockSyncGlobalFileStatesToDiskFile] save file state to disk success.")
 			case <-WatcherContext.Done(): // 退出协程，并退出ClockSyncGlobalFileStatesToDiskFile的定时器
-				k3.K3LogInfo("[ClockSyncGlobalFileStatesToDiskFile]  Accept clock goroutine exit singal.")
+				k3.K3LogWarn("[ClockSyncGlobalFileStatesToDiskFile]  Accept clock goroutine exit singal.")
 				return
 			}
 		}
@@ -599,7 +599,7 @@ func ClockSyncGlobalFileStatesToDiskFile(filePath string) {
 
 	go func() {
 		ClockWG.Wait() // 阻塞等待Clock定时器协程协程退出
-		k3.K3LogInfo("[ClockSyncGlobalFileStatesToDiskFile]  All clock goroutine  exit.")
+		k3.K3LogWarn("[ClockSyncGlobalFileStatesToDiskFile]  All clock goroutine  exit.")
 		WatcherContextCancel()
 	}()
 }
@@ -724,7 +724,7 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	for _, readFile := range readFilePath {
 		// 如果文件已经读取完了，就不用再读取了
 		if fileInfo, err := os.Stat(readFile); err != nil {
-			k3.K3LogWarn("[readObsoleteFiles] stat file error: %s", err.Error())
+			k3.K3LogError("[readObsoleteFiles] stat file error: %s", err.Error())
 			continue
 		} else {
 			if fileInfo.Size() == GlobalFileStates[readFile].Offset {
@@ -765,7 +765,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 
 	// 打开待读取的文件
 	if fd, err = os.OpenFile(fileState.Path, os.O_RDONLY, os.ModePerm); err != nil {
-		k3.K3LogWarn("[processReadFile] open file error: %s", err.Error())
+		k3.K3LogError("[processReadFile] open file error: %s", err.Error())
 		return
 	}
 	defer fd.Close()
@@ -830,7 +830,7 @@ func processReadObsoleteFileBak(fileState *FileState, maxReadCount int) {
 
 	// 打开待读取的文件
 	if fd, err = os.OpenFile(fileState.Path, os.O_RDONLY, os.ModePerm); err != nil {
-		k3.K3LogWarn("[processReadFile] open file error: %s", err.Error())
+		k3.K3LogError("[processReadFile] open file error: %s", err.Error())
 		return
 	}
 	defer fd.Close()
