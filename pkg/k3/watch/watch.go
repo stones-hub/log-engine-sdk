@@ -653,7 +653,7 @@ func Run(directory map[string][]string) (func(), error) {
 
 // Closed 清理协程，并关闭资源
 func Closed() {
-	k3.K3LogDebug("[Closed] closed watch.")
+	k3.K3LogInfo("[Closed] closed watch.")
 	// 回收定时器协程和监听协程
 	WatcherContextCancel()
 	time.Sleep(time.Second * 1) // 留1s的时间给协程来回收资源
@@ -700,7 +700,7 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 
 	go func() {
 		ClockObsoleteWG.Wait()
-		k3.K3LogInfo("[ClockSyncObsoleteFile]  All clock obsolete goroutine exit.")
+		k3.K3LogWarn("[ClockSyncObsoleteFile]  All clock obsolete goroutine exit.")
 		WatcherContextCancel()
 	}()
 }
@@ -787,7 +787,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 	}
 
 	if err = scanner.Err(); err != nil {
-		k3.K3LogError("[processReadObsoleteFile] read file error: %s", err.Error())
+		k3.K3LogError("[processReadObsoleteFile] read file[%s] error: %s", fileState.Path, err.Error())
 		return
 	}
 

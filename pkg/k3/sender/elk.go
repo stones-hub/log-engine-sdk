@@ -186,7 +186,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 			buffer.WriteString("\n")
 		}
 
-		k3.K3LogInfo("[sendBulkElasticSearch] bulk_data:%s\n", buffer.String())
+		k3.K3LogInfo("[sendBulkElasticSearch] 批量提交给ELK的数据 :%s\n", buffer.String())
 
 		BulkData = make([]*Bulk, 0)
 
