@@ -283,6 +283,8 @@ func consumerDataToElkData(data *protocol.Data) string {
 
 	// 将日志解析成elkData ， 解析失败，就将原来的数据封装到elkData下的text字段内发送
 	if err = json.Unmarshal([]byte(_data.(string)), &elkData); err != nil || elkData.EventName == "" {
+		k3.K3LogWarn("[consumerDataToElkData] Failed to unmarshal data, err[%v], data[%s]", err, _data.(string))
+
 		elkData.HostIp = data.Ip
 		elkData.HostName = hostName
 		elkData.UUID = data.UUID
