@@ -63,7 +63,7 @@ func (k *K3LogConsumer) Flush() error {
 		err error
 	)
 
-	K3LogInfo("flush log data")
+	K3LogDebug("flush log data")
 	k.mutex.Lock()
 	defer func() { k.mutex.Unlock() }()
 
@@ -78,7 +78,7 @@ func (k *K3LogConsumer) Close() error {
 		err error
 	)
 
-	K3LogInfo("close log consumer")
+	K3LogDebug("close log consumer")
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
@@ -132,7 +132,6 @@ func (k *K3LogConsumer) init() error {
 				}
 
 				jsonStr := parseTime(res)
-				// K3LogInfo("write event data :%s", jsonStr)
 				// 将管道的数据写入到 log 文件
 				k.rsyncFile(jsonStr)
 			}
@@ -155,7 +154,7 @@ func (k *K3LogConsumer) initLogFile() (*os.File, error) {
 	// 创建文件名
 
 	logFileName := k.generateFileName(time.Now().Format(k.dateFormat), 0)
-	K3LogInfo("log file name:%s", logFileName)
+	K3LogDebug("log file name:%s", logFileName)
 
 	return os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
 }

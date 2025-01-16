@@ -885,7 +885,7 @@ func processReadObsoleteFileBak(fileState *FileState, maxReadCount int) {
 
 	// 已经有协程在处理这个文件，跳过
 	if _, ok := processingMap.LoadOrStore(fileState.Path, true); ok {
-		k3.K3LogWarn("[processReadFile] %s is already being processed, skipping .", fileState.Path)
+		k3.K3LogDebug("[processReadFile] %s is already being processed, skipping .", fileState.Path)
 		return
 	}
 	defer processingMap.Delete(fileState.Path)

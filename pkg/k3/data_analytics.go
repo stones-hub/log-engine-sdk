@@ -14,7 +14,7 @@ type DataAnalytics struct {
 }
 
 func NewDataAnalytics(consumer protocol.K3Consumer) DataAnalytics {
-	K3LogInfo("New Data Analytics")
+	K3LogDebug("New Data Analytics")
 
 	return DataAnalytics{
 		consumer:        consumer,
