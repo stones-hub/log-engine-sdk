@@ -420,17 +420,34 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 
 	scanner = bufio.NewScanner(fd)
 	// 日志文件比较大，缓存设置防止读取的内容过大，导致内存溢出
-	const maxCapacity = 1024 * 1024
+	const maxCapacity = 1024 * 1024 // 1MB
 	buf := make([]byte, maxCapacity)
 	scanner.Buffer(buf, maxCapacity)
+
+	// 处理换行符不一致的问题
+	scanner.Split(bufio.ScanLines)
+
+	var (
+		lastLine = ""
+	)
 
 	// 3.2. 根据GlobalFileState的offset开始循环读取文件，读取次数为maxReadCount
 	for currentReadCount < maxReadCount && scanner.Scan() {
 		currentReadCount++
 		line := scanner.Text()
-		content.WriteString(line)
-		content.WriteString("\n")
-		currentOffset += int64(len(line) + 1)
+
+		/*
+			content.WriteString(line)
+			content.WriteString("\n")
+			currentOffset += int64(len(line) + 1)
+		*/
+
+		if currentReadCount > 1 {
+			content.WriteString(lastLine)
+			content.WriteString("\n")
+			currentOffset += int64(len(lastLine) + 1)
+		}
+		lastLine = line
 	}
 
 	if err = scanner.Err(); err != nil {
