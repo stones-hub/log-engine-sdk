@@ -441,7 +441,7 @@ func readEventNameByOffset(indexName string, event fsnotify.Event) {
 	// 3.3. 将读取的数据，发送给ELK
 	if content.Len() > 0 {
 		// k3.K3LogDebug("[readEventNameByOffset] send data to elk : %s", content.String())
-		k3.K3LogInfo("[readEventNameByOffset] 实时传递数据给Consumer : %s", content)
+		k3.K3LogInfo("[readEventNameByOffset] 实时传递数据给Consumer : %s", content.String())
 		SendData2Consumer(content.String(), currentFileState)
 	}
 
@@ -793,7 +793,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 	}
 
 	if content.Len() > 0 {
-		k3.K3LogInfo("[processReadObsoleteFile] 定时传递数据给Consumer : %s", content)
+		k3.K3LogInfo("[processReadObsoleteFile] 定时传递数据给Consumer : %s", content.String())
 		SendData2Consumer(content.String(), fileState)
 	}
 
