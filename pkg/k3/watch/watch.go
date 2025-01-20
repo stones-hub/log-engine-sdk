@@ -533,7 +533,10 @@ func writeEvent(indexName string, event fsnotify.Event) {
 	processingWg.Add(1)
 	// 监测到某个文件有写入，循环读取
 	go processing(indexName, event, processingWg)
-	go processingWg.Wait()
+	go func() {
+		k3.K3LogWarn("[writeEvent] 所有监听到文件变化所开启的协程被关闭.")
+		processingWg.Wait()
+	}()
 }
 
 // 文件或目录创建
@@ -760,7 +763,10 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 		go processReadObsoleteFile(GlobalFileStates[readFile], obsoleteMaxReadCount, processingWg)
 	}
 
-	go processingWg.Wait()
+	go func() {
+		k3.K3LogWarn("[readObsoleteFiles]所有定时读取的文件协程被回收.")
+		processingWg.Wait()
+	}()
 }
 
 // 毕竟是定时读取，而且是读取长时间未读取的文件，没必要加文件锁
