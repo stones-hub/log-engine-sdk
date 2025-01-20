@@ -59,7 +59,7 @@ var (
 // 用于处理读取文件的协程， 控制协程的数量即可，多个文件可以同时读取发送
 var (
 	processingSem chan struct{} // 可开启的最大协程数量
-	processingWg  *sync.WaitGroup
+	// processingWg  *sync.WaitGroup
 	processingMap *sync.Map
 )
 
@@ -77,7 +77,7 @@ func InitVars() {
 	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background()) // Watcher取消上下文
 
 	processingMap = &sync.Map{}
-	processingWg = &sync.WaitGroup{}
+	// processingWg = &sync.WaitGroup{}
 	processingSem = make(chan struct{}, 100) // 控制最大协程数量为100
 
 	ClockObsoleteWG = &sync.WaitGroup{}
@@ -251,7 +251,7 @@ func InitWatcher(directory map[string][]string, fileStatePath string) error {
 	go func() {
 		WatcherWG.Wait() // 阻塞函数
 		k3.K3LogWarn("[InitWatcher] All watcher goroutine exit.")
-		processingWg.Wait() // 阻塞函数, 回收每次读取文件时开的所有协程
+		// processingWg.Wait() // 阻塞函数, 回收每次读取文件时开的所有协程
 		k3.K3LogWarn("[InitWatcher] All processing goroutine exit.")
 		WatcherContextCancel() // 考虑到所有的Watcher的协程都退出了， 保险起见再次发一个退出信号
 	}()
@@ -355,7 +355,7 @@ func handlerEvent(indexName string, event fsnotify.Event, fileStatePath string, 
 }
 
 // processing 协程中处理
-func processing(indexName string, event fsnotify.Event) {
+func processing(indexName string, event fsnotify.Event, processingWg *sync.WaitGroup) {
 	defer processingWg.Done()
 
 	// 1. 判断当前协程数量是否负载, 如果负载processingSem会阻塞，等待其他协程处理完, 队列如果一直是满状态的时候，这里会阻塞
@@ -525,10 +525,15 @@ func writeEvent(indexName string, event fsnotify.Event) {
 	}
 	GlobalFileStatesLock.Unlock()
 
+	var (
+		processingWg = &sync.WaitGroup{}
+	)
+
 	// 每次监听到文件变化，需要开一个协程
 	processingWg.Add(1)
 	// 监测到某个文件有写入，循环读取
-	go processing(indexName, event)
+	go processing(indexName, event, processingWg)
+	go processingWg.Wait()
 }
 
 // 文件或目录创建
@@ -728,6 +733,7 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	var (
 		// 满足需要读取的文件
 		readFilePath = make([]string, 0)
+		processingWg = &sync.WaitGroup{}
 	)
 
 	// 1. 遍历GlobalFileStates中记录的文件，长时间未被操作
@@ -751,14 +757,14 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 		}
 
 		processingWg.Add(1)
-		go processReadObsoleteFile(GlobalFileStates[readFile], obsoleteMaxReadCount)
+		go processReadObsoleteFile(GlobalFileStates[readFile], obsoleteMaxReadCount, processingWg)
 	}
 
 	go processingWg.Wait()
 }
 
 // 毕竟是定时读取，而且是读取长时间未读取的文件，没必要加文件锁
-func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
+func processReadObsoleteFile(fileState *FileState, maxReadCount int, processingWg *sync.WaitGroup) {
 	defer processingWg.Done()
 	processingSem <- struct{}{}
 	defer func() {
@@ -822,11 +828,10 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int) {
 	}
 	GlobalFileStates[fileState.Path].LastReadTime = time.Now().Unix()
 	GlobalFileStatesLock.Unlock()
-
 }
 
 // processReadObsoleteFileBak 废弃
-func processReadObsoleteFileBak(fileState *FileState, maxReadCount int) {
+func processReadObsoleteFileBak(fileState *FileState, maxReadCount int, processingWg *sync.WaitGroup) {
 	defer processingWg.Done()
 	processingSem <- struct{}{}
 	defer func() {
