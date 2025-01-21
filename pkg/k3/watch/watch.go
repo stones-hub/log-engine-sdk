@@ -33,8 +33,9 @@ func (f *FileState) String() string {
 
 // 处理不同类型的协程回收工作
 var (
-	ClockWG   *sync.WaitGroup // 定时器协程的等待退出
-	WatcherWG *sync.WaitGroup // Watch协程的等待退出
+	WatcherWG       *sync.WaitGroup // Watch协程的等待退出
+	ClockWG         *sync.WaitGroup // 定时器协程的等待退出
+	ClockObsoleteWG *sync.WaitGroup
 )
 
 // 处理全局资源的并发问题, 确保GlobalFileStates数据的变更是原子的
@@ -63,13 +64,11 @@ var (
 	processingMap *sync.Map
 )
 
-var (
-	ClockObsoleteWG *sync.WaitGroup
-)
-
 func InitVars() {
-	ClockWG = &sync.WaitGroup{}                                                          // 定时器协程锁
-	WatcherWG = &sync.WaitGroup{}                                                        // Watcher协程锁
+	ClockWG = &sync.WaitGroup{}   // 定时器协程锁
+	WatcherWG = &sync.WaitGroup{} // Watcher协程锁
+	ClockObsoleteWG = &sync.WaitGroup{}
+
 	GlobalFileStatesLock = &sync.Mutex{}                                                 // 全局FileStates锁
 	FileStateFilePath = k3.GetRootPath() + "/" + config.GlobalConfig.Watch.StateFilePath // Watcher读写硬盘的状态文件记录地址
 	GlobalFileStates = make(map[string]*FileState)                                       // 初始化全局FileStates
@@ -77,10 +76,7 @@ func InitVars() {
 	WatcherContext, WatcherContextCancel = context.WithCancel(context.Background()) // Watcher取消上下文
 
 	processingMap = &sync.Map{}
-	// processingWg = &sync.WaitGroup{}
 	processingSem = make(chan struct{}, 100) // 控制最大协程数量为100
-
-	ClockObsoleteWG = &sync.WaitGroup{}
 }
 
 func InitConsumerBatchLog() error {
@@ -538,7 +534,6 @@ func writeEvent(indexName string, event fsnotify.Event) {
 			k3.K3LogWarn("[writeEvent] 所有监听到文件变化所开启的协程被关闭.")
 			processingWg.Wait()
 		}()
-
 	*/
 
 	go processingWg.Wait()
