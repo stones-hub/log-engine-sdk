@@ -827,6 +827,7 @@ func processReadObsoleteFile(fileState *FileState, maxReadCount int, processingW
 
 	if content.Len() > 0 {
 		k3.K3LogInfo("[processReadObsoleteFile] 定时传递数据给Consumer : %s", content.String())
+
 		SendData2Consumer(content.String(), fileState)
 	}
 
