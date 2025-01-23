@@ -21,7 +21,7 @@ const (
 	Blue   = "\033[32m"
 	Yellow = "\033[33m"
 	Green  = "\033[34m"
-	White  = "\033[37m"
+	White  = "\033[38m"
 )
 
 // K3Logger is a logger interface
