@@ -330,7 +330,7 @@ func mustMarshal(v interface{}) string {
 	return string(b)
 }
 
-// TODO 考虑真实提交给ELK的时候失败要记录, 后续需要扩展一下哈
+// TODO 考虑真实提交给ELK的时候失败要记录, 后续需要扩展一下
 func recordSendELKLoseLog(s strings.Builder) {
 	_ = config.GlobalConsumer.Add(protocol.Data{
 		UUID:      "",
