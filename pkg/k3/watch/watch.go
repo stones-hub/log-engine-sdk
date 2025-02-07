@@ -742,7 +742,7 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	// 1. 遍历GlobalFileStates中记录的文件，长时间未被操作
 	for fileName, fileState := range GlobalFileStates {
 		// 查看文件是否满足长时间未读取的条件
-		if duration := time.Now().Unix() - fileState.LastReadTime; duration > int64(obsoleteDate*60*60) {
+		if duration := time.Now().Unix() - fileState.LastReadTime; duration > int64(obsoleteDate*60) {
 			readFilePath = append(readFilePath, fileName)
 		}
 	}
