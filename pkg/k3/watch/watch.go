@@ -764,10 +764,11 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	}
 
 	/*
-		go func() {
-			k3.K3LogWarn("[readObsoleteFiles]所有定时读取的文件协程被回收.")
-			processingWg.Wait()
-		}()
+		    // 如果不需要打印，可以简化
+			go func() {
+				k3.K3LogWarn("[readObsoleteFiles]所有定时读取的文件协程被回收.")
+				processingWg.Wait()
+			}()
 	*/
 
 	go processingWg.Wait()
