@@ -23,6 +23,7 @@ var (
 	BulkData              []*Bulk
 	clockExitCtx          context.Context
 	clockCancel           context.CancelFunc
+	BulkDataLock          *sync.Mutex
 )
 
 type Bulk struct {
@@ -100,7 +101,9 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 		sg:            &sync.WaitGroup{},
 	}
 
+	// 初始化退出上下文和Bulk锁
 	clockExitCtx, clockCancel = context.WithCancel(context.Background())
+	BulkDataLock = &sync.Mutex{}
 
 	c.sg.Add(2)
 	go WriteDataToElasticSearch(c)
@@ -163,13 +166,16 @@ func (e *ElasticSearchClient) Close() error {
 	close(e.dataChan)
 	e.sg.Wait()
 	sendBulkElasticSearch(e.client, true)
-	clockCancel()
+	clockCancel() // 退出定时器
 	return nil
 }
 
+// 多个协程会重入，保证数据安全
 func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
-
 	var buffer strings.Builder
+
+	BulkDataLock.Lock()
+	defer BulkDataLock.Unlock()
 
 	currentBulkSize := len(BulkData)
 	if currentBulkSize == 0 {
@@ -194,7 +200,6 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 		}
 
 		k3.K3LogInfo("[sendBulkElasticSearch] 批量提交给ELK的数据 :%s\n", buffer.String())
-
 		BulkData = make([]*Bulk, 0)
 
 		// 创建批量请求
@@ -369,6 +374,7 @@ func clock(e *ElasticSearchClient) {
 				LastSendTime = time.Now()
 			}
 		case <-clockExitCtx.Done():
+			k3.K3LogDebug("[clock] elk timeout clock goroutine exit")
 			return
 		}
 	}
