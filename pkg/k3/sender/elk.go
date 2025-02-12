@@ -161,6 +161,7 @@ func (e *ElasticSearchClient) Close() error {
 	return nil
 }
 
+// TODO 缺失超时时间来处理发送elk
 func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 
 	var buffer strings.Builder
