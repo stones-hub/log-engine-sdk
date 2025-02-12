@@ -54,7 +54,7 @@ var (
 var (
 	GlobalDataAnalytics k3.DataAnalytics // 日志接收器
 	DefaultSyncInterval = 60             // 单位秒, 默认为60s, 默认定时60秒将GlobalFileStates的状态同步到硬盘
-	DefaultMaxReadCount = 200            // 默认每次读取日志文件的最大次数
+	DefaultMaxReadCount = 10000          // 默认每次读取日志文件的最大次数
 )
 
 // 用于处理读取文件的协程， 控制协程的数量即可，多个文件可以同时读取发送

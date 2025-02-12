@@ -84,7 +84,9 @@ func (k *K3BatchConsumer) Flush() error {
 	if len(k.cacheBuffer) >= k.cacheCapacity || len(k.cacheBuffer) > 0 {
 		// 减少一个cache buffer , 并上传
 		err = k.sender.Send(k.cacheBuffer[0])
-		k.cacheBuffer = k.cacheBuffer[1:]
+		if len(k.cacheBuffer) > 0 {
+			k.cacheBuffer = k.cacheBuffer[1:]
+		}
 	}
 
 	return err
@@ -101,7 +103,9 @@ func (k *K3BatchConsumer) FlushAll() error {
 		if err = k.sender.Send(k.cacheBuffer[0]); err != nil {
 			return err
 		}
-		k.cacheBuffer = k.cacheBuffer[1:]
+		if len(k.cacheBuffer) > 0 {
+			k.cacheBuffer = k.cacheBuffer[1:]
+		}
 	}
 
 	return err
