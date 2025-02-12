@@ -43,6 +43,7 @@ func TestDataAnalytics(t *testing.T) {
 		return
 	}
 
+	// TODO 2544-05-10 08:41:20, 将截止时间改为可配置, 尽量配置大一点
 	dataAnalytics = NewDataAnalytics(consumer)
 
 	dataAnalytics.SetSuperProperties(map[string]interface{}{"user": "yelei", "age": 12})
