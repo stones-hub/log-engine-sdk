@@ -21,6 +21,8 @@ var (
 	DefaultTimeout        = 30    // 秒, 数据发送的超时时间
 	DefaultRetryInterval  = 3     // 秒， 默认队列满等待时间间隔
 	BulkData              []*Bulk
+	clockExitCtx          context.Context
+	clockCancel           context.CancelFunc
 )
 
 type Bulk struct {
@@ -98,6 +100,8 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 		sg:            &sync.WaitGroup{},
 	}
 
+	clockExitCtx, clockCancel = context.WithCancel(context.Background())
+
 	c.sg.Add(2)
 	go WriteDataToElasticSearch(c)
 	go clock(c)
@@ -159,6 +163,7 @@ func (e *ElasticSearchClient) Close() error {
 	close(e.dataChan)
 	e.sg.Wait()
 	sendBulkElasticSearch(e.client, true)
+	clockCancel()
 	return nil
 }
 
@@ -173,6 +178,7 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 
 	// 检查是否满足批量提交的条件
 	if currentBulkSize >= config.GlobalConfig.ELK.BulkSize || force == true {
+		LastSendTime = time.Now() // 记录最后最后一次提交时间
 
 		for _, item := range BulkData {
 			action := map[string]interface{}{
@@ -347,10 +353,23 @@ func recordSendELKLoseLog(s strings.Builder) {
 }
 
 var (
-	LastSendTime = time.Now()
+	LastSendTime time.Time
 )
 
-// clock 定时器，来解决bulk当不满足发送elk需求的时候， 继续发送
+// clock 定时器，来解决bulk当不满足发送elk需求的时候， 继续发送， 可能要加锁， 毕竟2个协程在处理同一个bulk
 func clock(e *ElasticSearchClient) {
-
+	defer e.sg.Done()
+	// 创建一个定时器，每隔1秒执行一次
+	t := time.NewTicker(5 * time.Second)
+	for {
+		select {
+		case <-t.C:
+			if int(time.Now().Unix()-LastSendTime.Unix()) > e.timeout {
+				sendBulkElasticSearch(e.client, true)
+				LastSendTime = time.Now()
+			}
+		case <-clockExitCtx.Done():
+			return
+		}
+	}
 }
