@@ -98,8 +98,9 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 		sg:            &sync.WaitGroup{},
 	}
 
-	c.sg.Add(1)
+	c.sg.Add(2)
 	go WriteDataToElasticSearch(c)
+	go clock(c)
 
 	return c, nil
 }
@@ -161,7 +162,6 @@ func (e *ElasticSearchClient) Close() error {
 	return nil
 }
 
-// TODO 缺失超时时间来处理发送elk
 func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 
 	var buffer strings.Builder
@@ -344,4 +344,13 @@ func recordSendELKLoseLog(s strings.Builder) {
 			"text": s.String(),
 		},
 	})
+}
+
+var (
+	LastSendTime = time.Now()
+)
+
+// clock 定时器，来解决bulk当不满足发送elk需求的时候， 继续发送
+func clock(e *ElasticSearchClient) {
+
 }
