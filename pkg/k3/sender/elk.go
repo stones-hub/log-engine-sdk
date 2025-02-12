@@ -162,11 +162,10 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 }
 
 func (e *ElasticSearchClient) Close() error {
-
 	close(e.dataChan)
+	clockCancel() // 退出定时器
 	e.sg.Wait()
 	sendBulkElasticSearch(e.client, true)
-	clockCancel() // 退出定时器
 	return nil
 }
 
@@ -370,11 +369,12 @@ func clock(e *ElasticSearchClient) {
 		select {
 		case <-t.C:
 			if int(time.Now().Unix()-LastSendTime.Unix()) > e.timeout {
+				k3.K3LogDebug("[clock] 发送数据到 elk.")
 				sendBulkElasticSearch(e.client, true)
 				LastSendTime = time.Now()
 			}
 		case <-clockExitCtx.Done():
-			k3.K3LogDebug("[clock] elk timeout clock goroutine exit")
+			k3.K3LogDebug("[clock] elk clock goroutine exit")
 			return
 		}
 	}
