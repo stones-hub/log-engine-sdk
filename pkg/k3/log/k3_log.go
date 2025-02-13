@@ -50,6 +50,15 @@ func getLogFormatter(t RotateMode) string {
 	}
 }
 
+// 初始化日志文件
+func initLogFile(directory string, format string, prefix string, index int) (*os.File, error) {
+	var (
+		fileName string
+	)
+	fileName = fmt.Sprintf("%s/%s_%s_%d.log", directory, prefix, time.Now().Format(format), index)
+	return os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+}
+
 func NewLogger(directory string, rotate RotateMode, prefix string, size int64, channelSize int, index int) (*Logger, error) {
 	var (
 		logger *Logger
@@ -79,21 +88,13 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 	// 初始化日志文件
 	if fd, err = initLogFile(logger.directory, logger.format, logger.prefix, logger.index); err != nil {
 		return nil, err
+	} else {
+		logger.fd = fd
 	}
-	logger.fd = fd
 
 	logger.wg.Add(1)
 	go run(logger)
 	return logger, nil
-}
-
-// 初始化日志文件
-func initLogFile(directory string, format string, prefix string, index int) (*os.File, error) {
-	var (
-		fileName string
-	)
-	fileName = fmt.Sprintf("%s/%s_%s_%d.log", directory, prefix, time.Now().Format(format), index)
-	return os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
 }
 
 // 协程获取管道数据，写入硬盘文件
@@ -117,6 +118,7 @@ func run(logger *Logger) {
 }
 
 func write(data string) {
+	// 将数据写入硬盘文件
 
 }
 
