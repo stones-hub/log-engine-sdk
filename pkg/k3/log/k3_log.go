@@ -2,8 +2,10 @@ package log
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
+	"time"
 )
 
 /**
@@ -51,6 +53,7 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 	var (
 		log *Log
 		err error
+		fd  *os.File
 	)
 
 	log = &Log{
@@ -73,14 +76,28 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 	}
 
 	// 初始化日志文件
+	if fd, err = initLogFile(log.directory, log.format, log.prefix, log.index); err != nil {
+		return nil, err
+	}
+	log.fd = fd
 
-	return nil, nil
+	run(log)
+
+	return log, nil
 }
 
 // 初始化日志文件
-func initLogFile(directory string, format string, prefix string, index int) error {
+func initLogFile(directory string, format string, prefix string, index int) (*os.File, error) {
+	var (
+		fileName string
+	)
+	fileName = fmt.Sprintf("%s/%s_%s_%d.log", directory, prefix, time.Now().Format(format), index)
+	return os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+}
 
-	return nil
+// 协程获取管道数据，写入硬盘文件
+func run(log *Log) {
+
 }
 
 func write(data string) {
