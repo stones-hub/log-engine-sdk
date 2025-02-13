@@ -23,6 +23,18 @@ const (
 	ROTATE_HOURLY RotateMode = 1
 )
 
+type Log struct {
+	index     int             // 文件索引
+	directory string          // 日志存储地址
+	format    string          // 时间格式
+	prefix    string          // 文件前缀
+	size      int64           // 单个文件大小
+	fd        *os.File        // 当前记录日志的文件fd
+	wg        *sync.WaitGroup // 协程退出等待
+	ch        chan []byte     // 队列
+	mutex     *sync.RWMutex   // 读写锁
+}
+
 // 获取日志轮转类型
 func getLogFormatter(t RotateMode) string {
 	switch t {
@@ -69,18 +81,6 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 func initLogFile(directory string, format string, prefix string, index int) error {
 
 	return nil
-}
-
-type Log struct {
-	index     int             // 文件索引
-	directory string          // 日志存储地址
-	format    string          // 时间格式
-	prefix    string          // 文件前缀
-	size      int64           // 单个文件大小
-	fd        *os.File        // 当前记录日志的文件fd
-	wg        *sync.WaitGroup // 协程退出等待
-	ch        chan []byte     // 队列
-	mutex     *sync.RWMutex   // 读写锁
 }
 
 func write(data string) {
