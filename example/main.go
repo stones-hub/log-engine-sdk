@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"log-engine-sdk/pkg/k3"
-	"log-engine-sdk/pkg/k3/log"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
 	_ "net/http/pprof"
@@ -116,13 +115,13 @@ type TestData struct {
 }
 
 func main() {
-	logger, err := log.NewLogger("/Users/yelei/data/code/go-projects/log-engine-sdk/logs", 0, "test", 1024*1024*1024, 10, 0)
+	logger, err := k3.NewLogger("/Users/yelei/data/code/go-projects/log-engine-sdk/logs", 0, "test", 1024*1024*1024, 10, 0)
 	fmt.Println(err)
 	for i := 0; i < 20; i++ {
 		logger.Add("123131321231231")
 	}
 
-	logger2, err2 := log.NewLogger("/Users/yelei/data/code/go-projects/log-engine-sdk/logs", 0, "test", 1024*1024*1024, 10, 0)
+	logger2, err2 := k3.NewLogger("/Users/yelei/data/code/go-projects/log-engine-sdk/logs", 0, "test", 1024*1024*1024, 10, 0)
 	fmt.Println(err2)
 	for i := 0; i < 30; i++ {
 		logger2.Add("111111111111")

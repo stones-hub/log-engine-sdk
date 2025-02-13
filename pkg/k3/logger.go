@@ -1,4 +1,4 @@
-package log
+package k3
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 当前日志组件，支撑日志轮转，轮转方式采用文件大小和时间格式的方式，时间格式支持小时和天为单位
 */
 
-type RotateMode int
+// type RotateMode int
 
 type IBaseLog interface {
 	Add(data interface{}) error
@@ -22,10 +22,13 @@ type IBaseLog interface {
 	Close() error
 }
 
+/*
 const (
 	ROTATE_DAILY  RotateMode = 0
 	ROTATE_HOURLY RotateMode = 1
 )
+
+*/
 
 type Logger struct {
 	index     int             // 文件索引
@@ -95,7 +98,7 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 	return logger, nil
 }
 
-// Add  TODO 将数据加入到管道, 协程管道的写或者读操作都是原子的，在没有多协程同时对一个管道执行读/写操作时，无需加锁
+// Add  将数据加入到管道, 协程管道的写或者读操作都是原子的，在没有多协程同时对一个管道执行读/写操作时，无需加锁
 func (l *Logger) Add(data interface{}) error {
 	var s string
 
@@ -188,6 +191,7 @@ func (l *Logger) write(data string) {
 
 // 回收资源
 func (l *Logger) Close() error {
+	fmt.Println("close logger......")
 	close(l.ch)
 	l.wg.Wait()
 	if l.fd != nil {
