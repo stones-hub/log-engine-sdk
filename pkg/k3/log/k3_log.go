@@ -19,7 +19,7 @@ type LogInterface interface {
 }
 
 type Log struct {
-	fileIndex      int            // 文件索引
+	index          int            // 文件索引
 	directory      string         // 日志存储地址
 	dateFormat     string         // 时间格式
 	fileSize       int64          // 单个文件大小
