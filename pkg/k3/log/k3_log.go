@@ -32,7 +32,7 @@ type Logger struct {
 	directory string          // 日志存储地址
 	format    string          // 时间格式
 	prefix    string          // 文件前缀
-	size      int64           // 单个文件大小
+	size      int64           // 日志文件最大大小
 	fd        *os.File        // 当前记录日志的文件fd
 	wg        *sync.WaitGroup // 协程退出等待
 	ch        chan []byte     // 队列
@@ -132,7 +132,7 @@ func (l *Logger) Flush() {
 		select {
 		case res, ok := <-l.ch:
 			if !ok {
-				log.Println("flush log data")
+				log.Println("flush log data, channel is closed.")
 				return
 			}
 			l.write(string(res))
@@ -144,6 +144,7 @@ func (l *Logger) write(data string) {
 	var (
 		logFileName string
 		err         error
+		fileInfo    os.FileInfo
 	)
 
 	// 获取当前应该写入的文件
@@ -164,6 +165,23 @@ func (l *Logger) write(data string) {
 	}
 
 	// 解决日志超过最大轮转问题
+	if l.size > 0 {
+		if fileInfo, err = l.fd.Stat(); err != nil {
+			log.Fatalf("get file stat error: %s", err.Error())
+			return
+		}
+
+		if fileInfo.Size() >= l.size {
+			l.fd.Sync()
+			l.fd.Close()
+			l.index++
+			logFileName = getLogFileName(l.directory, l.format, l.prefix, l.index)
+			if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
+				log.Fatalf("open log file failed: %s", err.Error())
+				return
+			}
+		}
+	}
 
 	fmt.Fprintf(l.fd, "%s\n", data)
 }
