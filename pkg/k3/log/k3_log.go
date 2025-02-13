@@ -101,7 +101,7 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 func run(logger *Logger) {
 	defer func() {
 		if e := recover(); e != nil {
-			log.Println("panic:", e)
+			log.Println("logger panic:", e)
 		}
 		logger.wg.Done()
 	}()
