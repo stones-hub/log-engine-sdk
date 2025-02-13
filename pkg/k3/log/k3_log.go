@@ -59,6 +59,7 @@ func initLogFile(directory string, format string, prefix string, index int) (*os
 	return os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
 }
 
+// NewLogger 多个场景都会生成一个Logger对象来记录适合自己模块的日志文件
 func NewLogger(directory string, rotate RotateMode, prefix string, size int64, channelSize int, index int) (*Logger, error) {
 	var (
 		logger *Logger
