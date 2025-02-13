@@ -110,9 +110,10 @@ func run(logger *Logger) {
 		select {
 		case res, ok := <-logger.ch:
 			if !ok {
+				log.Println("logger close")
 				return
 			}
-			write(string(res))
+
 		}
 	}
 }
@@ -122,11 +123,8 @@ func write(data string) {
 
 }
 
-// Add 将数据加入到管道
+// Add  TODO 将数据加入到管道, 协程管道的写或者读操作都是原子的，在没有多协程同时对一个管道执行读/写操作时，无需加锁
 func (l *Logger) Add(data interface{}) error {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
 	var s string
 
 	switch v := data.(type) {
