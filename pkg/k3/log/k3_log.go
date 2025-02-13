@@ -35,6 +35,42 @@ func getLogFormatter(t RotateMode) string {
 	}
 }
 
+func NewLogger(directory string, rotate RotateMode, prefix string, size int64, channelSize int, index int) (*Log, error) {
+	var (
+		log *Log
+		err error
+	)
+
+	log = &Log{
+		index:     index,
+		directory: directory,
+		format:    getLogFormatter(rotate),
+		prefix:    prefix,
+		size:      size,
+		fd:        nil,
+		wg:        &sync.WaitGroup{},
+		ch:        make(chan []byte, channelSize),
+		mutex:     &sync.RWMutex{},
+	}
+
+	// 初始化日志目录
+	if _, err = os.Stat(log.directory); err != nil && os.IsNotExist(err) {
+		if err = os.MkdirAll(log.directory, os.ModePerm); err != nil {
+			return nil, err
+		}
+	}
+
+	// 初始化日志文件
+
+	return nil, nil
+}
+
+// 初始化日志文件
+func initLogFile(directory string, format string, prefix string, index int) error {
+
+	return nil
+}
+
 type Log struct {
 	index     int             // 文件索引
 	directory string          // 日志存储地址
