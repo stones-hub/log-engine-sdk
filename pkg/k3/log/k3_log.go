@@ -2,6 +2,7 @@ package log
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -17,7 +18,7 @@ type RotateMode int
 
 type IBaseLog interface {
 	Add(data interface{}) error
-	Flush() error
+	Flush()
 	Close() error
 }
 
@@ -92,36 +93,9 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 	} else {
 		logger.fd = fd
 	}
-
 	logger.wg.Add(1)
-	go run(logger)
+	go logger.Flush()
 	return logger, nil
-}
-
-// 协程获取管道数据，写入硬盘文件
-func run(logger *Logger) {
-	defer func() {
-		if e := recover(); e != nil {
-			log.Println("logger panic:", e)
-		}
-		logger.wg.Done()
-	}()
-
-	for {
-		select {
-		case res, ok := <-logger.ch:
-			if !ok {
-				log.Println("logger close")
-				return
-			}
-
-		}
-	}
-}
-
-func write(data string) {
-	// 将数据写入硬盘文件
-
 }
 
 // Add  TODO 将数据加入到管道, 协程管道的写或者读操作都是原子的，在没有多协程同时对一个管道执行读/写操作时，无需加锁
@@ -141,16 +115,37 @@ func (l *Logger) Add(data interface{}) error {
 		s = string(jsonData)
 	}
 
-	l.ch <- []byte(s)
-	return nil
+	if l.ch != nil {
+		l.ch <- []byte(s)
+		return nil
+	} else {
+		return errors.New("add event failed, Logger has been closed ")
+	}
 }
 
-func (l *Logger) Flush() error {
-	//TODO implement me
-	panic("implement me")
+func (l *Logger) Flush() {
+	for {
+		select {
+		case res, ok := <-l.ch:
+			if !ok {
+				log.Println("flush log data")
+				return
+			}
+			l.write(string(res))
+		}
+	}
+}
+
+func (l *Logger) write(data string) {
+
 }
 
 func (l *Logger) Close() error {
 	l.wg.Wait()
+	if l.fd != nil {
+		_ = l.fd.Sync()
+		_ = l.fd.Close()
+		l.fd = nil
+	}
 	return nil
 }
