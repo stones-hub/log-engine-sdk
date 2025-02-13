@@ -153,12 +153,12 @@ func (l *Logger) write(data string) {
 	if l.fd != nil && l.fd.Name() != logFileName {
 		l.fd.Sync()
 		l.fd.Close()
-		if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
+		if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644); err != nil {
 			log.Fatalf("open log file failed: %s", err.Error())
 			return
 		}
 	} else if l.fd == nil {
-		if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
+		if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644); err != nil {
 			log.Fatalf("open log file failed: %s", err.Error())
 			return
 		}
@@ -176,7 +176,7 @@ func (l *Logger) write(data string) {
 			l.fd.Close()
 			l.index++
 			logFileName = getLogFileName(l.directory, l.format, l.prefix, l.index)
-			if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
+			if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644); err != nil {
 				log.Fatalf("open log file failed: %s", err.Error())
 				return
 			}
