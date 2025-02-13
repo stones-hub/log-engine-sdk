@@ -36,7 +36,6 @@ type Logger struct {
 	fd        *os.File        // 当前记录日志的文件fd
 	wg        *sync.WaitGroup // 协程退出等待
 	ch        chan []byte     // 队列
-	mutex     *sync.RWMutex   // 读写锁
 }
 
 // 获取日志轮转类型
@@ -74,7 +73,6 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 		fd:        nil,
 		wg:        &sync.WaitGroup{},
 		ch:        make(chan []byte, channelSize),
-		mutex:     &sync.RWMutex{},
 	}
 
 	// 初始化日志目录
@@ -147,21 +145,25 @@ func (l *Logger) write(data string) {
 		logFileName string
 		err         error
 	)
+
 	// 获取当前应该写入的文件
 	logFileName = getLogFileName(l.directory, l.format, l.prefix, l.index)
 
 	if l.fd != nil && l.fd.Name() != logFileName {
+		l.fd.Sync()
 		l.fd.Close()
 		if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
 			log.Fatalf("open log file failed: %s", err.Error())
+			return
 		}
-		return
 	} else if l.fd == nil {
 		if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
 			log.Fatalf("open log file failed: %s", err.Error())
 			return
 		}
 	}
+
+	// 解决日志超过最大轮转问题
 
 	fmt.Fprintf(l.fd, "%s\n", data)
 }
