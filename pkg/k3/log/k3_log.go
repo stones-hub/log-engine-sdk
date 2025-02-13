@@ -3,6 +3,7 @@ package log
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -25,7 +26,7 @@ const (
 	ROTATE_HOURLY RotateMode = 1
 )
 
-type Log struct {
+type Logger struct {
 	index     int             // 文件索引
 	directory string          // 日志存储地址
 	format    string          // 时间格式
@@ -49,14 +50,14 @@ func getLogFormatter(t RotateMode) string {
 	}
 }
 
-func NewLogger(directory string, rotate RotateMode, prefix string, size int64, channelSize int, index int) (*Log, error) {
+func NewLogger(directory string, rotate RotateMode, prefix string, size int64, channelSize int, index int) (*Logger, error) {
 	var (
-		log *Log
-		err error
-		fd  *os.File
+		logger *Logger
+		err    error
+		fd     *os.File
 	)
 
-	log = &Log{
+	logger = &Logger{
 		index:     index,
 		directory: directory,
 		format:    getLogFormatter(rotate),
@@ -69,21 +70,21 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 	}
 
 	// 初始化日志目录
-	if _, err = os.Stat(log.directory); err != nil && os.IsNotExist(err) {
-		if err = os.MkdirAll(log.directory, os.ModePerm); err != nil {
+	if _, err = os.Stat(logger.directory); err != nil && os.IsNotExist(err) {
+		if err = os.MkdirAll(logger.directory, os.ModePerm); err != nil {
 			return nil, err
 		}
 	}
 
 	// 初始化日志文件
-	if fd, err = initLogFile(log.directory, log.format, log.prefix, log.index); err != nil {
+	if fd, err = initLogFile(logger.directory, logger.format, logger.prefix, logger.index); err != nil {
 		return nil, err
 	}
-	log.fd = fd
+	logger.fd = fd
 
-	run(log)
-
-	return log, nil
+	logger.wg.Add(1)
+	go run(logger)
+	return logger, nil
 }
 
 // 初始化日志文件
@@ -96,8 +97,23 @@ func initLogFile(directory string, format string, prefix string, index int) (*os
 }
 
 // 协程获取管道数据，写入硬盘文件
-func run(log *Log) {
+func run(logger *Logger) {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Println("panic:", e)
+		}
+		logger.wg.Done()
+	}()
 
+	for {
+		select {
+		case res, ok := <-logger.ch:
+			if !ok {
+				return
+			}
+			write(string(res))
+		}
+	}
 }
 
 func write(data string) {
@@ -105,7 +121,7 @@ func write(data string) {
 }
 
 // Add 将数据加入到管道
-func (l *Log) Add(data interface{}) error {
+func (l *Logger) Add(data interface{}) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -128,12 +144,12 @@ func (l *Log) Add(data interface{}) error {
 	return nil
 }
 
-func (l *Log) Flush() error {
+func (l *Logger) Flush() error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l *Log) Close() error {
+func (l *Logger) Close() error {
 	l.wg.Wait()
 	return nil
 }
