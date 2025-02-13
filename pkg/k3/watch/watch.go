@@ -701,7 +701,7 @@ func ClockSyncObsoleteFile(directory map[string][]string, filePath string) {
 
 		t *time.Ticker
 	)
-	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Minute)
+	t = time.NewTicker(time.Duration(obsoleteInterval) * time.Second)
 
 	ClockObsoleteWG.Add(1)
 	go func() {
@@ -742,7 +742,7 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 	// 1. 遍历GlobalFileStates中记录的文件，长时间未被操作
 	for fileName, fileState := range GlobalFileStates {
 		// 查看文件是否满足长时间未读取的条件
-		if duration := time.Now().Unix() - fileState.LastReadTime; duration > int64(obsoleteDate*60) {
+		if duration := time.Now().Unix() - fileState.LastReadTime; duration > int64(obsoleteDate) {
 			readFilePath = append(readFilePath, fileName)
 		}
 	}
@@ -762,14 +762,6 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 		processingWg.Add(1)
 		go processReadObsoleteFile(GlobalFileStates[readFile], obsoleteMaxReadCount, processingWg)
 	}
-
-	/*
-		    // 如果不需要打印，可以简化
-			go func() {
-				k3.K3LogWarn("[readObsoleteFiles]所有定时读取的文件协程被回收.")
-				processingWg.Wait()
-			}()
-	*/
 
 	go processingWg.Wait()
 }

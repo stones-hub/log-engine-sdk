@@ -1,7 +1,7 @@
 # watch监控目录列表
 watch :
   read_path : # read_path每个Key的目录不可以重复，且value不可以包含相同的子集
-    test_test_index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx", "/Users/yelei/data/code/go-projects/logs/nginx_temp"] # 必须是目录
+    test_test_index_nginx: ["/Users/yelei/data/code/go-projects/logs/nginx"] # 必须是目录
     test_test_index_admin : [ "/Users/yelei/data/code/go-projects/logs/admin"]
     test_test_index_api : [ "/Users/yelei/data/code/go-projects/logs/api"]
     test_test_index_test : ["/Users/yelei/data/code/go-projects/logs/test"]
@@ -9,6 +9,6 @@ watch :
   sync_interval : 60 # 单位秒，默认60, 程序运行过程中，要定时落盘
   state_file_path : "state/core.json" # 记录监控文件的offset
 
-  obsolete_interval : 5 # 单位分钟, 默认1 表示定时多久时间检查文件是否已经读完了
-  obsolete_date : 1 # 单位分钟， 默认1， 表示文件如果1小时没有写入, 就查看下是不是读取完了，没读完就读完整个文件.
-  obsolete_max_read_count : 1000 # 对于长时间没有读写的文件， 一次最大读取次数
+  obsolete_interval : 5 # 单位秒, 默认5 表示定时多久时间检查文件是否已经读完了
+  obsolete_date : 1 # 单位秒，默认1，表示如果obsolete_date秒 日志文件没有任何操作，证明日志文件是一个历史文件，需要追溯剩余未发送到elk的数据
+  obsolete_max_read_count : 2 # 对于长时间没有读写的文件， 一次最大读取次数
