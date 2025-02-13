@@ -51,21 +51,18 @@ func getLogFormatter(t RotateMode) string {
 	}
 }
 
-// 初始化日志文件
-func initLogFile(directory string, format string, prefix string, index int) (*os.File, error) {
-	var (
-		fileName string
-	)
-	fileName = fmt.Sprintf("%s/%s_%s_%d.log", directory, prefix, time.Now().Format(format), index)
-	return os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+// 获取当前应该写入的文件路径和文件名
+func getLogFileName(directory string, format string, prefix string, index int) string {
+	return fmt.Sprintf("%s/%s_%s_%d.log", directory, prefix, time.Now().Format(format), index)
 }
 
 // NewLogger 多个场景都会生成一个Logger对象来记录适合自己模块的日志文件
 func NewLogger(directory string, rotate RotateMode, prefix string, size int64, channelSize int, index int) (*Logger, error) {
 	var (
-		logger *Logger
-		err    error
-		fd     *os.File
+		logger      *Logger
+		err         error
+		fd          *os.File
+		logFileName string
 	)
 
 	logger = &Logger{
@@ -88,11 +85,13 @@ func NewLogger(directory string, rotate RotateMode, prefix string, size int64, c
 	}
 
 	// 初始化日志文件
-	if fd, err = initLogFile(logger.directory, logger.format, logger.prefix, logger.index); err != nil {
+	logFileName = getLogFileName(logger.directory, logger.format, logger.prefix, logger.index)
+
+	if fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
 		return nil, err
-	} else {
-		logger.fd = fd
 	}
+	logger.fd = fd
+
 	logger.wg.Add(1)
 	go logger.Flush()
 	return logger, nil
@@ -124,6 +123,13 @@ func (l *Logger) Add(data interface{}) error {
 }
 
 func (l *Logger) Flush() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Logger Flush goroutine panic: ", r)
+		}
+		l.wg.Done()
+	}()
+
 	for {
 		select {
 		case res, ok := <-l.ch:
@@ -137,15 +143,38 @@ func (l *Logger) Flush() {
 }
 
 func (l *Logger) write(data string) {
+	var (
+		logFileName string
+		err         error
+	)
+	// 获取当前应该写入的文件
+	logFileName = getLogFileName(l.directory, l.format, l.prefix, l.index)
 
+	if l.fd != nil && l.fd.Name() != logFileName {
+		l.fd.Close()
+		if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
+			log.Fatalf("open log file failed: %s", err.Error())
+		}
+		return
+	} else if l.fd == nil {
+		if l.fd, err = os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666); err != nil {
+			log.Fatalf("open log file failed: %s", err.Error())
+			return
+		}
+	}
+
+	fmt.Fprintf(l.fd, "%s\n", data)
 }
 
+// 回收资源
 func (l *Logger) Close() error {
+	close(l.ch)
 	l.wg.Wait()
 	if l.fd != nil {
 		_ = l.fd.Sync()
 		_ = l.fd.Close()
 		l.fd = nil
 	}
+	l.ch = nil
 	return nil
 }
