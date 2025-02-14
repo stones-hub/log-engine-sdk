@@ -21,9 +21,6 @@ var (
 	DefaultTimeout        = 30    // 秒, 数据发送的超时时间
 	DefaultRetryInterval  = 3     // 秒， 默认队列满等待时间间隔
 	BulkData              []*Bulk
-	clockExitCtx          context.Context
-	clockCancel           context.CancelFunc
-	BulkDataLock          *sync.Mutex
 )
 
 type Bulk struct {
@@ -101,13 +98,8 @@ func NewElasticsearchWithConfig(elasticsearchConfig config.ELK) (*ElasticSearchC
 		sg:            &sync.WaitGroup{},
 	}
 
-	// 初始化退出上下文和Bulk锁
-	clockExitCtx, clockCancel = context.WithCancel(context.Background())
-	BulkDataLock = &sync.Mutex{}
-
-	c.sg.Add(2)
+	c.sg.Add(1)
 	go WriteDataToElasticSearch(c)
-	go clock(c)
 
 	return c, nil
 }
@@ -163,7 +155,6 @@ func WriteDataToElasticSearch(client *ElasticSearchClient) {
 
 func (e *ElasticSearchClient) Close() error {
 	close(e.dataChan)
-	clockCancel() // 退出定时器
 	e.sg.Wait()
 	sendBulkElasticSearch(e.client, true)
 	return nil
@@ -173,9 +164,6 @@ func (e *ElasticSearchClient) Close() error {
 func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 	var buffer strings.Builder
 
-	BulkDataLock.Lock()
-	defer BulkDataLock.Unlock()
-
 	currentBulkSize := len(BulkData)
 	if currentBulkSize == 0 {
 		return
@@ -183,7 +171,6 @@ func sendBulkElasticSearch(client *elasticsearch.Client, force bool) {
 
 	// 检查是否满足批量提交的条件
 	if currentBulkSize >= config.GlobalConfig.ELK.BulkSize || force == true {
-		LastSendTime = time.Now() // 记录最后最后一次提交时间
 
 		for _, item := range BulkData {
 			action := map[string]interface{}{
@@ -354,28 +341,4 @@ func recordSendELKLoseLog(s strings.Builder) {
 			"text": s.String(),
 		},
 	})
-}
-
-var (
-	LastSendTime time.Time
-)
-
-// clock 定时器，来解决bulk当不满足发送elk需求的时候， 继续发送， 可能要加锁， 毕竟2个协程在处理同一个bulk
-func clock(e *ElasticSearchClient) {
-	defer e.sg.Done()
-	// 创建一个定时器，每隔1秒执行一次
-	t := time.NewTicker(5 * time.Second)
-	for {
-		select {
-		case <-t.C:
-			if int(time.Now().Unix()-LastSendTime.Unix()) > e.timeout {
-				k3.K3LogDebug("[clock] 发送数据到 elk.")
-				sendBulkElasticSearch(e.client, true)
-				LastSendTime = time.Now()
-			}
-		case <-clockExitCtx.Done():
-			k3.K3LogDebug("[clock] elk clock goroutine exit")
-			return
-		}
-	}
 }

@@ -3,11 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
 	"log-engine-sdk/pkg/k3/sender"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"time"
@@ -117,14 +115,20 @@ type TestData struct {
 }
 
 func main() {
-	// watch.Run()
+	logger, err := k3.NewLogger("/Users/yelei/data/code/go-projects/log-engine-sdk/logs", 0, "test", 1024*1024*1024, 10, 0)
+	fmt.Println(err)
+	for i := 0; i < 20; i++ {
+		logger.Add("123131321231231")
+	}
 
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-	// 你的应用逻辑
-	select {} // 阻塞主 goroutine，防止应用退出
+	logger2, err2 := k3.NewLogger("/Users/yelei/data/code/go-projects/log-engine-sdk/logs", 0, "test", 1024*1024*1024, 10, 0)
+	fmt.Println(err2)
+	for i := 0; i < 30; i++ {
+		logger2.Add("111111111111")
+	}
 
+	logger.Close()
+	logger2.Close()
 }
 
 func TestAddData() {

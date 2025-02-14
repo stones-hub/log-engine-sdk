@@ -7,7 +7,7 @@ elk:
   logstash: ["http://192.168.3.35:5044"]
   max_retries: 5 # 最大重试次数
   retry_interval: 1 # 重试等待时间
-  timeout: 5 # bulk_size不满足的时候，超过多长时间，强制写入. 单位秒
+  timeout: 5 # 暂时未使用
   default_index_name: "logstash" # 默认elk index name
   is_use_suffix_date: true # 是否使用日期作为后缀的index
   bulk_size: 10 # 批量单次写入elk的日志条数

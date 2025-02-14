@@ -71,7 +71,7 @@ func main() {
 		FileNamePrefix: "disk",
 		ChannelSize:    1024,
 	})
-	defer config.GlobalConsumer.Close()
+	//  defer config.GlobalConsumer.Close()
 
 	/*
 		fmt.Println("----------------------------------")
@@ -188,6 +188,9 @@ EXIT:
 			cleanFunc()
 		}
 	}
+	// TODO: 这里有个问题，为啥用defer的方式函数并没有调用
+	config.GlobalConsumer.Close()
+	k3.GlobalLogger.Close()
 	time.Sleep(1 * time.Second)
 	os.Exit(state)
 }
