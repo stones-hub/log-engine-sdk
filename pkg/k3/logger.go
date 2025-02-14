@@ -182,7 +182,7 @@ func (l *Logger) write(data string) {
 		}
 	}
 
-	fmt.Fprintf(l.fd, "%s\n", data)
+	fmt.Fprintf(l.fd, "[%s]: %s\n", time.Now().Format("2006-01-02 15:04:05"), data)
 }
 
 // Close 回收资源
