@@ -19,11 +19,10 @@ import (
 )
 
 var (
-	ConfigPath  string // Makefile 中设置，解决config path不在项目内的问题
-	Tag         string
-	Version     string
-	BuildTime   string
-	DebugLogger *k3.Logger
+	ConfigPath string // Makefile 中设置，解决config path不在项目内的问题
+	Tag        string
+	Version    string
+	BuildTime  string
 )
 
 func main() {
@@ -77,7 +76,7 @@ func main() {
 	// ==========================
 	// 初始化通用日志
 	// ==========================
-	DebugLogger, err = k3.NewLogger(config.GlobalConfig.System.LogPath,
+	config.GlobalLogger, err = k3.NewLogger(config.GlobalConfig.System.LogPath,
 		k3.ROTATE_DAILY,
 		"debug",
 		1024,
@@ -204,7 +203,7 @@ EXIT:
 	}
 	// TODO: 这里有个问题，为啥用defer的方式函数并没有调用
 	config.GlobalConsumer.Close()
-	DebugLogger.Close()
+	config.GlobalLogger.Close()
 	time.Sleep(1 * time.Second)
 	os.Exit(state)
 }

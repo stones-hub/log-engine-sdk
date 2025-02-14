@@ -755,9 +755,12 @@ func readObsoleteFiles(obsoleteDate, obsoleteMaxReadCount int) {
 			continue
 		} else {
 			if fileInfo.Size() == GlobalFileStates[readFile].Offset {
+				config.GlobalLogger.Add(readFile + " 文件已经读取完了.")
 				continue
 			}
 		}
+
+		config.GlobalLogger.Add("长时间未读取文件:" + readFile + " 将要被读取.")
 
 		processingWg.Add(1)
 		go processReadObsoleteFile(GlobalFileStates[readFile], obsoleteMaxReadCount, processingWg)

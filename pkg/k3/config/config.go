@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/koding/multiconfig"
+	"log-engine-sdk/pkg/k3"
 	"log-engine-sdk/pkg/k3/protocol"
 	"strings"
 	"sync"
@@ -74,6 +75,8 @@ var (
 	GlobalConfig = new(Config)
 	// GlobalConsumer 日志处理模块
 	GlobalConsumer protocol.K3Consumer
+	// GlobalLogger 日志记录模块
+	GlobalLogger *k3.Logger
 )
 
 func MustLoad(fpaths ...string) {
