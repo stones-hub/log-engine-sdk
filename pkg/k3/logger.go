@@ -213,7 +213,7 @@ func init() {
 	GlobalLogger, err = NewLogger(path+"/logs",
 		ROTATE_DAILY,
 		"debug",
-		1024,
+		1024*1024*1024,
 		1024,
 		0)
 	if err != nil {
