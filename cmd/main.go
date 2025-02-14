@@ -73,19 +73,6 @@ func main() {
 	})
 	//  defer config.GlobalConsumer.Close()
 
-	// ==========================
-	// 初始化通用日志
-	// ==========================
-	config.GlobalLogger, err = k3.NewLogger(config.GlobalConfig.System.LogPath,
-		k3.ROTATE_DAILY,
-		"debug",
-		1024,
-		1024,
-		0)
-	if err != nil {
-		return
-	}
-
 	/*
 		fmt.Println("----------------------------------")
 		fmt.Printf("configDir : %s\n", configDir)
@@ -203,7 +190,7 @@ EXIT:
 	}
 	// TODO: 这里有个问题，为啥用defer的方式函数并没有调用
 	config.GlobalConsumer.Close()
-	config.GlobalLogger.Close()
+	k3.GlobalLogger.Close()
 	time.Sleep(1 * time.Second)
 	os.Exit(state)
 }

@@ -198,3 +198,25 @@ func (l *Logger) Close() error {
 	log.Println("close logger success.")
 	return nil
 }
+
+var (
+	GlobalLogger *Logger
+)
+
+func init() {
+	var (
+		err  error
+		path string
+	)
+
+	path, err = os.Getwd()
+	GlobalLogger, err = NewLogger(path+"/logs",
+		ROTATE_DAILY,
+		"debug",
+		1024,
+		1024,
+		0)
+	if err != nil {
+		log.Fatalf("init logger failed: %s", err.Error())
+	}
+}
