@@ -10,25 +10,21 @@ import (
 	"time"
 )
 
-/**
-当前日志组件，支撑日志轮转，轮转方式采用文件大小和时间格式的方式，时间格式支持小时和天为单位
+/*
+type RotateMode int
+const (
+	ROTATE_DAILY  RotateMode = 0
+	ROTATE_HOURLY RotateMode = 1
+)
 */
 
-// type RotateMode int
+// 当前日志组件，支撑日志轮转，轮转方式采用文件大小和时间格式的方式，时间格式支持小时和天为单位
 
 type IBaseLog interface {
 	Add(data interface{}) error
 	Flush()
 	Close() error
 }
-
-/*
-const (
-	ROTATE_DAILY  RotateMode = 0
-	ROTATE_HOURLY RotateMode = 1
-)
-
-*/
 
 type Logger struct {
 	index     int             // 文件索引
@@ -189,9 +185,8 @@ func (l *Logger) write(data string) {
 	fmt.Fprintf(l.fd, "%s\n", data)
 }
 
-// 回收资源
+// Close 回收资源
 func (l *Logger) Close() error {
-	fmt.Println("close logger......")
 	close(l.ch)
 	l.wg.Wait()
 	if l.fd != nil {
@@ -200,5 +195,6 @@ func (l *Logger) Close() error {
 		l.fd = nil
 	}
 	l.ch = nil
+	log.Println("close logger success.")
 	return nil
 }
