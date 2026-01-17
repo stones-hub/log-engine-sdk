@@ -30,3 +30,4 @@ state/*
 cmd/log-engine-sdk/*
 logs/*
 release/*
+.DS_Store
